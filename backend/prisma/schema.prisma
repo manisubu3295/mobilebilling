@@ -1,0 +1,362 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum Role {
+  SUPER_ADMIN
+  STORE_MANAGER
+  BILLING_CLERK
+  INVENTORY_MANAGER
+}
+
+enum ProductType {
+  ENGINE
+  ELECTRICAL
+  BODY_FRAME
+  BRAKES_SUSPENSION
+  FILTERS_FLUIDS
+  CHAIN_SPROCKET
+  TRANSMISSION
+  ACCESSORIES
+  OTHER
+}
+
+enum StockStatus {
+  IN_STOCK
+  SOLD
+  RESERVED
+  DEFECTIVE_RMA
+}
+
+enum InvoiceStatus {
+  DRAFT
+  PAID
+  PARTIALLY_PAID
+  CANCELLED
+  RETURNED
+}
+
+enum PaymentMode {
+  CASH
+  CREDIT_CARD
+  DEBIT_CARD
+  UPI
+  BANK_TRANSFER
+  EMI
+}
+
+enum AuditAction {
+  STOCK_IN
+  STOCK_OUT
+  STOCK_ADJUST
+  PRICE_CHANGE
+  INVOICE_CREATE
+  INVOICE_CANCEL
+  RETURN_PROCESS
+  USER_CREATE
+  USER_UPDATE
+  DISCOUNT_OVERRIDE
+}
+
+// ─── Users & Store ────────────────────────────────────────────────────────────
+
+model Store {
+  id          String   @id @default(cuid())
+  name        String
+  address     String?
+  phone       String?
+  gstNumber   String?  @map("gst_number")
+  logoUrl     String?  @map("logo_url")
+  staticQrUrl String?  @map("static_qr_url")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  users     User[]
+  inventory SerialInventory[]
+  invoices  Invoice[]
+  products  Product[]
+  skus      SKU[]
+  auditLogs AuditLog[]
+
+  @@map("stores")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  phone        String?
+  passwordHash String   @map("password_hash")
+  name         String
+  role         Role
+  isActive     Boolean  @default(true) @map("is_active")
+  storeId      String   @map("store_id")
+  store        Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  refreshTokens RefreshToken[]
+  invoices      Invoice[]
+  auditLogs     AuditLog[]
+
+  @@index([email])
+  @@index([storeId])
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([token])
+  @@map("refresh_tokens")
+}
+
+// ─── Products & Inventory ─────────────────────────────────────────────────────
+
+model Category {
+  id       String    @id @default(cuid())
+  name     String    @unique
+  products Product[]
+
+  @@map("categories")
+}
+
+model Supplier {
+  id      String  @id @default(cuid())
+  name    String
+  phone   String?
+  email   String?
+  address String?
+  gstin   String?
+
+  purchaseOrders PurchaseOrder[]
+  inventory      SerialInventory[]
+
+  @@map("suppliers")
+}
+
+model Product {
+  id               String      @id @default(cuid())
+  name             String
+  brand            String      @default("Royal Enfield")
+  partNumber       String?     @map("part_number")   // OEM Part Number
+  compatibleModels String?     @map("compatible_models") // e.g. "Classic 350, Meteor 350"
+  type             ProductType
+  categoryId       String      @map("category_id")
+  category         Category    @relation(fields: [categoryId], references: [id])
+  storeId          String      @map("store_id")
+  store            Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  description      String?
+  hsnCode          String?     @map("hsn_code")
+  createdAt        DateTime    @default(now()) @map("created_at")
+  updatedAt        DateTime    @updatedAt @map("updated_at")
+
+  skus SKU[]
+
+  @@index([storeId])
+  @@index([partNumber])
+  @@map("products")
+}
+
+model SKU {
+  id                String   @id @default(cuid())
+  productId         String   @map("product_id")
+  product           Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  storeId           String   @map("store_id")
+  store             Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  variantName       String   @map("variant_name")   // e.g. "Standard", "BS6", "Chrome"
+  unit              String   @default("PCS")         // PCS, SET, LITER, PAIR, METER
+  isSerialized      Boolean  @default(false) @map("is_serialized") // false = bulk qty tracking
+  stockQty          Int      @default(0) @map("stock_qty")         // for non-serialized parts
+  costPrice         Decimal  @map("cost_price") @db.Decimal(10, 2)
+  sellingPrice      Decimal  @map("selling_price") @db.Decimal(10, 2)
+  taxRate           Decimal  @default(18) @map("tax_rate") @db.Decimal(5, 2)
+  lowStockThreshold Int      @default(5) @map("low_stock_threshold")
+  barcode           String?  @unique
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  serialInventory    SerialInventory[]
+  invoiceItems       InvoiceItem[]
+  purchaseOrderItems PurchaseOrderItem[]
+
+  @@index([productId])
+  @@index([storeId])
+  @@index([barcode])
+  @@map("skus")
+}
+
+model SerialInventory {
+  id            String      @id @default(cuid())
+  skuId         String      @map("sku_id")
+  sku           SKU         @relation(fields: [skuId], references: [id], onDelete: Cascade)
+  storeId       String      @map("store_id")
+  store         Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  supplierId    String?     @map("supplier_id")
+  supplier      Supplier?   @relation(fields: [supplierId], references: [id])
+  serialNumber  String?     @unique @map("serial_number") // for serialized high-value parts
+  batchNumber   String?     @map("batch_number")          // batch/lot tracking
+  status        StockStatus @default(IN_STOCK)
+  purchasedAt   DateTime?   @map("purchased_at")
+  soldAt        DateTime?   @map("sold_at")
+  invoiceItemId String?     @map("invoice_item_id")
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+
+  invoiceItem InvoiceItem? @relation(fields: [invoiceItemId], references: [id])
+
+  @@index([serialNumber])
+  @@index([skuId])
+  @@index([storeId])
+  @@map("serial_inventory")
+}
+
+// ─── Purchase Orders ──────────────────────────────────────────────────────────
+
+model PurchaseOrder {
+  id         String            @id @default(cuid())
+  supplierId String            @map("supplier_id")
+  supplier   Supplier          @relation(fields: [supplierId], references: [id])
+  status     String            @default("DRAFT")
+  notes      String?
+  createdAt  DateTime          @default(now()) @map("created_at")
+  updatedAt  DateTime          @updatedAt @map("updated_at")
+
+  items PurchaseOrderItem[]
+
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id              String        @id @default(cuid())
+  purchaseOrderId String        @map("purchase_order_id")
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  skuId           String        @map("sku_id")
+  sku             SKU           @relation(fields: [skuId], references: [id])
+  quantity        Int
+  unitCost        Decimal       @map("unit_cost") @db.Decimal(10, 2)
+
+  @@map("purchase_order_items")
+}
+
+// ─── Customers ────────────────────────────────────────────────────────────────
+
+model Customer {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String   @unique
+  email     String?
+  address   String?
+  gstin     String?
+  vehicleNo String?  @map("vehicle_no")   // e.g. TN01AB1234
+  reModel   String?  @map("re_model")     // e.g. Classic 350
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  invoices Invoice[]
+
+  @@index([phone])
+  @@map("customers")
+}
+
+// ─── Invoices & Payments ──────────────────────────────────────────────────────
+
+model Invoice {
+  id             String        @id @default(cuid())
+  invoiceNumber  String        @unique @map("invoice_number")
+  storeId        String        @map("store_id")
+  store          Store         @relation(fields: [storeId], references: [id])
+  customerId     String?       @map("customer_id")
+  customer       Customer?     @relation(fields: [customerId], references: [id])
+  createdById    String        @map("created_by_id")
+  createdBy      User          @relation(fields: [createdById], references: [id])
+  status         InvoiceStatus @default(DRAFT)
+  subtotal       Decimal       @db.Decimal(10, 2)
+  discountType   String?       @map("discount_type")
+  discountValue  Decimal       @default(0) @map("discount_value") @db.Decimal(10, 2)
+  discountAmount Decimal       @default(0) @map("discount_amount") @db.Decimal(10, 2)
+  taxAmount      Decimal       @map("tax_amount") @db.Decimal(10, 2)
+  totalAmount    Decimal       @map("total_amount") @db.Decimal(10, 2)
+  paidAmount     Decimal       @default(0) @map("paid_amount") @db.Decimal(10, 2)
+  notes          String?
+  managerOverride Boolean      @default(false) @map("manager_override")
+  overriddenById  String?      @map("overridden_by_id")
+  qrPayload      String?       @map("qr_payload")
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  items    InvoiceItem[]
+  payments Payment[]
+
+  @@index([invoiceNumber])
+  @@index([storeId])
+  @@index([customerId])
+  @@index([createdAt])
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id           String  @id @default(cuid())
+  invoiceId    String  @map("invoice_id")
+  invoice      Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  skuId        String  @map("sku_id")
+  sku          SKU     @relation(fields: [skuId], references: [id])
+  quantity     Int
+  returnedQty  Int     @default(0) @map("returned_qty")
+  unitPrice    Decimal @map("unit_price") @db.Decimal(10, 2)
+  taxRate      Decimal @map("tax_rate") @db.Decimal(5, 2)
+  taxAmount    Decimal @map("tax_amount") @db.Decimal(10, 2)
+  lineTotal    Decimal @map("line_total") @db.Decimal(10, 2)
+  hsnCode      String? @map("hsn_code")
+
+  serialUnits SerialInventory[]
+
+  @@map("invoice_items")
+}
+
+model Payment {
+  id        String      @id @default(cuid())
+  invoiceId String      @map("invoice_id")
+  invoice   Invoice     @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  mode      PaymentMode
+  amount    Decimal     @db.Decimal(10, 2)
+  reference String?
+  paidAt    DateTime    @default(now()) @map("paid_at")
+
+  @@index([invoiceId])
+  @@map("payments")
+}
+
+// ─── Audit Logs ───────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id         String      @id @default(cuid())
+  storeId    String      @map("store_id")
+  store      Store       @relation(fields: [storeId], references: [id])
+  userId     String      @map("user_id")
+  user       User        @relation(fields: [userId], references: [id])
+  action     AuditAction
+  entityType String      @map("entity_type")
+  entityId   String      @map("entity_id")
+  oldValues  Json?       @map("old_values")
+  newValues  Json?       @map("new_values")
+  ipAddress  String?     @map("ip_address")
+  createdAt  DateTime    @default(now()) @map("created_at")
+
+  @@index([storeId])
+  @@index([userId])
+  @@index([entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
