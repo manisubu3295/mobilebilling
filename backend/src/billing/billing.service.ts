@@ -315,8 +315,9 @@ export class BillingService {
 
     if (from || to) {
       where.createdAt = {};
-      if (from) where.createdAt.gte = new Date(from);
-      if (to)   where.createdAt.lte = new Date(to);
+      // Append IST offset so "2026-06-17" means IST midnight, not UTC midnight
+      if (from) where.createdAt.gte = new Date(from + 'T00:00:00+05:30');
+      if (to)   where.createdAt.lte = new Date(to   + 'T23:59:59+05:30');
     }
 
     if (status && Object.values(InvoiceStatus).includes(status as InvoiceStatus)) {

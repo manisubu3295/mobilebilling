@@ -299,6 +299,10 @@ function buildHtml(invoice: PrintInvoice, qrDataUrl: string): string {
 }
 
 export async function printReceipt(invoice: PrintInvoice): Promise<void> {
+  // Open the window synchronously within the user gesture so iOS Safari allows it.
+  // Do async work (QR generation) only after the window is already open.
+  const win = window.open('', '_blank', 'width=420,height=700,scrollbars=yes,resizable=yes');
+
   let qrDataUrl = '';
   if (invoice.qrPayload) {
     try {
@@ -312,10 +316,9 @@ export async function printReceipt(invoice: PrintInvoice): Promise<void> {
   }
 
   const html = buildHtml(invoice, qrDataUrl);
-  const win = window.open('', '_blank', 'width=420,height=700,scrollbars=yes,resizable=yes');
 
   if (!win) {
-    // Pop-up blocked — fall back to same-window print
+    // Pop-up blocked — fall back to hidden iframe
     const iframe = document.createElement('iframe');
     iframe.style.position = 'fixed';
     iframe.style.top = '-9999px';

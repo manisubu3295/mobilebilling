@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(powershell -Command \"Get-Service -Name postgresql* 2>&1 | Select-Object Name,Status; pg_isready 2>&1; psql -V 2>&1\")",
+      "Bash(npx ts-node *)",
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(node dist/main.js)",
+      "Bash(node dist/src/main.js)",
+      "Read(//tmp/**)",
+      "Bash(curl -s -X POST http://localhost:4000/api/v1/auth/login -H 'Content-Type: application/json' -d '{\"email\":\"admin@aadhirai.com\",\"password\":\"Admin@1234\"}')",
+      "Bash(python -m json.tool)",
+      "Bash(curl -s -X POST http://localhost:4000/api/v1/auth/login -H \"Content-Type: application/json\" -d '{\"email\":\"admin@aadhirai.com\",\"password\":\"Admin@1234\"}')",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(f'Status: {d[\\\\\"status\\\\\"]}, soldAt: {d[\\\\\"soldAt\\\\\"]}, invoiceItemId: {d[\\\\\"invoiceItemId\\\\\"]}'\\)\")",
+      "Bash(echo \"\")",
+      "Bash(echo \"=== Test: Discount >15% blocked for clerk ===\")",
+      "Bash(curl -s -X POST http://localhost:4000/api/v1/auth/login -H 'Content-Type: application/json' -d '{\"email\":\"clerk@aadhirai.com\",\"password\":\"Clerk@1234\"}')",
+      "Bash(curl -s http://localhost:3000/)",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\" http://localhost:3000/login)",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\" http://localhost:3000/billing/checkout)",
+      "Bash(pkill -f \"node dist/src/main\")",
+      "PowerShell(Start-Sleep -Seconds 10; Invoke-WebRequest -Uri \"http://localhost:3000\" -UseBasicParsing -TimeoutSec 5 | Select-Object -ExpandProperty StatusCode 2>&1)",
+      "PowerShell(Start-Sleep -Seconds 6; $token = \\(Invoke-RestMethod -Uri \"http://localhost:4000/api/v1/auth/login\" -Method POST -ContentType \"application/json\" -Body '{\"email\":\"admin@aadhirai.com\",\"password\":\"Admin@1234\"}'\\).accessToken; $h = @{\"Authorization\"=\"Bearer $token\"}; Invoke-RestMethod -Uri \"http://localhost:4000/api/v1/billing/lookup/search?q=Air Filter\" -Headers $h | ConvertTo-Json -Depth 3)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000)",
+      "Bash(curl *)",
+      "PowerShell(Stop-Process *)",
+      "PowerShell(\\(Get-WmiObject Win32_Process -Filter \"ProcessId=15832\"\\).CommandLine; \\(Get-WmiObject Win32_Process -Filter \"ProcessId=17232\"\\).CommandLine)"
+    ]
+  }
+}

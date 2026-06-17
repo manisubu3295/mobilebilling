@@ -81,8 +81,9 @@ export default function InvoicesPage() {
 
   /* filters */
   const [search, setSearch]       = useState('');
-  const [dateFrom, setDateFrom]   = useState('');
-  const [dateTo, setDateTo]       = useState('');
+  const today = new Date().toISOString().slice(0, 10);
+  const [dateFrom, setDateFrom]   = useState(today);
+  const [dateTo, setDateTo]       = useState(today);
   const [statusFilter, setStatus] = useState('');
   const searchTimer               = useRef<ReturnType<typeof setTimeout>>();
 
@@ -261,12 +262,12 @@ export default function InvoicesPage() {
                 <X className="h-4 w-4" />
               </button>
             )}
-            {(search || statusFilter || dateFrom || dateTo) && (
+            {(search || statusFilter || dateFrom !== today || dateTo !== today) && (
               <button
-                onClick={() => { setSearch(''); setStatus(''); setDateFrom(''); setDateTo(''); }}
+                onClick={() => { setSearch(''); setStatus(''); setDateFrom(today); setDateTo(today); }}
                 className="ml-2 text-xs text-red-600 hover:text-red-800 font-medium"
               >
-                Clear all
+                Reset
               </button>
             )}
           </div>

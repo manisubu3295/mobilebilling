@@ -63,9 +63,9 @@ export function CartTable() {
                 <p className="text-xs text-gray-400">(+₹{lineTax.toFixed(0)} GST)</p>
                 <button
                   onClick={() => removeItem(item.skuId)}
-                  className="mt-1.5 p-1.5 rounded hover:bg-red-100 text-gray-300 hover:text-red-600"
+                  className="mt-1.5 p-3 rounded hover:bg-red-100 text-gray-300 hover:text-red-600 min-w-[44px] min-h-[44px] flex items-center justify-center"
                 >
-                  <Trash2 className="h-3.5 w-3.5" />
+                  <Trash2 className="h-4 w-4" />
                 </button>
               </div>
             </div>

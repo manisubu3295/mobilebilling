@@ -9,6 +9,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
+import { SkipThrottle, Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -22,10 +23,13 @@ const COOKIE_OPTS = {
 };
 
 @Controller('auth')
+@SkipThrottle()
 export class AuthController {
   constructor(private authService: AuthService) {}
 
   @Post('login')
+  @SkipThrottle({ default: false })
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
   @HttpCode(HttpStatus.OK)
   async login(@Body() dto: LoginDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const ipAddress = req.ip;

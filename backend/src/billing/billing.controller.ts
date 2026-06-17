@@ -10,6 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { Request } from 'express';
+import { SkipThrottle } from '@nestjs/throttler';
 import { BillingService } from './billing.service';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
@@ -20,6 +21,7 @@ import { Role } from '@prisma/client';
 
 @Controller('billing')
 @UseGuards(JwtAuthGuard, RolesGuard)
+@SkipThrottle()
 export class BillingController {
   constructor(private billingService: BillingService) {}
 
@@ -83,8 +85,9 @@ export class BillingController {
     @Query('from') from: string,
     @Query('to') to: string,
   ) {
-    const fromDate = from ? new Date(from) : (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; })();
-    const toDate = to ? new Date(to) : new Date();
+    // Use IST offset so date strings map to IST midnight / end-of-day
+    const fromDate = from ? new Date(from + 'T00:00:00+05:30') : new Date(new Date().toLocaleDateString('en-CA') + 'T00:00:00+05:30');
+    const toDate   = to   ? new Date(to   + 'T23:59:59+05:30') : new Date(new Date().toLocaleDateString('en-CA') + 'T23:59:59+05:30');
     return this.billingService.getCollectionsSummary(storeId, fromDate, toDate);
   }
 }
