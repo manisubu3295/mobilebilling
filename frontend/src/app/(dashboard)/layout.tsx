@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   ShoppingCart, Package, Users, FileText,
   BarChart2, Settings, LogOut, Wrench, Menu, X, UserCircle, Landmark,
@@ -22,8 +22,13 @@ const NAV = [
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { user, logout } = useAuthStore();
+  const router   = useRouter();
+  const { user, logout, isAuthenticated } = useAuthStore();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    if (!isAuthenticated) router.replace('/login');
+  }, [isAuthenticated, router]);
 
   const visibleNav = NAV.filter((n) => !user || n.roles.includes(user.role));
 
@@ -96,7 +101,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <p className="text-xs text-gray-500">{user?.role?.replace(/_/g, ' ')}</p>
           </div>
           <button
-            onClick={() => logout()}
+            onClick={async () => { await logout(); router.replace('/login'); }}
             className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-400
                        hover:bg-gray-800 hover:text-white transition-colors"
           >

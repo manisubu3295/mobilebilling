@@ -1,5 +1,16 @@
-import { redirect } from 'next/navigation';
+'use client';
+
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuthStore } from '@/store/auth.store';
 
 export default function Home() {
-  redirect('/billing/checkout');
+  const router = useRouter();
+  const { isAuthenticated } = useAuthStore();
+
+  useEffect(() => {
+    router.replace(isAuthenticated ? '/billing/checkout' : '/login');
+  }, [isAuthenticated, router]);
+
+  return null;
 }
