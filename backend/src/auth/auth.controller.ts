@@ -23,12 +23,10 @@ const COOKIE_OPTS = {
 };
 
 @Controller('auth')
-@SkipThrottle()
 export class AuthController {
   constructor(private authService: AuthService) {}
 
   @Post('login')
-  @SkipThrottle({ default: false })
   @Throttle({ default: { ttl: 60000, limit: 5 } })
   @HttpCode(HttpStatus.OK)
   async login(@Body() dto: LoginDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
@@ -39,6 +37,7 @@ export class AuthController {
   }
 
   @Post('refresh')
+  @SkipThrottle()
   @HttpCode(HttpStatus.OK)
   async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const token = req.cookies?.[REFRESH_COOKIE];
@@ -48,6 +47,7 @@ export class AuthController {
   }
 
   @Post('logout')
+  @SkipThrottle()
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.NO_CONTENT)
   async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {

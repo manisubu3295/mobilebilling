@@ -66,9 +66,9 @@ export function ImeiScanner() {
       quantity: 1,
       unitPrice: parseFloat(sku.sellingPrice),
       taxRate: parseFloat(sku.taxRate),
+      unit: sku.unit ?? 'pcs',
+      isSerialized: true,
       serialIds: [found.id],
-      imei1: found.imei1 ?? undefined,
-      imei2: found.imei2 ?? undefined,
       hsnCode: sku.product.hsnCode ?? undefined,
     });
     setInput('');

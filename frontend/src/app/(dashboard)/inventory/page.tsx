@@ -587,7 +587,7 @@ function AddStockModal({
 }
 
 function Field({ label, value, onChange, type = 'text', placeholder = '' }: {
-  label: string; value: string; onChange: any; type?: string; placeholder?: string;
+  label: string; value: string; onChange: (e: React.ChangeEvent<HTMLInputElement>) => void; type?: string; placeholder?: string;
 }) {
   return (
     <div>
