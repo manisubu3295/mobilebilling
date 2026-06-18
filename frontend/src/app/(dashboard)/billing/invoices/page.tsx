@@ -92,38 +92,42 @@ export default function InvoicesPage() {
   const [modalLoading, setML]     = useState(false);
 
   /* action state */
-  const [cancelling, setCancelling]   = useState(false);
-  const [returnModal, setReturnModal] = useState(false);
-  const [returnQtys, setReturnQtys]   = useState<Record<string, number>>({});
-  const [returning, setReturning]     = useState(false);
-  const [actionError, setActionError] = useState<string | null>(null);
+  const [cancelling, setCancelling]     = useState(false);
+  const [confirmCancel, setConfirmCancel] = useState(false);
+  const [returnModal, setReturnModal]   = useState(false);
+  const [returnQtys, setReturnQtys]     = useState<Record<string, number>>({});
+  const [returning, setReturning]       = useState(false);
+  const [actionError, setActionError]   = useState<string | null>(null);
+
+  const [listError, setListError] = useState('');
 
   /* ── Load list ────────────────────────────────────────────────── */
   const load = useCallback(async (
     p = 1, sq = search, from = dateFrom, to = dateTo, st = statusFilter,
   ) => {
     setLoading(true);
+    setListError('');
     try {
       const params = new URLSearchParams({ page: String(p), limit: '20' });
       if (sq.trim()) params.set('search', sq.trim());
-      if (from)      params.set('from', `${from}T00:00:00.000Z`);
-      if (to)        params.set('to',   `${to}T23:59:59.999Z`);
+      if (from)      params.set('from', from);   // plain YYYY-MM-DD; backend adds IST offset
+      if (to)        params.set('to',   to);
       if (st)        params.set('status', st);
       const { data } = await api.get(`/billing/invoices?${params}`);
       setInvoices(data.data);
       setTotal(data.total);
       setPage(p);
-    } catch { /* ignore */ } finally {
+    } catch (e: any) {
+      setListError(e?.response?.data?.message || 'Failed to load invoices');
+    } finally {
       setLoading(false);
     }
   }, [search, dateFrom, dateTo, statusFilter]);
 
-  useEffect(() => { load(1); }, []);           // initial load
-
-  /* debounce search + instant-apply status/date changes */
+  /* debounce all filter changes; fires on mount too (initial load) */
   useEffect(() => {
     clearTimeout(searchTimer.current);
-    searchTimer.current = setTimeout(() => load(1, search, dateFrom, dateTo, statusFilter), 400);
+    searchTimer.current = setTimeout(() => load(1, search, dateFrom, dateTo, statusFilter), 300);
     return () => clearTimeout(searchTimer.current);
   }, [search, dateFrom, dateTo, statusFilter]);
 
@@ -136,8 +140,9 @@ export default function InvoicesPage() {
       setSelected(data);
       setReturnQtys({});
       setReturnModal(false);
-    } catch { alert('Could not load invoice'); }
-    finally { setML(false); }
+    } catch (e: any) {
+      setActionError(e?.response?.data?.message || 'Could not load invoice');
+    } finally { setML(false); }
   };
 
   /* ── Print receipt ────────────────────────────────────────────── */
@@ -149,11 +154,11 @@ export default function InvoicesPage() {
   /* ── Full cancel ──────────────────────────────────────────────── */
   const handleCancel = async () => {
     if (!selected) return;
-    if (!confirm(`Cancel invoice ${selected.invoiceNumber} and restock all items?`)) return;
     setCancelling(true);
     setActionError(null);
     try {
       await api.patch(`/billing/invoices/${selected.id}/cancel`);
+      setConfirmCancel(false);
       await handleView(selected.id);
       load(page);
     } catch (e: any) {
@@ -280,10 +285,15 @@ export default function InvoicesPage() {
           <div className="flex justify-center items-center h-40 text-gray-400">
             <RefreshCw className="h-6 w-6 animate-spin mr-2" /> Loading…
           </div>
+        ) : listError ? (
+          <div className="flex flex-col items-center justify-center h-40 text-red-500 gap-2">
+            <p>{listError}</p>
+            <button onClick={() => load(1)} className="text-sm text-red-700 underline">Retry</button>
+          </div>
         ) : invoices.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-40 text-gray-400 gap-2">
             <FileText className="h-10 w-10 opacity-40" />
-            <p>{search || dateFrom || dateTo ? 'No invoices match your filters' : 'No invoices yet'}</p>
+            <p>{search || statusFilter ? 'No invoices match your filters' : 'No invoices for this date range'}</p>
           </div>
         ) : (
           <>
@@ -430,7 +440,7 @@ export default function InvoicesPage() {
                       {selected.createdBy && ` · ${selected.createdBy.name}`}
                     </p>
                   </div>
-                  <button onClick={() => { setSelected(null); setReturnModal(false); setActionError(null); }} className="text-gray-400 hover:text-gray-700 ml-3">
+                  <button onClick={() => { setSelected(null); setReturnModal(false); setConfirmCancel(false); setActionError(null); }} className="text-gray-400 hover:text-gray-700 ml-3">
                     <X className="h-5 w-5" />
                   </button>
                 </div>
@@ -601,7 +611,7 @@ export default function InvoicesPage() {
 
                   {isManager && selected.status !== 'CANCELLED' && selected.status !== 'RETURNED' && (
                     <>
-                      {!returnModal && (
+                      {!returnModal && !confirmCancel && (
                         <button
                           onClick={openReturnModal}
                           className="flex items-center gap-2 px-4 py-2 border border-purple-300 text-purple-700 rounded-lg text-sm font-medium hover:bg-purple-50"
@@ -609,14 +619,33 @@ export default function InvoicesPage() {
                           <RotateCcw className="h-4 w-4" /> Return Items
                         </button>
                       )}
-                      <button
-                        onClick={handleCancel}
-                        disabled={cancelling}
-                        className="flex items-center gap-2 px-4 py-2 border border-red-300 text-red-600 rounded-lg text-sm font-medium hover:bg-red-50 disabled:opacity-50 ml-auto"
-                      >
-                        <XCircle className="h-4 w-4" />
-                        {cancelling ? 'Cancelling…' : 'Cancel Invoice'}
-                      </button>
+                      <div className="ml-auto flex items-center gap-2">
+                        {confirmCancel ? (
+                          <>
+                            <span className="text-xs text-red-600 font-medium">Restock all items and cancel?</span>
+                            <button
+                              onClick={handleCancel}
+                              disabled={cancelling}
+                              className="px-3 py-2 bg-red-700 text-white rounded-lg text-sm font-semibold hover:bg-red-800 disabled:opacity-50"
+                            >
+                              {cancelling ? 'Cancelling…' : 'Yes, Cancel'}
+                            </button>
+                            <button
+                              onClick={() => setConfirmCancel(false)}
+                              className="px-3 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50"
+                            >
+                              No
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            onClick={() => setConfirmCancel(true)}
+                            className="flex items-center gap-2 px-4 py-2 border border-red-300 text-red-600 rounded-lg text-sm font-medium hover:bg-red-50"
+                          >
+                            <XCircle className="h-4 w-4" /> Cancel Invoice
+                          </button>
+                        )}
+                      </div>
                     </>
                   )}
                 </div>
