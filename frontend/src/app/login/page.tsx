@@ -21,7 +21,10 @@ export default function LoginPage() {
       await login(email, password);
       router.push('/billing/checkout');
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Invalid credentials');
+      setError(
+        err.response?.data?.message ||
+        (err.request ? 'Cannot reach server. Check your Wi-Fi connection.' : 'Login failed'),
+      );
     } finally {
       setLoading(false);
     }

@@ -103,7 +103,7 @@ export default function InventoryPage() {
 
   return (
     <div className="h-full flex flex-col bg-gray-50">
-      <div className="bg-white border-b px-6 py-4 flex items-center justify-between">
+      <div className="bg-white border-b px-4 sm:px-6 py-4 flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Parts Inventory</h1>
           <p className="text-sm text-gray-500 mt-0.5">
@@ -128,7 +128,7 @@ export default function InventoryPage() {
       </div>
 
       {/* Tabs */}
-      <div className="bg-white border-b px-6 flex gap-4">
+      <div className="bg-white border-b px-4 sm:px-6 flex gap-4">
         {(['products', 'alerts'] as const).map((t) => (
           <button
             key={t}
@@ -151,7 +151,7 @@ export default function InventoryPage() {
         ))}
       </div>
 
-      <div className="flex-1 overflow-auto p-6">
+      <div className="flex-1 overflow-auto p-4 sm:p-6">
         {activeTab === 'products' ? (
           <>
             <div className="relative mb-4">
@@ -216,7 +216,7 @@ export default function InventoryPage() {
                             const stock = effectiveStock(sku);
                             const isLow = stock <= sku.lowStockThreshold;
                             return (
-                              <div key={sku.id} className="px-5 py-3 flex items-center gap-4">
+                              <div key={sku.id} className="px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
                                 <div className="flex-1 min-w-0">
                                   <p className="font-medium text-sm text-gray-900">{sku.variantName}</p>
                                   <p className="text-xs text-gray-500">
@@ -227,7 +227,7 @@ export default function InventoryPage() {
                                     {sku.barcode && ` · Barcode: ${sku.barcode}`}
                                   </p>
                                 </div>
-                                <div className="flex items-center gap-3 shrink-0">
+                                <div className="flex items-center gap-3 shrink-0 flex-wrap">
                                   <div className="text-right">
                                     <p className={`font-bold text-sm ${isLow ? 'text-red-600' : 'text-green-700'}`}>
                                       {stock} {sku.unit}

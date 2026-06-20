@@ -52,20 +52,20 @@ export default function UsersPage() {
 
   return (
     <div className="h-full flex flex-col bg-gray-50">
-      <div className="bg-white border-b px-6 py-4 flex items-center justify-between">
+      <div className="bg-white border-b px-4 sm:px-6 py-4 flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-gray-900">User Management</h1>
           <p className="text-sm text-gray-500 mt-0.5">{users.length} users in this store</p>
         </div>
         <button
           onClick={() => setShowAdd(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-red-700 text-white rounded-lg text-sm font-medium hover:bg-red-800"
+          className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-red-700 text-white rounded-lg text-sm font-medium hover:bg-red-800"
         >
-          <Plus className="h-4 w-4" /> Add User
+          <Plus className="h-4 w-4" /> <span className="hidden sm:inline">Add User</span>
         </button>
       </div>
 
-      <div className="flex-1 overflow-auto p-6">
+      <div className="flex-1 overflow-auto p-4 sm:p-6">
         {loading ? (
           <div className="flex justify-center items-center h-40 text-gray-400">Loading…</div>
         ) : (

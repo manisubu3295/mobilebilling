@@ -14,8 +14,15 @@ async function bootstrap() {
   app.use(helmet());
   app.use(cookieParser());
   app.setGlobalPrefix('api/v1');
+  const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:3000')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
   app.enableCors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    origin: (origin, cb) => {
+      if (!origin || allowedOrigins.includes(origin)) cb(null, true);
+      else cb(new Error('Not allowed by CORS'));
+    },
     credentials: true,
   });
   app.useGlobalPipes(

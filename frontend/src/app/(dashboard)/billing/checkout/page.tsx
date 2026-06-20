@@ -110,11 +110,11 @@ export default function CheckoutPage() {
         )}
       </div>
 
-      {/* Desktop: side-by-side | Mobile: stacked scrollable */}
-      <div className="flex-1 overflow-hidden flex flex-col lg:flex-row">
+      {/* Desktop: side-by-side | Mobile: stacked + sticky checkout */}
+      <div className="flex-1 overflow-auto lg:overflow-hidden flex flex-col lg:flex-row">
 
         {/* ── Left panel: customer + scanner + cart ───────────────── */}
-        <div className="flex flex-col lg:flex-[2] min-h-0 border-b lg:border-b-0 lg:border-r bg-white">
+        <div className="flex flex-col lg:flex-[2] lg:min-h-0 border-b lg:border-b-0 lg:border-r bg-white">
           {/* Customer */}
           <div className="p-3 border-b shrink-0">
             <CustomerSearch
@@ -126,15 +126,15 @@ export default function CheckoutPage() {
           <div className="p-3 border-b shrink-0">
             <PartScanner />
           </div>
-          {/* Cart — scrollable */}
-          <div className="flex-1 overflow-auto min-h-[120px]">
+          {/* Cart */}
+          <div className="overflow-auto min-h-[160px] lg:flex-1">
             <CartTable />
           </div>
         </div>
 
         {/* ── Right panel: summary + payment + checkout ────────────── */}
-        <div className="flex flex-col lg:flex-[1] min-h-0 bg-gray-50">
-          <div className="flex-1 overflow-auto p-3 space-y-3">
+        <div className="flex flex-col lg:flex-[1] lg:min-h-0 bg-gray-50">
+          <div className="p-3 space-y-3 lg:flex-1 lg:overflow-auto">
             <InvoiceSummary />
             <PaymentPanel />
           </div>
@@ -145,8 +145,8 @@ export default function CheckoutPage() {
             </div>
           )}
 
-          {/* Sticky checkout button */}
-          <div className="p-3 border-t bg-white shrink-0">
+          {/* Sticky checkout button — sticks to bottom on mobile */}
+          <div className="p-3 border-t bg-white shrink-0 sticky bottom-0 lg:static z-10">
             <button
               onClick={handleCheckout}
               disabled={isSubmitting || store.items.length === 0}
