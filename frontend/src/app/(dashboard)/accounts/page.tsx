@@ -80,8 +80,8 @@ function getRangeDates(range: RangeId, customFrom: string, customTo: string): { 
     `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
   if (range === 'today') {
-    const d = iso(now);
-    return { from: `${d}T00:00:00.000Z`, to: now.toISOString() };
+    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+    return { from: start.toISOString(), to: now.toISOString() };
   }
   if (range === 'week') {
     const day = now.getDay(); // 0=Sun

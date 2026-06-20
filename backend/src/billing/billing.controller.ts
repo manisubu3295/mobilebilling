@@ -85,9 +85,8 @@ export class BillingController {
     @Query('from') from: string,
     @Query('to') to: string,
   ) {
-    // Use IST offset so date strings map to IST midnight / end-of-day
-    const fromDate = from ? new Date(from + 'T00:00:00+05:30') : new Date(new Date().toLocaleDateString('en-CA') + 'T00:00:00+05:30');
-    const toDate   = to   ? new Date(to   + 'T23:59:59+05:30') : new Date(new Date().toLocaleDateString('en-CA') + 'T23:59:59+05:30');
+    const fromDate = from ? new Date(from) : new Date(new Date().toLocaleDateString('en-CA') + 'T00:00:00+05:30');
+    const toDate   = to   ? new Date(to)   : new Date(new Date().toLocaleDateString('en-CA') + 'T23:59:59+05:30');
     return this.billingService.getCollectionsSummary(storeId, fromDate, toDate);
   }
 }
