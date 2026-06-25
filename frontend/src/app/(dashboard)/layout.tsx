@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   ShoppingCart, Package, Users, FileText,
-  BarChart2, Settings, LogOut, Wrench, Menu, X, UserCircle, Landmark,
+  BarChart2, Settings, LogOut, Wrench, Menu, X, UserCircle, Landmark, BookOpen,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
 
@@ -100,6 +100,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <p className="text-xs font-semibold text-gray-300 truncate">{user?.name}</p>
             <p className="text-xs text-gray-500">{user?.role?.replace(/_/g, ' ')}</p>
           </div>
+          <a
+            href="/docs/user-guide.html"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-400
+                       hover:bg-gray-800 hover:text-white transition-colors"
+          >
+            <BookOpen className="h-4 w-4" /> User Guide
+          </a>
           <button
             onClick={async () => { await logout(); router.replace('/login'); }}
             className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-400
