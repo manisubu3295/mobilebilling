@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Aadhirai Royal Enfield — User Guide</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #222; }
+
+    /* Header */
+    .header { background: #111; color: #fff; padding: 32px 48px; display: flex; align-items: center; gap: 20px; }
+    .header-icon { width: 52px; height: 52px; background: #c0392b; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 26px; }
+    .header h1 { font-size: 26px; font-weight: 700; }
+    .header p { font-size: 14px; color: #aaa; margin-top: 4px; }
+
+    /* Nav */
+    .toc { background: #fff; border-bottom: 1px solid #e0e0e0; padding: 0 48px; display: flex; gap: 0; overflow-x: auto; }
+    .toc a { padding: 14px 18px; text-decoration: none; color: #555; font-size: 13px; font-weight: 500; white-space: nowrap; border-bottom: 3px solid transparent; }
+    .toc a:hover { color: #c0392b; border-bottom-color: #c0392b; }
+
+    /* Main */
+    .main { max-width: 960px; margin: 0 auto; padding: 40px 24px 80px; }
+
+    /* Section */
+    .section { background: #fff; border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.08); margin-bottom: 40px; overflow: hidden; }
+    .section-header { padding: 24px 32px 20px; border-bottom: 1px solid #f0f0f0; display: flex; align-items: center; gap: 14px; }
+    .section-num { width: 32px; height: 32px; background: #c0392b; color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; flex-shrink: 0; }
+    .section-header h2 { font-size: 20px; font-weight: 700; }
+    .section-header p { font-size: 13px; color: #777; margin-top: 2px; }
+    .section-body { padding: 24px 32px; }
+
+    /* Screenshot */
+    .screenshot { width: 100%; border-radius: 8px; border: 1px solid #e0e0e0; margin: 16px 0; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+    .screenshot-caption { font-size: 12px; color: #888; text-align: center; margin-top: -8px; margin-bottom: 16px; font-style: italic; }
+
+    /* Steps */
+    .steps { counter-reset: step; list-style: none; }
+    .steps li { counter-increment: step; display: flex; gap: 14px; margin-bottom: 14px; align-items: flex-start; }
+    .steps li::before { content: counter(step); min-width: 26px; height: 26px; background: #f0f0f0; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #444; flex-shrink: 0; margin-top: 1px; }
+    .steps li span { font-size: 14px; line-height: 1.6; color: #333; }
+
+    /* Tips */
+    .tip { background: #fff8f0; border-left: 4px solid #f39c12; border-radius: 6px; padding: 12px 16px; margin: 14px 0; font-size: 13px; color: #555; }
+    .tip strong { color: #c0392b; }
+    .note { background: #f0f4ff; border-left: 4px solid #4a6cf7; border-radius: 6px; padding: 12px 16px; margin: 14px 0; font-size: 13px; color: #444; }
+
+    /* Role badges */
+    .badge { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; margin-left: 8px; }
+    .badge-admin { background: #f0e6ff; color: #7c3aed; }
+    .badge-clerk { background: #e6f4ff; color: #1d6fa4; }
+
+    /* FAQ */
+    .faq-item { border: 1px solid #e8e8e8; border-radius: 8px; margin-bottom: 12px; overflow: hidden; }
+    .faq-q { padding: 16px 20px; font-weight: 600; font-size: 14px; background: #fafafa; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+    .faq-q::after { content: '+'; font-size: 20px; color: #c0392b; }
+    .faq-a { padding: 14px 20px; font-size: 14px; color: #444; line-height: 1.7; border-top: 1px solid #eee; }
+
+    /* Shortcut table */
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th { background: #f5f5f5; padding: 10px 14px; text-align: left; font-size: 12px; color: #777; text-transform: uppercase; letter-spacing: .5px; }
+    td { padding: 10px 14px; border-top: 1px solid #f0f0f0; }
+    td code { background: #f5f5f5; padding: 2px 8px; border-radius: 4px; font-family: monospace; font-size: 13px; }
+
+    /* Role table */
+    .role-table td:first-child { font-weight: 600; }
+    .check { color: #27ae60; font-size: 16px; }
+    .cross { color: #bbb; font-size: 16px; }
+
+    /* Footer */
+    .footer { text-align: center; padding: 32px; color: #aaa; font-size: 13px; }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="header-icon">🔧</div>
+  <div>
+    <h1>Aadhirai Royal Enfield</h1>
+    <p>Spare Parts Billing System — User Guide</p>
+  </div>
+</div>
+
+<!-- Table of Contents -->
+<div class="toc">
+  <a href="#login">1. Login</a>
+  <a href="#checkout">2. Billing / Checkout</a>
+  <a href="#invoices">3. Invoices</a>
+  <a href="#accounts">4. Accounts</a>
+  <a href="#inventory">5. Inventory</a>
+  <a href="#customers">6. Customers</a>
+  <a href="#users">7. Users</a>
+  <a href="#audit">8. Audit Logs</a>
+  <a href="#settings">9. Settings</a>
+  <a href="#faq">FAQ</a>
+</div>
+
+<div class="main">
+
+  <!-- ── 1. LOGIN ── -->
+  <div class="section" id="login">
+    <div class="section-header">
+      <div class="section-num">1</div>
+      <div>
+        <h2>Signing In</h2>
+        <p>Access the system with your store credentials</p>
+      </div>
+    </div>
+    <div class="section-body">
+      <img src="screenshots/01_login.png" class="screenshot" alt="Login page" />
+      <p class="screenshot-caption">Login page — https://billing.aadhiraiinnovations.com</p>
+      <ol class="steps">
+        <li><span>Open <strong>https://billing.aadhiraiinnovations.com</strong> in any browser.</span></li>
+        <li><span>Enter your <strong>Email</strong> address.</span></li>
+        <li><span>Enter your <strong>Password</strong>.</span></li>
+        <li><span>Click <strong>Sign In</strong>. You will be taken directly to the Billing screen.</span></li>
+      </ol>
+      <div class="tip"><strong>Tip:</strong> After 5 failed attempts your account is temporarily locked for 15 minutes.</div>
+      <div class="note"><strong>Default credentials:</strong><br>
+        Admin: admin@aadhirai.com / Admin@1234<br>
+        Clerk: clerk@aadhirai.com / Clerk@1234<br>
+        Change these passwords after first login via Settings → Users.
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 2. CHECKOUT ── -->
+  <div class="section" id="checkout">
+    <div class="section-header">
+      <div class="section-num">2</div>
+      <div>
+        <h2>Billing / Checkout</h2>
+        <p>Create a new sale and generate an invoice</p>
+      </div>
+    </div>
+    <div class="section-body">
+      <img src="screenshots/02_checkout.png" class="screenshot" alt="Checkout page" />
+      <p class="screenshot-caption">Checkout — Parts Billing screen with cart and order summary</p>
+
+      <h3 style="margin: 16px 0 10px; font-size: 15px;">How to create a bill</h3>
+      <ol class="steps">
+        <li><span><strong>Search for a customer</strong> by name or phone number in the top search box. Leave blank for a walk-in customer.</span></li>
+        <li><span><strong>Search for a part</strong> by name, part number (e.g. RE-500-39A01), or barcode in the part search box. Click <strong>Find</strong> or press Enter.</span></li>
+        <li><span>The part appears in the cart. Adjust the <strong>quantity</strong> if needed.</span></li>
+        <li><span>Repeat steps 2–3 to add more parts.</span></li>
+        <li><span>Optionally click <strong>Apply Discount</strong> to add a flat or percentage discount.</span></li>
+        <li><span>Select the <strong>Payment Mode</strong> (Cash, UPI, Card, etc.) and enter the amount received.</span></li>
+        <li><span>Click <strong>Add Payment</strong>, then confirm the invoice to complete the sale.</span></li>
+      </ol>
+
+      <div class="tip"><strong>Tip:</strong> You can add multiple payment modes for split payments (e.g. part cash, part UPI).</div>
+      <div class="tip"><strong>Tip:</strong> Scanning a barcode with a USB barcode scanner automatically fills the part search box.</div>
+    </div>
+  </div>
+
+  <!-- ── 3. INVOICES ── -->
+  <div class="section" id="invoices">
+    <div class="section-header">
+      <div class="section-num">3</div>
+      <div>
+        <h2>Invoices</h2>
+        <p>View, search and manage past bills</p>
+      </div>
+    </div>
+    <div class="section-body">
+      <img src="screenshots/03_invoices.png" class="screenshot" alt="Invoices page" />
+      <p class="screenshot-caption">Invoices list — searchable with date range filter and status filter</p>
+      <ol class="steps">
+        <li><span>Click <strong>Invoices</strong> in the left sidebar.</span></li>
+        <li><span>Use the <strong>search box</strong> to find by invoice number, customer name, or phone.</span></li>
+        <li><span>Use the <strong>date pickers</strong> to filter by date range.</span></li>
+        <li><span>Use the <strong>status dropdown</strong> (All / Paid / Partial / Cancelled) to filter by status.</span></li>
+        <li><span>Click the <strong>eye icon</strong> on any row to view full invoice details and print.</span></li>
+      </ol>
+      <div class="tip"><strong>Status colours:</strong> Green = Paid &nbsp;|&nbsp; Yellow = Partial &nbsp;|&nbsp; Red = Cancelled</div>
+    </div>
+  </div>
+
+  <!-- ── 4. ACCOUNTS ── -->
+  <div class="section" id="accounts">
+    <div class="section-header">
+      <div class="section-num">4</div>
+      <div>
+        <h2>Accounts &amp; Collections</h2>
+        <p>Revenue summary, payment breakdown and outstanding amounts</p>
+      </div>
+    </div>
+    <div class="section-body">
+      <img src="screenshots/04_accounts.png" class="screenshot" alt="Accounts page" />
+      <p class="screenshot-caption">Accounts — daily/weekly/monthly revenue with outstanding invoices</p>
+      <ol class="steps">
+        <li><span>Click <strong>Accounts</strong> in the left sidebar.</span></li>
+        <li><span>Choose <strong>Today / This Week / This Month / Custom</strong> to change the period.</span></li>
+        <li><span>The top cards show: Total Billed, Collected, Outstanding, Cancelled, Avg Invoice.</span></li>
+        <li><span>The <strong>Payment Mode Breakdown</strong> shows how much was collected via Cash, UPI, Card, etc.</span></li>
+        <li><span>The <strong>Outstanding / Credit Invoices</strong> table lists bills that are not fully paid.</span></li>
+        <li><span>Click <strong>CSV</strong> or <strong>PDF</strong> to export the report.</span></li>
+      </ol>
+      <div class="tip"><strong>Tip:</strong> Check this page at the end of each day to reconcile cash and UPI collections.</div>
+    </div>
+  </div>
+
+  <!-- ── 5. INVENTORY ── -->
+  <div class="section" id="inventory">
+    <div class="section-header">
+      <div class="section-num">5</div>
+      <div>
+        <h2>Parts Inventory</h2>
+        <p>Manage stock, add new parts and monitor low-stock alerts</p>
+      </div>
+    </div>
+    <div class="section-body">
+      <img src="screenshots/05_inventory.png" class="screenshot" alt="Inventory page" />
+      <p class="screenshot-caption">Parts Inventory — 7 parts with categories, part numbers and stock counts</p>
+      <ol class="steps">
+        <li><span>Click <strong>Inventory</strong> in the sidebar.</span></li>
+        <li><span>Search by part name, part number, or compatible models.</span></li>
+        <li><span>Click the <strong>arrow</strong> on any row to expand and see variants (e.g. 20W50, 10W40).</span></li>
+        <li><span>Click <strong>+ Add Part</strong> to add a new spare part with variants, price and stock.</span></li>
+        <li><span>Click the <strong>Low Stock Alerts</strong> tab to see parts below their threshold.</span></li>
+        <li><span>Use <strong>Export / Import</strong> to bulk-update stock via CSV.</span></li>
+      </ol>
+      <div class="tip"><strong>Categories:</strong> Engine · Electrical · Body/Frame · Brakes/Suspension · Filters/Fluids · Chain/Sprocket · Transmission · Accessories</div>
+      <div class="note"><strong>Two stock modes:</strong><br>
+        <strong>Bulk Qty</strong> — for standard parts (filters, oils, plugs). Stock number goes up/down.<br>
+        <strong>Serialized</strong> — for high-value assemblies (gasket kits). Each unit has its own serial number tracked individually.
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 6. CUSTOMERS ── -->
+  <div class="section" id="customers">
+    <div class="section-header">
+      <div class="section-num">6</div>
+      <div>
+        <h2>Customers</h2>
+        <p>Manage customer records with vehicle details</p>
+      </div>
+    </div>
+    <div class="section-body">
+      <img src="screenshots/06_customers.png" class="screenshot" alt="Customers page" />
+      <p class="screenshot-caption">Customers — list with name, phone, vehicle registration and RE model</p>
+      <ol class="steps">
+        <li><span>Click <strong>Customers</strong> in the sidebar.</span></li>
+        <li><span>Search by name, phone, or email.</span></li>
+        <li><span>Click <strong>+ Add Customer</strong> to register a new customer.</span></li>
+        <li><span>Fill in Name, Phone (required), Email, Address, GSTIN, <strong>Vehicle No</strong>, and <strong>RE Model</strong>.</span></li>
+        <li><span>Click a customer row to view their full profile and invoice history.</span></li>
+      </ol>
+      <div class="tip"><strong>Tip:</strong> Always fill the Vehicle No and RE Model — it helps identify the right parts for warranty claims and repeat visits.</div>
+    </div>
+  </div>
+
+  <!-- ── 7. USERS ── -->
+  <div class="section" id="users">
+    <div class="section-header">
+      <div class="section-num">7</div>
+      <div>
+        <h2>User Management <span class="badge badge-admin">Admin only</span></h2>
+        <p>Add and manage staff accounts</p>
+      </div>
+    </div>
+    <div class="section-body">
+      <img src="screenshots/07_users.png" class="screenshot" alt="Users page" />
+      <p class="screenshot-caption">User Management — staff list with roles and account status</p>
+      <ol class="steps">
+        <li><span>Click <strong>Users</strong> in the sidebar (visible to Super Admin only).</span></li>
+        <li><span>Click <strong>+ Add User</strong> to create a new staff account.</span></li>
+        <li><span>Enter Name, Email, Password, Phone, and assign a <strong>Role</strong>.</span></li>
+        <li><span>To deactivate an account, click the toggle icon on the right of the user row.</span></li>
+      </ol>
+
+      <h3 style="margin: 20px 0 12px; font-size: 15px;">Role Permissions</h3>
+      <table class="role-table">
+        <thead>
+          <tr>
+            <th>Feature</th>
+            <th>Super Admin</th>
+            <th>Billing Clerk</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Create Bills</td><td class="check">✔</td><td class="check">✔</td></tr>
+          <tr><td>View Invoices</td><td class="check">✔</td><td class="check">✔</td></tr>
+          <tr><td>View Accounts</td><td class="check">✔</td><td class="check">✔</td></tr>
+          <tr><td>Manage Inventory</td><td class="check">✔</td><td class="cross">—</td></tr>
+          <tr><td>Manage Customers</td><td class="check">✔</td><td class="check">✔</td></tr>
+          <tr><td>Manage Users</td><td class="check">✔</td><td class="cross">—</td></tr>
+          <tr><td>View Audit Logs</td><td class="check">✔</td><td class="cross">—</td></tr>
+          <tr><td>Change Settings</td><td class="check">✔</td><td class="cross">—</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── 8. AUDIT ── -->
+  <div class="section" id="audit">
+    <div class="section-header">
+      <div class="section-num">8</div>
+      <div>
+        <h2>Audit Logs <span class="badge badge-admin">Admin only</span></h2>
+        <p>Full trail of every action taken in the system</p>
+      </div>
+    </div>
+    <div class="section-body">
+      <img src="screenshots/08_audit.png" class="screenshot" alt="Audit Logs page" />
+      <p class="screenshot-caption">Audit Logs — every invoice, stock and user action with timestamps and IP addresses</p>
+      <ol class="steps">
+        <li><span>Click <strong>Audit Logs</strong> in the sidebar.</span></li>
+        <li><span>Filter by <strong>Action type</strong> (Invoice Create, Stock In, Return, etc.).</span></li>
+        <li><span>Filter by <strong>date range</strong> to narrow results.</span></li>
+        <li><span>Click <strong>Details</strong> on any row to see before/after values for that change.</span></li>
+      </ol>
+      <div class="note"><strong>Logged actions include:</strong> Invoice Create/Cancel, Return Process, Stock In/Out/Adjust, Price Change, User Create/Update, Discount Override.</div>
+    </div>
+  </div>
+
+  <!-- ── 9. SETTINGS ── -->
+  <div class="section" id="settings">
+    <div class="section-header">
+      <div class="section-num">9</div>
+      <div>
+        <h2>Settings <span class="badge badge-admin">Admin only</span></h2>
+        <p>Configure store information and payment QR</p>
+      </div>
+    </div>
+    <div class="section-body">
+      <img src="screenshots/09_settings.png" class="screenshot" alt="Settings page" />
+      <p class="screenshot-caption">Settings — store name, address, GSTIN and UPI QR configuration</p>
+      <ol class="steps">
+        <li><span>Click <strong>Settings</strong> in the sidebar.</span></li>
+        <li><span>Update <strong>Store Name</strong>, <strong>Phone</strong>, <strong>Address</strong>, and <strong>GSTIN</strong>.</span></li>
+        <li><span>Click <strong>Save Changes</strong>.</span></li>
+        <li><span>Under <strong>Payment QR Configuration</strong>, upload a static UPI QR image to show on invoices.</span></li>
+      </ol>
+      <div class="tip"><strong>Dynamic UPI QR:</strong> For automatic per-invoice QR codes (exact amount), set your UPI VPA (e.g. aadhirai@upi) in the server's backend/.env file under STORE_UPI_VPA.</div>
+    </div>
+  </div>
+
+  <!-- ── FAQ ── -->
+  <div class="section" id="faq">
+    <div class="section-header">
+      <div class="section-num">?</div>
+      <div>
+        <h2>Frequently Asked Questions</h2>
+        <p>Common questions and answers</p>
+      </div>
+    </div>
+    <div class="section-body">
+
+      <div class="faq-item">
+        <div class="faq-q">How do I reprint an invoice?</div>
+        <div class="faq-a">Go to <strong>Invoices</strong> → find the invoice → click the eye icon on the right → click <strong>Print</strong> or use your browser's Ctrl+P.</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">A customer returned a part. How do I process it?</div>
+        <div class="faq-a">Go to <strong>Invoices</strong> → open the invoice → click <strong>Return Items</strong> → select the parts being returned and quantity → confirm. Stock is automatically restored.</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">How do I add stock when new parts arrive?</div>
+        <div class="faq-a">Go to <strong>Inventory</strong> → find the part → expand it → click the variant → update the <strong>Stock Qty</strong> field. The system logs a Stock In entry in Audit Logs automatically.</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">How do I cancel an invoice?</div>
+        <div class="faq-a">Go to <strong>Invoices</strong> → open the invoice → click <strong>Cancel Invoice</strong>. Cancelled invoices are recorded in Audit Logs and stock is restored for serialized parts.</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">Can I apply a discount to a bill?</div>
+        <div class="faq-a">Yes. On the Checkout screen click <strong>Apply Discount</strong> and choose either a flat amount (e.g. ₹50 off) or a percentage (e.g. 10%). Large discounts may require manager approval depending on your settings.</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">How do I export the accounts report?</div>
+        <div class="faq-a">Go to <strong>Accounts</strong> → select the period → click <strong>CSV</strong> for a spreadsheet or <strong>PDF</strong> for a printable report.</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">I forgot my password. What do I do?</div>
+        <div class="faq-a">Ask your Super Admin to create a new account or reset your password from the <strong>Users</strong> page.</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">The page says "Cannot reach server". What do I do?</div>
+        <div class="faq-a">Check your internet connection. If the connection is fine, the server may have restarted. Contact your administrator to check that the backend service (PM2) is running on the server.</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">How do I add a new spare part to the system?</div>
+        <div class="faq-a">Go to <strong>Inventory</strong> → click <strong>+ Add Part</strong> → fill in the part name, brand, OEM part number, compatible models, category, and add at least one variant with cost price, selling price, and opening stock.</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">What is the difference between "Bulk" and "Serialized" stock?</div>
+        <div class="faq-a"><strong>Bulk</strong> tracks a total count (e.g. 24 Oil Filters). <strong>Serialized</strong> tracks each individual unit by serial number (e.g. each Engine Gasket Kit has a unique ID). Use serialized for high-value, warranty-tracked assemblies.</div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<div class="footer">
+  Aadhirai Royal Enfield · Spare Parts Billing System · For support contact your system administrator
+</div>
+
+</body>
+</html>
