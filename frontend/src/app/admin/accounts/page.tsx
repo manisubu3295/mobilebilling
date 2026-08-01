@@ -83,6 +83,7 @@ export default function AdminAccountsPage() {
                   <th className="px-4 py-3 font-medium">Owner</th>
                   <th className="px-4 py-3 font-medium">Email</th>
                   <th className="px-4 py-3 font-medium">Phone</th>
+                  <th className="px-4 py-3 font-medium">Database</th>
                   <th className="px-4 py-3 font-medium">Status</th>
                   <th className="px-4 py-3 font-medium">Signed Up</th>
                 </tr>
@@ -90,10 +91,14 @@ export default function AdminAccountsPage() {
               <tbody>
                 {filtered.map((a) => (
                   <tr key={a.id} className="border-b last:border-0">
-                    <td className="px-4 py-3 font-medium text-gray-900">{a.businessName}</td>
+                    <td className="px-4 py-3">
+                      <p className="font-medium text-gray-900">{a.businessName}</p>
+                      <p className="text-xs text-gray-400 font-mono">{a.id}</p>
+                    </td>
                     <td className="px-4 py-3 text-gray-700">{a.ownerName}</td>
                     <td className="px-4 py-3 text-gray-700">{a.email}</td>
                     <td className="px-4 py-3 text-gray-700">{a.phone}</td>
+                    <td className="px-4 py-3 text-gray-600 font-mono text-xs">{a.tenantDbName}</td>
                     <td className="px-4 py-3">
                       <span
                         className={`text-xs px-2 py-0.5 rounded-full font-medium ${
