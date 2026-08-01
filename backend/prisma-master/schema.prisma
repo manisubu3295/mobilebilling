@@ -39,6 +39,22 @@ model PlatformAccount {
   @@map("platform_accounts")
 }
 
+// Single-row table (id is always "singleton") for platform-wide settings that used
+// to be env-var-only — SMTP + the address that gets notified of reset requests.
+// Env vars remain a fallback for whichever of these fields aren't set here yet.
+model PlatformSettings {
+  id               String   @id @default("singleton")
+  smtpHost         String?  @map("smtp_host")
+  smtpPort         Int?     @map("smtp_port")
+  smtpUser         String?  @map("smtp_user")
+  smtpPass         String?  @map("smtp_pass")
+  smtpFrom         String?  @map("smtp_from")
+  adminNotifyEmail String?  @map("admin_notify_email")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@map("platform_settings")
+}
+
 model PlatformAdmin {
   id           String   @id @default(cuid())
   email        String   @unique

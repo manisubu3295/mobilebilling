@@ -6,6 +6,7 @@ import { MasterPrismaService } from '../master-prisma/master-prisma.service';
 import { TenantConnectionManager } from '../prisma/tenant-connection.manager';
 import { MailerService } from '../mailer/mailer.service';
 import { AdminLoginDto } from './dto/admin-login.dto';
+import { UpdatePlatformSettingsDto } from './dto/update-settings.dto';
 
 @Injectable()
 export class PlatformAdminService {
@@ -29,6 +30,32 @@ export class PlatformAdminService {
     );
 
     return { accessToken, admin: { id: admin.id, email: admin.email, name: admin.name } };
+  }
+
+  async getSettings() {
+    const settings = await this.master.platformSettings.findUnique({ where: { id: 'singleton' } });
+    return {
+      smtpHost: settings?.smtpHost || '',
+      smtpPort: settings?.smtpPort || 587,
+      smtpUser: settings?.smtpUser || '',
+      smtpPassSet: !!settings?.smtpPass, // never return the actual password
+      smtpFrom: settings?.smtpFrom || '',
+      adminNotifyEmail: settings?.adminNotifyEmail || '',
+    };
+  }
+
+  async updateSettings(dto: UpdatePlatformSettingsDto) {
+    const { smtpPass, ...rest } = dto;
+    const data: Record<string, any> = { ...rest };
+    if (smtpPass) data.smtpPass = smtpPass;
+
+    await this.master.platformSettings.upsert({
+      where: { id: 'singleton' },
+      create: { id: 'singleton', ...data },
+      update: data,
+    });
+
+    return this.getSettings();
   }
 
   async listAccounts() {

@@ -139,7 +139,7 @@ export class AuthService {
         data: { accountId: account.id, requestedEmail: dto.email },
       });
 
-      const adminEmail = process.env.ADMIN_NOTIFY_EMAIL;
+      const adminEmail = await this.mailer.getAdminNotifyEmail();
       if (adminEmail) {
         await this.mailer.send(
           adminEmail,

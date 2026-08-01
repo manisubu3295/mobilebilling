@@ -8,6 +8,7 @@ import { ADMIN_TOKEN_KEY } from '@/lib/admin-api';
 const TABS = [
   { href: '/admin/accounts', label: 'Accounts' },
   { href: '/admin/requests', label: 'Reset Requests' },
+  { href: '/admin/settings', label: 'Settings' },
 ];
 
 export function AdminHeader({ title, subtitle }: { title: string; subtitle: string }) {
