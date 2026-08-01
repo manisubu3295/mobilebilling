@@ -65,6 +65,8 @@ async function main() {
     const accountId = uuidv4().replace(/-/g, '');
     const dbUrl = process.env.DATABASE_URL;
     if (!dbUrl) throw new Error('DATABASE_URL not set');
+    const tenantDbName = new URL(dbUrl).pathname.replace(/^\//, '');
+    if (!tenantDbName) throw new Error(`Could not parse a database name out of DATABASE_URL: ${dbUrl}`);
 
     await master.platformAccount.create({
       data: {
@@ -73,7 +75,7 @@ async function main() {
         ownerName: adminUser.name,
         email: adminUser.email,
         phone: store.phone || '+910000000000',
-        tenantDbName: 'mobilebilling',
+        tenantDbName,
         tenantDbUrl: dbUrl,
       },
     });
