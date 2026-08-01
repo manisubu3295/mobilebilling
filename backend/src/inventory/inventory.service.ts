@@ -213,6 +213,14 @@ export class InventoryService {
     return this.prisma.category.findMany({ orderBy: { name: 'asc' } });
   }
 
+  async createCategory(name: string) {
+    const trimmed = name.trim();
+    if (!trimmed) throw new BadRequestException('Category name is required');
+    const existing = await this.prisma.category.findUnique({ where: { name: trimmed } });
+    if (existing) throw new ConflictException('Category already exists');
+    return this.prisma.category.create({ data: { name: trimmed } });
+  }
+
   async importProducts(
     rows: Array<{
       productName: string;

@@ -90,6 +90,12 @@ export class InventoryController {
     return this.inventoryService.listCategories();
   }
 
+  @Post('categories')
+  @Roles(Role.SUPER_ADMIN, Role.STORE_MANAGER, Role.INVENTORY_MANAGER)
+  createCategory(@Body() body: { name: string }) {
+    return this.inventoryService.createCategory(body.name);
+  }
+
   @Post('products/import')
   @HttpCode(200)
   @Roles(Role.SUPER_ADMIN, Role.STORE_MANAGER, Role.INVENTORY_MANAGER)

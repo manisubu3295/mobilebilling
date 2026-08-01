@@ -345,10 +345,32 @@ function AddProductModal({ onClose, onSave }: { onClose: () => void; onSave: () 
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [showNewCategory, setShowNewCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [savingCategory, setSavingCategory] = useState(false);
 
-  useEffect(() => {
+  const loadCategories = useCallback(() => {
     api.get('/inventory/categories').then(({ data }) => setCategories(data)).catch(() => {});
   }, []);
+
+  useEffect(() => { loadCategories(); }, [loadCategories]);
+
+  const handleAddCategory = async () => {
+    if (!newCategoryName.trim()) return;
+    setSavingCategory(true);
+    setError('');
+    try {
+      const { data } = await api.post('/inventory/categories', { name: newCategoryName.trim() });
+      setNewCategoryName('');
+      setShowNewCategory(false);
+      loadCategories();
+      setForm((p) => ({ ...p, categoryId: data.id }));
+    } catch (e: any) {
+      setError(e.response?.data?.message || 'Could not create category');
+    } finally {
+      setSavingCategory(false);
+    }
+  };
 
   const handleSave = async () => {
     setError('');
@@ -406,10 +428,46 @@ function AddProductModal({ onClose, onSave }: { onClose: () => void; onSave: () 
             <Field label="Part / SKU Number" value={form.partNumber} onChange={f('partNumber')} placeholder="e.g. SKU-1234" />
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Category *</label>
-              <select value={form.categoryId} onChange={f('categoryId')} className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500">
-                <option value="">Select…</option>
-                {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
+              {!showNewCategory ? (
+                <select
+                  value={form.categoryId}
+                  onChange={(e) => {
+                    if (e.target.value === '__new__') { setShowNewCategory(true); return; }
+                    setForm((p) => ({ ...p, categoryId: e.target.value }));
+                  }}
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+                >
+                  <option value="">Select…</option>
+                  {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  <option value="__new__">+ Add new category…</option>
+                </select>
+              ) : (
+                <div className="flex gap-1">
+                  <input
+                    autoFocus
+                    value={newCategoryName}
+                    onChange={(e) => setNewCategoryName(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddCategory(); } }}
+                    placeholder="New category name"
+                    className="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddCategory}
+                    disabled={savingCategory}
+                    className="px-3 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50"
+                  >
+                    Add
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setShowNewCategory(false); setNewCategoryName(''); }}
+                    className="px-3 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50"
+                  >
+                    &times;
+                  </button>
+                </div>
+              )}
             </div>
             <Field label="HSN Code" value={form.hsnCode} onChange={f('hsnCode')} />
             <div className="col-span-2">
