@@ -9,8 +9,7 @@ interface Customer {
   name: string;
   phone: string;
   email?: string;
-  vehicleNo?: string;
-  reModel?: string;
+  customFields?: Record<string, any>;
 }
 
 interface CustomerSearchProps {
@@ -54,7 +53,14 @@ export function CustomerSearch({ selectedId, onSelect }: CustomerSearchProps) {
   const handleCreate = async () => {
     if (!newCustomer.name || !newCustomer.phone) return;
     try {
-      const { data } = await api.post('/customers', newCustomer);
+      const { name, phone, email, vehicleNo, reModel } = newCustomer;
+      const customFields: Record<string, string> = {};
+      if (vehicleNo) customFields.vehicle_no = vehicleNo;
+      if (reModel) customFields.re_model = reModel;
+      const { data } = await api.post('/customers', {
+        name, phone, email,
+        customFields: Object.keys(customFields).length ? customFields : undefined,
+      });
       handleSelect(data);
       setShowCreate(false);
       setNewCustomer({ name: '', phone: '', email: '', vehicleNo: '', reModel: '' });
@@ -70,8 +76,8 @@ export function CustomerSearch({ selectedId, onSelect }: CustomerSearchProps) {
           <p className="text-sm font-semibold text-red-900">{selected.name}</p>
           <p className="text-xs text-red-600">
             {selected.phone}
-            {selected.vehicleNo && ` · ${selected.vehicleNo}`}
-            {selected.reModel && ` · ${selected.reModel}`}
+            {selected.customFields?.vehicle_no && ` · ${selected.customFields.vehicle_no}`}
+            {selected.customFields?.re_model && ` · ${selected.customFields.re_model}`}
           </p>
         </div>
         <button onClick={handleClear} className="text-red-400 hover:text-red-700">
@@ -140,13 +146,13 @@ export function CustomerSearch({ selectedId, onSelect }: CustomerSearchProps) {
               className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
             />
             <input
-              placeholder="Vehicle No. (e.g. TN01AB1234)"
+              placeholder="Vehicle No. (optional)"
               value={newCustomer.vehicleNo}
               onChange={(e) => setNewCustomer((p) => ({ ...p, vehicleNo: e.target.value }))}
               className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
             />
             <input
-              placeholder="RE Model (e.g. Classic 350)"
+              placeholder="Model (optional)"
               value={newCustomer.reModel}
               onChange={(e) => setNewCustomer((p) => ({ ...p, reModel: e.target.value }))}
               className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"

@@ -452,8 +452,8 @@ export default function InvoicesPage() {
                       <p className="font-semibold text-gray-800">{selected.customer.name}</p>
                       <p className="text-gray-500 text-xs mt-0.5">
                         {(selected.customer as any).phone}
-                        {(selected.customer as any).vehicleNo && ` · ${(selected.customer as any).vehicleNo}`}
-                        {(selected.customer as any).reModel   && ` · ${(selected.customer as any).reModel}`}
+                        {(selected.customer as any).customFields?.vehicle_no && ` · ${(selected.customer as any).customFields.vehicle_no}`}
+                        {(selected.customer as any).customFields?.re_model   && ` · ${(selected.customer as any).customFields.re_model}`}
                       </p>
                     </div>
                   )}

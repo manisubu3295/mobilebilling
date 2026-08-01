@@ -16,16 +16,13 @@ enum Role {
   INVENTORY_MANAGER
 }
 
-enum ProductType {
-  ENGINE
-  ELECTRICAL
-  BODY_FRAME
-  BRAKES_SUSPENSION
-  FILTERS_FLUIDS
-  CHAIN_SPROCKET
-  TRANSMISSION
-  ACCESSORIES
-  OTHER
+enum AttributeFieldType {
+  TEXT
+  NUMBER
+  BOOLEAN
+  DATE
+  SELECT
+  MULTISELECT
 }
 
 enum StockStatus {
@@ -78,12 +75,13 @@ model Store {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  users     User[]
-  inventory SerialInventory[]
-  invoices  Invoice[]
-  products  Product[]
-  skus      SKU[]
-  auditLogs AuditLog[]
+  users                User[]
+  inventory            SerialInventory[]
+  invoices             Invoice[]
+  products             Product[]
+  skus                 SKU[]
+  auditLogs            AuditLog[]
+  attributeDefinitions AttributeDefinition[]
 
   @@map("stores")
 }
@@ -132,6 +130,26 @@ model Category {
   @@map("categories")
 }
 
+model AttributeDefinition {
+  id         String             @id @default(cuid())
+  storeId    String             @map("store_id")
+  store      Store              @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  entityType String             @map("entity_type") // "PRODUCT" | "CUSTOMER"
+  key        String             // machine key, e.g. "compatible_models"
+  label      String             // display label, e.g. "Compatible Models"
+  fieldType  AttributeFieldType @map("field_type")
+  options    Json?              // string[] for SELECT/MULTISELECT
+  required   Boolean            @default(false)
+  sortOrder  Int                @default(0) @map("sort_order")
+  isActive   Boolean            @default(true) @map("is_active")
+  createdAt  DateTime           @default(now()) @map("created_at")
+  updatedAt  DateTime           @updatedAt @map("updated_at")
+
+  @@unique([storeId, entityType, key])
+  @@index([storeId, entityType])
+  @@map("attribute_definitions")
+}
+
 model Supplier {
   id      String  @id @default(cuid())
   name    String
@@ -149,16 +167,15 @@ model Supplier {
 model Product {
   id               String      @id @default(cuid())
   name             String
-  brand            String      @default("Royal Enfield")
-  partNumber       String?     @map("part_number")   // OEM Part Number
-  compatibleModels String?     @map("compatible_models") // e.g. "Classic 350, Meteor 350"
-  type             ProductType
+  brand            String?
+  partNumber       String?     @map("part_number")   // manufacturer part/SKU number
   categoryId       String      @map("category_id")
   category         Category    @relation(fields: [categoryId], references: [id])
   storeId          String      @map("store_id")
   store            Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
   description      String?
   hsnCode          String?     @map("hsn_code")
+  customFields     Json?       @map("custom_fields")
   createdAt        DateTime    @default(now()) @map("created_at")
   updatedAt        DateTime    @updatedAt @map("updated_at")
 
@@ -259,8 +276,7 @@ model Customer {
   email     String?
   address   String?
   gstin     String?
-  vehicleNo String?  @map("vehicle_no")   // e.g. TN01AB1234
-  reModel   String?  @map("re_model")     // e.g. Classic 350
+  customFields Json? @map("custom_fields")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 

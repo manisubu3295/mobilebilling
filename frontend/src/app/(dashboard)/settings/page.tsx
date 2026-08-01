@@ -122,17 +122,6 @@ export default function SettingsPage() {
             <h2 className="font-semibold text-gray-900">Payment QR Configuration</h2>
           </div>
 
-          {/* Dynamic UPI note */}
-          <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
-            <p className="font-semibold">Dynamic UPI QR (Recommended)</p>
-            <p className="text-xs mt-1 text-amber-700">
-              Set <code className="bg-amber-100 px-1 rounded font-mono">STORE_UPI_VPA</code> in{' '}
-              <code className="bg-amber-100 px-1 rounded font-mono">backend/.env</code> to your UPI VPA
-              (e.g. <code className="font-mono">aadhirai@upi</code>). Each invoice then shows a QR with
-              the exact amount — customer just scans and pays.
-            </p>
-          </div>
-
           {/* Static QR upload */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -202,7 +191,7 @@ export default function SettingsPage() {
             </div>
 
             <p className="text-xs text-gray-400 mt-1">
-              This QR is shown on the payment screen and printed on receipts when dynamic UPI is not configured.
+              This QR is shown on the payment screen and printed on receipts.
             </p>
           </div>
 

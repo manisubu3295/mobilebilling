@@ -35,6 +35,7 @@ Thumbs.db
 
 # Prisma generated (regenerated on install)
 node_modules/.prisma/
+backend/generated/
 
 # Next.js
 .next/
@@ -42,3 +43,6 @@ next-env.d.ts
 
 # Testing
 coverage/
+
+# TypeScript incremental build info
+*.tsbuildinfo

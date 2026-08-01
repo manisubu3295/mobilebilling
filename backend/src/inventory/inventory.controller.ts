@@ -37,10 +37,10 @@ export class InventoryController {
   listProducts(
     @CurrentUser('storeId') storeId: string,
     @Query('search') search?: string,
-    @Query('type') type?: string,
+    @Query('categoryId') categoryId?: string,
     @Query('lowStock') lowStock?: string,
   ) {
-    return this.inventoryService.listProducts(storeId, { search, type, lowStock: lowStock === 'true' });
+    return this.inventoryService.listProducts(storeId, { search, categoryId, lowStock: lowStock === 'true' });
   }
 
   @Get('products/:id')

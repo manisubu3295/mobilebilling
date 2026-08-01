@@ -8,8 +8,7 @@ export interface PrintInvoice {
     name?: string | null;
     phone?: string | null;
     email?: string | null;
-    vehicleNo?: string | null;
-    reModel?: string | null;
+    customFields?: Record<string, any> | null;
   } | null;
   items: Array<{
     sku: {
@@ -179,10 +178,10 @@ function buildHtml(invoice: PrintInvoice, qrDataUrl: string): string {
       <div class="customer-name">${esc(invoice.customer.name || 'Walk-in Customer')}</div>
       ${invoice.customer.phone ? `<div class="customer-detail">${esc(invoice.customer.phone)}</div>` : ''}
       ${invoice.customer.email ? `<div class="customer-detail">${esc(invoice.customer.email)}</div>` : ''}
-      ${(invoice.customer.vehicleNo || invoice.customer.reModel) ? `
+      ${(invoice.customer.customFields?.vehicle_no || invoice.customer.customFields?.re_model) ? `
         <div class="vehicle-row">
-          ${invoice.customer.vehicleNo ? `<span class="vehicle-badge">${esc(invoice.customer.vehicleNo)}</span>` : ''}
-          ${invoice.customer.reModel ? `<span class="model-badge">${esc(invoice.customer.reModel)}</span>` : ''}
+          ${invoice.customer.customFields?.vehicle_no ? `<span class="vehicle-badge">${esc(invoice.customer.customFields.vehicle_no)}</span>` : ''}
+          ${invoice.customer.customFields?.re_model ? `<span class="model-badge">${esc(invoice.customer.customFields.re_model)}</span>` : ''}
         </div>` : ''}
     </div>` : '';
 
@@ -235,7 +234,6 @@ function buildHtml(invoice: PrintInvoice, qrDataUrl: string): string {
 <body>
   <div class="brand-band">
     <div class="store-name">${esc(invoice.store.name)}</div>
-    <div class="store-sub">Royal Enfield Authorised Spare Parts</div>
   </div>
 
   <div class="store-details">
@@ -282,7 +280,7 @@ function buildHtml(invoice: PrintInvoice, qrDataUrl: string): string {
   ${qrHtml}
 
   <div class="footer">
-    <div class="footer-line">&#10022; Thank you for choosing Aadhirai Royal Enfield &#10022;</div>
+    <div class="footer-line">&#10022; Thank you for your business &#10022;</div>
     <div class="footer-note">Parts sold are non-returnable.</div>
     <div class="footer-note">Warranty as per manufacturer terms.</div>
     ${invoice.createdBy ? `<div class="served-by">Served by: <strong>${esc(invoice.createdBy.name)}</strong></div>` : ''}

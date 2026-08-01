@@ -507,14 +507,13 @@ export class BillingService {
       }];
     }
 
-    // 3. Fuzzy search on product name, part number, compatible models
+    // 3. Fuzzy search on product name, part number
     const products = await this.prisma.product.findMany({
       where: {
         storeId,
         OR: [
           { name: { contains: q, mode: 'insensitive' } },
           { partNumber: { contains: q, mode: 'insensitive' } },
-          { compatibleModels: { contains: q, mode: 'insensitive' } },
         ],
       },
       include: { skus: { where: { storeId } } },
@@ -526,7 +525,7 @@ export class BillingService {
     for (const product of products) {
       for (const sku of product.skus) {
         const r = await this._buildSkuResult({ ...sku, product }, storeId);
-        results.push({ ...r, compatibleModels: product.compatibleModels });
+        results.push({ ...r, customFields: product.customFields });
       }
     }
 
@@ -581,7 +580,7 @@ export class BillingService {
         },
         include: {
           payments: true,
-          customer: { select: { name: true, phone: true, vehicleNo: true } },
+          customer: { select: { name: true, phone: true, customFields: true } },
           createdBy: { select: { name: true } },
         },
         orderBy: { createdAt: 'desc' },

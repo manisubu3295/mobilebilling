@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   ShoppingCart, Package, Users, FileText,
-  BarChart2, Settings, LogOut, Wrench, Menu, X, UserCircle, Landmark, BookOpen,
+  BarChart2, Settings, LogOut, Store, Menu, X, UserCircle, Landmark, BookOpen,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
 
@@ -77,9 +77,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       >
         <div className="p-4 border-b border-gray-700 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Wrench className="h-6 w-6 text-red-400 shrink-0" />
+            <Store className="h-6 w-6 text-red-400 shrink-0" />
             <div className="min-w-0">
-              <p className="font-bold text-sm leading-tight">RE Parts</p>
+              <p className="font-bold text-sm leading-tight">Aadhirai Billing</p>
               <p className="text-xs text-gray-400 truncate">{user?.store?.name}</p>
             </div>
           </div>
@@ -130,8 +130,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <Menu className="h-6 w-6" />
           </button>
           <div className="flex items-center gap-2">
-            <Wrench className="h-5 w-5 text-red-400" />
-            <span className="font-bold text-sm">RE Parts</span>
+            <Store className="h-5 w-5 text-red-400" />
+            <span className="font-bold text-sm">Aadhirai Billing</span>
           </div>
         </header>
 

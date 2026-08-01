@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'RE Parts — Spare Parts Billing',
-  description: 'Royal Enfield Spare Parts Retail Billing System',
+  title: 'Aadhirai Billing — Billing & Inventory',
+  description: 'Billing and inventory management for any retail business',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

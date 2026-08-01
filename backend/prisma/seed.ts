@@ -1,4 +1,9 @@
-import { PrismaClient, Role, ProductType } from '@prisma/client';
+// Optional Royal Enfield demo-data loader. Not run automatically for new tenants —
+// run manually (`npm run prisma:seed`) against a tenant's DATABASE_URL if you want
+// sample data to explore the app with. Product-specific info that used to be
+// hardcoded columns (compatible models, RE part category) now lives in customFields,
+// same as any tenant-defined custom field would.
+import { PrismaClient, Role } from '@prisma/client';
 import * as argon2 from 'argon2';
 
 const prisma = new PrismaClient();
@@ -36,6 +41,14 @@ async function main() {
       create: { name },
     });
   }
+
+  // Custom field definitions so the demo's "compatible models" data has somewhere to live
+  await prisma.attributeDefinition.createMany({
+    data: [
+      { storeId: store.id, entityType: 'PRODUCT', key: 'compatible_models', label: 'Compatible Models', fieldType: 'TEXT', sortOrder: 10 },
+    ],
+    skipDuplicates: true,
+  });
 
   // Admin user
   const adminHash = await argon2.hash('Admin@1234');
@@ -76,8 +89,7 @@ async function main() {
       name: 'Air Filter',
       brand: 'Royal Enfield',
       partNumber: 'RE-500-39A01',
-      compatibleModels: 'Classic 350, Bullet 350, Meteor 350',
-      type: ProductType.FILTERS_FLUIDS,
+      customFields: { compatible_models: 'Classic 350, Bullet 350, Meteor 350' },
       categoryId: categories['Filters & Fluids'].id,
       storeId: store.id,
       hsnCode: '84212100',
@@ -106,8 +118,7 @@ async function main() {
       name: 'Oil Filter',
       brand: 'Royal Enfield',
       partNumber: 'RE-143-00BH01',
-      compatibleModels: 'Classic 350, Bullet 350, Thunderbird 350',
-      type: ProductType.FILTERS_FLUIDS,
+      customFields: { compatible_models: 'Classic 350, Bullet 350, Thunderbird 350' },
       categoryId: categories['Filters & Fluids'].id,
       storeId: store.id,
       hsnCode: '84212300',
@@ -136,8 +147,7 @@ async function main() {
       name: 'Spark Plug',
       brand: 'Royal Enfield',
       partNumber: 'RE-110400',
-      compatibleModels: 'Meteor 350, Hunter 350, Classic 350 J1',
-      type: ProductType.ELECTRICAL,
+      customFields: { compatible_models: 'Meteor 350, Hunter 350, Classic 350 J1' },
       categoryId: categories['Electrical & Ignition'].id,
       storeId: store.id,
       hsnCode: '85111000',
@@ -179,8 +189,7 @@ async function main() {
       name: 'Chain Sprocket Kit',
       brand: 'Royal Enfield',
       partNumber: 'RE-CS-350KIT',
-      compatibleModels: 'Classic 350, Bullet 350, Electra 350',
-      type: ProductType.CHAIN_SPROCKET,
+      customFields: { compatible_models: 'Classic 350, Bullet 350, Electra 350' },
       categoryId: categories['Chain & Sprocket'].id,
       storeId: store.id,
       hsnCode: '73151900',
@@ -209,8 +218,7 @@ async function main() {
       name: 'Brake Shoe Set',
       brand: 'Royal Enfield',
       partNumber: 'RE-591650',
-      compatibleModels: 'Classic 350, Bullet 350, Thunderbird 350',
-      type: ProductType.BRAKES_SUSPENSION,
+      customFields: { compatible_models: 'Classic 350, Bullet 350, Thunderbird 350' },
       categoryId: categories['Brakes & Suspension'].id,
       storeId: store.id,
       hsnCode: '87083100',
@@ -252,8 +260,7 @@ async function main() {
       name: 'Complete Engine Gasket Kit',
       brand: 'Royal Enfield',
       partNumber: 'RE-GASKET-350',
-      compatibleModels: 'Classic 350 B3, Bullet 350',
-      type: ProductType.ENGINE,
+      customFields: { compatible_models: 'Classic 350 B3, Bullet 350' },
       categoryId: categories['Engine Parts'].id,
       storeId: store.id,
       hsnCode: '84841000',
@@ -282,8 +289,7 @@ async function main() {
       name: 'Engine Oil',
       brand: 'Royal Enfield',
       partNumber: 'RE-OIL-20W50',
-      compatibleModels: 'All RE Models',
-      type: ProductType.FILTERS_FLUIDS,
+      customFields: { compatible_models: 'All RE Models' },
       categoryId: categories['Filters & Fluids'].id,
       storeId: store.id,
       hsnCode: '27101999',

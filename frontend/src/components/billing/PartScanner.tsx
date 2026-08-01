@@ -20,7 +20,7 @@ interface PartResult {
   serialUnitId?: string;
   serialNumber?: string;
   batchNumber?: string;
-  compatibleModels?: string;
+  customFields?: Record<string, any>;
 }
 
 export function PartScanner() {
@@ -46,7 +46,7 @@ export function PartScanner() {
       const { data } = await api.get<PartResult[]>(`/billing/lookup/search?q=${encodeURIComponent(query)}`);
 
       if (!data || data.length === 0) {
-        setError('Part not found. Try part number, name, or compatible model (e.g. "Classic 350").');
+        setError('Product not found. Try the product name, number, or barcode.');
         return;
       }
 
@@ -122,7 +122,7 @@ export function PartScanner() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Part name, number (RE-500-39A01), or barcode…"
+            placeholder="Product name, number, or barcode…"
             className="w-full pl-10 pr-9 py-2.5 border rounded-lg text-sm focus:outline-none
                        focus:ring-2 focus:ring-red-500 font-mono"
             autoFocus
@@ -154,7 +154,7 @@ export function PartScanner() {
       {results.length > 1 && !selected && (
         <div className="border rounded-lg divide-y bg-white shadow-sm max-h-56 overflow-auto">
           <p className="px-3 py-2 text-xs text-gray-500 font-medium bg-gray-50">
-            {results.length} parts found — tap one to select
+            {results.length} results found — tap one to select
           </p>
           {results.map((r, i) => (
             <button
@@ -198,8 +198,8 @@ export function PartScanner() {
                 )}
               </p>
               <p className="text-xs text-gray-500">{selected.variantName}</p>
-              {selected.compatibleModels && (
-                <p className="text-xs text-gray-400">Fits: {selected.compatibleModels}</p>
+              {selected.customFields?.compatible_models && (
+                <p className="text-xs text-gray-400">Fits: {selected.customFields.compatible_models}</p>
               )}
               <p className="text-xs text-gray-500 font-mono mt-0.5">
                 {selected.type === 'serial'

@@ -1,0 +1,68 @@
+// Master/platform database — holds only account registry + password-reset queue.
+// Every PlatformAccount points at its own separate tenant database (see backend/prisma/schema.prisma),
+// provisioned dynamically at signup. This schema is intentionally tiny and never holds business data.
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/master-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("MASTER_DATABASE_URL")
+}
+
+enum AccountStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum ResetRequestStatus {
+  PENDING
+  RESOLVED
+}
+
+model PlatformAccount {
+  id           String        @id @default(cuid())
+  businessName String        @map("business_name")
+  ownerName    String        @map("owner_name")
+  email        String        @unique
+  phone        String        @unique
+  tenantDbName String        @unique @map("tenant_db_name")
+  tenantDbUrl  String        @map("tenant_db_url")
+  status       AccountStatus @default(ACTIVE)
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+
+  resetRequests PasswordResetRequest[]
+
+  @@map("platform_accounts")
+}
+
+model PlatformAdmin {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  name         String
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  resolvedRequests PasswordResetRequest[]
+
+  @@map("platform_admins")
+}
+
+model PasswordResetRequest {
+  id             String              @id @default(cuid())
+  accountId      String              @map("account_id")
+  account        PlatformAccount     @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  requestedEmail String              @map("requested_email")
+  status         ResetRequestStatus  @default(PENDING)
+  createdAt      DateTime            @default(now()) @map("created_at")
+  resolvedAt     DateTime?           @map("resolved_at")
+  resolvedById   String?             @map("resolved_by_id")
+  resolvedBy     PlatformAdmin?      @relation(fields: [resolvedById], references: [id])
+
+  @@index([accountId])
+  @@index([status])
+  @@map("password_reset_requests")
+}

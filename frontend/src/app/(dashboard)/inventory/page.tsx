@@ -24,10 +24,9 @@ interface SKU {
 interface Product {
   id: string;
   name: string;
-  brand: string;
+  brand: string | null;
   partNumber: string | null;
-  compatibleModels: string | null;
-  type: string;
+  customFields: Record<string, any> | null;
   hsnCode: string | null;
   category: { name: string };
   skus: SKU[];
@@ -105,7 +104,7 @@ export default function InventoryPage() {
     <div className="h-full flex flex-col bg-gray-50">
       <div className="bg-white border-b px-4 sm:px-6 py-4 flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Parts Inventory</h1>
+          <h1 className="text-xl font-bold text-gray-900">Inventory</h1>
           <p className="text-sm text-gray-500 mt-0.5">
             {products.length} products · {alerts.length} low-stock alerts
           </p>
@@ -122,7 +121,7 @@ export default function InventoryPage() {
             onClick={() => setShowAddProduct(true)}
             className="flex items-center gap-2 px-4 py-2 bg-red-700 text-white rounded-lg text-sm font-medium hover:bg-red-800"
           >
-            <Plus className="h-4 w-4" /> <span className="hidden sm:inline">Add Part</span>
+            <Plus className="h-4 w-4" /> <span className="hidden sm:inline">Add Product</span>
           </button>
         </div>
       </div>
@@ -137,7 +136,7 @@ export default function InventoryPage() {
               activeTab === t ? 'border-red-700 text-red-700' : 'border-transparent text-gray-500 hover:text-gray-900'
             }`}
           >
-            {t === 'products' ? 'Parts & Stock' : (
+            {t === 'products' ? 'Products & Stock' : (
               <span className="flex items-center gap-1.5">
                 Low Stock Alerts
                 {alerts.length > 0 && (
@@ -158,7 +157,7 @@ export default function InventoryPage() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
               <input
                 type="text"
-                placeholder="Search by name, part number, compatible models…"
+                placeholder="Search by name, part number…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="w-full pl-9 pr-4 py-2.5 border rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
@@ -190,9 +189,6 @@ export default function InventoryPage() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <p className="font-semibold text-gray-900">{product.name}</p>
-                            <span className="px-1.5 py-0.5 bg-red-50 text-red-700 text-xs rounded font-medium">
-                              {product.type.replace(/_/g, ' ')}
-                            </span>
                             {product.partNumber && (
                               <span className="flex items-center gap-0.5 text-xs text-gray-400 font-mono">
                                 <Tag className="h-3 w-3" /> {product.partNumber}
@@ -201,7 +197,7 @@ export default function InventoryPage() {
                           </div>
                           <p className="text-sm text-gray-500">
                             {product.category.name} · {product.skus.length} variant(s)
-                            {product.compatibleModels && ` · ${product.compatibleModels}`}
+                            {product.customFields?.compatible_models && ` · ${product.customFields.compatible_models}`}
                           </p>
                         </div>
                         <div className="text-right shrink-0">
@@ -248,7 +244,7 @@ export default function InventoryPage() {
                                   </button>
                                   <button
                                     onClick={() => {
-                                      const qrValue = sku.barcode || product.partNumber || `RE-SKU-${sku.id.slice(-8).toUpperCase()}`;
+                                      const qrValue = sku.barcode || product.partNumber || `SKU-${sku.id.slice(-8).toUpperCase()}`;
                                       setShowQrLabel({
                                         qrValue,
                                         productName: product.name,
@@ -321,12 +317,12 @@ export default function InventoryPage() {
         <AddStockModal sku={showAddStock} onClose={() => setShowAddStock(null)} onSave={load} />
       )}
       {showQrLabel && (
-        <QrLabelModal data={showQrLabel} onClose={() => setShowQrLabel(null)} />
+        <QrLabelModal data={showQrLabel} storeName={user?.store?.name || 'My Store'} onClose={() => setShowQrLabel(null)} />
       )}
       {showExportImport && (
         <ExportImportModal
           products={products}
-          storeName={user?.store?.name || 'Aadhirai Royal Enfield'}
+          storeName={user?.store?.name || 'My Store'}
           onClose={() => setShowExportImport(false)}
           onImportDone={() => { setShowExportImport(false); load(); }}
         />
@@ -335,26 +331,13 @@ export default function InventoryPage() {
   );
 }
 
-/* ── RE Part Types ───────────────────────────────────────────────────── */
-const PART_TYPES = [
-  { value: 'ENGINE', label: 'Engine Parts' },
-  { value: 'ELECTRICAL', label: 'Electrical & Ignition' },
-  { value: 'BODY_FRAME', label: 'Body & Frame' },
-  { value: 'BRAKES_SUSPENSION', label: 'Brakes & Suspension' },
-  { value: 'FILTERS_FLUIDS', label: 'Filters & Fluids' },
-  { value: 'CHAIN_SPROCKET', label: 'Chain & Sprocket' },
-  { value: 'TRANSMISSION', label: 'Transmission & Clutch' },
-  { value: 'ACCESSORIES', label: 'Accessories' },
-  { value: 'OTHER', label: 'Other' },
-];
-
 const UNITS = ['PCS', 'SET', 'PAIR', 'LITER', 'METER', 'KG'];
 
-/* ── Add Part Modal ──────────────────────────────────────────────────── */
+/* ── Add Product Modal ──────────────────────────────────────────────── */
 function AddProductModal({ onClose, onSave }: { onClose: () => void; onSave: () => void }) {
   const [form, setForm] = useState({
-    name: '', brand: 'Royal Enfield', partNumber: '', compatibleModels: '',
-    type: 'FILTERS_FLUIDS', categoryId: '', hsnCode: '', description: '',
+    name: '', brand: '', partNumber: '', compatibleModels: '',
+    categoryId: '', hsnCode: '', description: '',
     skuName: 'Standard', unit: 'PCS', isSerialized: false,
     costPrice: '', sellingPrice: '', taxRate: '18', threshold: '5', barcode: '',
     initialStock: '0',
@@ -376,10 +359,9 @@ function AddProductModal({ onClose, onSave }: { onClose: () => void; onSave: () 
     try {
       await api.post('/inventory/products', {
         name: form.name,
-        brand: form.brand || 'Royal Enfield',
+        brand: form.brand || undefined,
         partNumber: form.partNumber || undefined,
-        compatibleModels: form.compatibleModels || undefined,
-        type: form.type,
+        customFields: form.compatibleModels ? { compatible_models: form.compatibleModels } : undefined,
         categoryId: form.categoryId,
         hsnCode: form.hsnCode || undefined,
         description: form.description || undefined,
@@ -411,26 +393,17 @@ function AddProductModal({ onClose, onSave }: { onClose: () => void; onSave: () 
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4 overflow-auto">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg my-8">
         <div className="flex items-center justify-between p-6 border-b">
-          <h2 className="text-lg font-bold">Add Spare Part</h2>
+          <h2 className="text-lg font-bold">Add Product</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-2xl">&times;</button>
         </div>
         <div className="p-6 space-y-3 max-h-[75vh] overflow-auto">
           {error && <p className="text-sm text-red-600 bg-red-50 p-2 rounded">{error}</p>}
 
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Part Info</p>
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Product Info</p>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Part Name *" value={form.name} onChange={f('name')} />
+            <Field label="Product Name *" value={form.name} onChange={f('name')} />
             <Field label="Brand" value={form.brand} onChange={f('brand')} />
-            <Field label="OEM Part Number" value={form.partNumber} onChange={f('partNumber')} placeholder="e.g. RE-500-39A01" />
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Part Type *</label>
-              <select value={form.type} onChange={f('type')} className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500">
-                {PART_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-              </select>
-            </div>
-            <div className="col-span-2">
-              <Field label="Compatible Models" value={form.compatibleModels} onChange={f('compatibleModels')} placeholder="e.g. Classic 350, Meteor 350, Bullet 350" />
-            </div>
+            <Field label="Part / SKU Number" value={form.partNumber} onChange={f('partNumber')} placeholder="e.g. SKU-1234" />
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Category *</label>
               <select value={form.categoryId} onChange={f('categoryId')} className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500">
@@ -439,6 +412,9 @@ function AddProductModal({ onClose, onSave }: { onClose: () => void; onSave: () 
               </select>
             </div>
             <Field label="HSN Code" value={form.hsnCode} onChange={f('hsnCode')} />
+            <div className="col-span-2">
+              <Field label="Compatibility / Fitment Notes" value={form.compatibleModels} onChange={f('compatibleModels')} placeholder="Optional — e.g. compatible models, sizes, fits" />
+            </div>
           </div>
 
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide pt-2">Variant / SKU</p>
@@ -474,7 +450,7 @@ function AddProductModal({ onClose, onSave }: { onClose: () => void; onSave: () 
         <div className="flex gap-3 p-6 border-t">
           <button onClick={onClose} className="flex-1 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
           <button onClick={handleSave} disabled={saving} className="flex-1 py-2 bg-red-700 text-white rounded-lg text-sm font-medium hover:bg-red-800 disabled:opacity-50">
-            {saving ? 'Saving…' : 'Save Part'}
+            {saving ? 'Saving…' : 'Save Product'}
           </button>
         </div>
       </div>
@@ -604,7 +580,7 @@ function Field({ label, value, onChange, type = 'text', placeholder = '' }: {
 }
 
 /* ── QR Label Modal ──────────────────────────────────────────────────── */
-function QrLabelModal({ data, onClose }: { data: QrLabelData; onClose: () => void }) {
+function QrLabelModal({ data, storeName, onClose }: { data: QrLabelData; storeName: string; onClose: () => void }) {
   const [copies, setCopies] = useState(1);
 
   const handlePrint = () => {
@@ -618,7 +594,7 @@ function QrLabelModal({ data, onClose }: { data: QrLabelData; onClose: () => voi
         box-sizing:border-box;
       ">
         <div style="font-size:7pt;font-weight:700;color:#7f1d1d;letter-spacing:0.5px;text-transform:uppercase;">
-          AADHIRAI ROYAL ENFIELD
+          ${storeName}
         </div>
         <div style="font-size:9pt;font-weight:800;margin:1mm 0;line-height:1.2;">${data.productName}</div>
         <div style="font-size:7.5pt;color:#444;margin-bottom:1mm;">${data.variantName}</div>
@@ -664,7 +640,7 @@ function QrLabelModal({ data, onClose }: { data: QrLabelData; onClose: () => voi
         {/* Label preview */}
         <div className="p-5 flex flex-col items-center gap-3">
           <div className="border-2 border-dashed border-gray-200 rounded-xl p-4 w-full flex flex-col items-center gap-2 bg-gray-50">
-            <p className="text-xs font-bold text-red-700 tracking-widest uppercase">Aadhirai Royal Enfield</p>
+            <p className="text-xs font-bold text-red-700 tracking-widest uppercase">{storeName}</p>
             <p className="font-bold text-gray-900 text-center text-sm leading-tight">{data.productName}</p>
             <p className="text-xs text-gray-500">{data.variantName}</p>
             {data.partNumber && (
@@ -683,7 +659,7 @@ function QrLabelModal({ data, onClose }: { data: QrLabelData; onClose: () => voi
           <div className="w-full p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-700">
             <span className="font-semibold">QR encodes: </span>
             {data.qrValue}
-            {!data.qrValue.startsWith('RE-SKU-')
+            {!data.qrValue.startsWith('SKU-')
               ? ' (existing barcode / part number)'
               : ' (auto-generated — scan this in checkout to find the part)'}
           </div>

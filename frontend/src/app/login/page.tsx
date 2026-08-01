@@ -2,10 +2,15 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useAuthStore } from '@/store/auth.store';
-import { Wrench } from 'lucide-react';
+import { Store } from 'lucide-react';
+import { SignupForm } from './SignupForm';
+
+type Tab = 'login' | 'signup';
 
 export default function LoginPage() {
+  const [tab, setTab] = useState<Tab>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -31,14 +36,14 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-950">
+    <div className="min-h-screen flex items-center justify-center bg-gray-950 py-8">
       <div className="w-full max-w-sm space-y-6 px-4">
         <div className="text-center">
           <div className="inline-flex items-center justify-center w-14 h-14 bg-red-700 rounded-2xl mb-4">
-            <Wrench className="h-8 w-8 text-white" />
+            <Store className="h-8 w-8 text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-white">Aadhirai Royal Enfield</h1>
-          <p className="text-gray-400 text-sm mt-1">Spare Parts Billing — Sign in</p>
+          <h1 className="text-2xl font-bold text-white">Aadhirai Billing</h1>
+          <p className="text-gray-400 text-sm mt-1">Billing &amp; Inventory for your business</p>
         </div>
 
         <a
@@ -53,45 +58,75 @@ export default function LoginPage() {
           User Guide
         </a>
 
-        <form onSubmit={handleSubmit} className="bg-gray-900 rounded-2xl p-6 space-y-4">
-          {error && (
-            <div className="p-3 bg-red-950 border border-red-800 rounded-lg text-red-400 text-sm">
-              {error}
-            </div>
-          )}
-          <div>
-            <label className="block text-sm text-gray-400 mb-1.5">Email</label>
-            <input
-              type="email"
-              required
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2.5
-                         text-sm focus:outline-none focus:ring-2 focus:ring-red-600 focus:border-transparent"
-            />
-          </div>
-          <div>
-            <label className="block text-sm text-gray-400 mb-1.5">Password</label>
-            <input
-              type="password"
-              required
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2.5
-                         text-sm focus:outline-none focus:ring-2 focus:ring-red-600 focus:border-transparent"
-            />
-          </div>
+        <div className="grid grid-cols-2 bg-gray-900 rounded-xl p-1">
           <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-2.5 bg-red-700 text-white rounded-lg font-semibold text-sm
-                       hover:bg-red-800 disabled:opacity-50 transition-colors mt-2"
+            type="button"
+            onClick={() => setTab('login')}
+            className={`py-2 rounded-lg text-sm font-medium transition-colors ${
+              tab === 'login' ? 'bg-red-700 text-white' : 'text-gray-400 hover:text-white'
+            }`}
           >
-            {loading ? 'Signing in…' : 'Sign In'}
+            Sign In
           </button>
-        </form>
+          <button
+            type="button"
+            onClick={() => setTab('signup')}
+            className={`py-2 rounded-lg text-sm font-medium transition-colors ${
+              tab === 'signup' ? 'bg-red-700 text-white' : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            Create Account
+          </button>
+        </div>
+
+        {tab === 'login' ? (
+          <form onSubmit={handleSubmit} className="bg-gray-900 rounded-2xl p-6 space-y-4">
+            {error && (
+              <div className="p-3 bg-red-950 border border-red-800 rounded-lg text-red-400 text-sm">
+                {error}
+              </div>
+            )}
+            <div>
+              <label className="block text-sm text-gray-400 mb-1.5">Email</label>
+              <input
+                type="email"
+                required
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2.5
+                           text-sm focus:outline-none focus:ring-2 focus:ring-red-600 focus:border-transparent"
+              />
+            </div>
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-sm text-gray-400">Password</label>
+                <Link href="/forgot-password" className="text-xs text-red-400 hover:text-red-300">
+                  Forgot password?
+                </Link>
+              </div>
+              <input
+                type="password"
+                required
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2.5
+                           text-sm focus:outline-none focus:ring-2 focus:ring-red-600 focus:border-transparent"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-2.5 bg-red-700 text-white rounded-lg font-semibold text-sm
+                         hover:bg-red-800 disabled:opacity-50 transition-colors mt-2"
+            >
+              {loading ? 'Signing in…' : 'Sign In'}
+            </button>
+          </form>
+        ) : (
+          <SignupForm onSuccess={() => setTab('login')} />
+        )}
       </div>
     </div>
   );

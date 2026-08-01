@@ -26,7 +26,6 @@ interface ParsedRow {
   brand: string;
   partNumber: string;
   compatibleModels: string;
-  type: string;
   categoryName: string;
   hsnCode: string;
   variantName: string;
@@ -52,8 +51,7 @@ function buildExportRows(products: any[]): ExportRow[] {
         productName: p.name,
         brand: p.brand || '',
         partNumber: p.partNumber || '',
-        compatibleModels: p.compatibleModels || '',
-        type: p.type || '',
+        compatibleModels: p.customFields?.compatible_models || '',
         category: p.category?.name || '',
         hsnCode: p.hsnCode || '',
         variantName: sku.variantName || '',
@@ -127,10 +125,9 @@ export function ExportImportModal({ products, storeName, onClose, onImportDone }
 
           rows.push({
             productName: name,
-            brand: raw['Brand']?.trim() || 'Royal Enfield',
+            brand: raw['Brand']?.trim() || '',
             partNumber: raw['Part Number']?.trim() || '',
             compatibleModels: raw['Compatible Models']?.trim() || '',
-            type: raw['Type']?.trim().toUpperCase() || 'OTHER',
             categoryName: raw['Category']?.trim() || 'Other',
             hsnCode: raw['HSN Code']?.trim() || '',
             variantName: variant,
@@ -316,7 +313,6 @@ export function ExportImportModal({ products, storeName, onClose, onImportDone }
                               <th className="px-3 py-2 text-left">#</th>
                               <th className="px-3 py-2 text-left">Product</th>
                               <th className="px-3 py-2 text-left">Variant</th>
-                              <th className="px-3 py-2 text-left">Type</th>
                               <th className="px-3 py-2 text-left">Category</th>
                               <th className="px-3 py-2 text-right">Price</th>
                               <th className="px-3 py-2 text-right">Stock</th>
@@ -331,7 +327,6 @@ export function ExportImportModal({ products, storeName, onClose, onImportDone }
                                   {r.partNumber && <span className="ml-1 text-red-600 font-mono">[{r.partNumber}]</span>}
                                 </td>
                                 <td className="px-3 py-1.5 text-gray-600">{r.variantName}</td>
-                                <td className="px-3 py-1.5 text-gray-500">{r.type}</td>
                                 <td className="px-3 py-1.5 text-gray-500">{r.categoryName}</td>
                                 <td className="px-3 py-1.5 text-right font-semibold">₹{r.sellingPrice.toLocaleString('en-IN')}</td>
                                 <td className="px-3 py-1.5 text-right text-green-700">{r.openingStock}</td>

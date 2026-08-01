@@ -13,14 +13,13 @@ export class InventoryService {
     const product = await this.prisma.product.create({
       data: {
         name: dto.name,
-        brand: dto.brand || 'Royal Enfield',
+        brand: dto.brand || null,
         partNumber: dto.partNumber || null,
-        compatibleModels: dto.compatibleModels || null,
-        type: dto.type,
         categoryId: dto.categoryId,
         storeId,
         description: dto.description || null,
         hsnCode: dto.hsnCode || null,
+        customFields: dto.customFields ?? undefined,
         skus: {
           create: dto.skus.map((sku) => ({
             variantName: sku.variantName,
@@ -55,16 +54,15 @@ export class InventoryService {
 
   async listProducts(
     storeId: string,
-    filters: { search?: string; type?: string; lowStock?: boolean },
+    filters: { search?: string; categoryId?: string; lowStock?: boolean },
   ) {
     const where: any = { storeId };
-    if (filters.type) where.type = filters.type;
+    if (filters.categoryId) where.categoryId = filters.categoryId;
     if (filters.search) {
       where.OR = [
         { name: { contains: filters.search, mode: 'insensitive' } },
         { brand: { contains: filters.search, mode: 'insensitive' } },
         { partNumber: { contains: filters.search, mode: 'insensitive' } },
-        { compatibleModels: { contains: filters.search, mode: 'insensitive' } },
       ];
     }
 
@@ -221,7 +219,6 @@ export class InventoryService {
       brand?: string;
       partNumber?: string;
       compatibleModels?: string;
-      type: string;
       categoryName: string;
       hsnCode?: string;
       variantName: string;
@@ -243,17 +240,12 @@ export class InventoryService {
     const allCategories = await this.prisma.category.findMany();
     allCategories.forEach((c) => categoryCache.set(c.name.toLowerCase(), c.id));
 
-    const validTypes = ['ENGINE','ELECTRICAL','BODY_FRAME','BRAKES_SUSPENSION','FILTERS_FLUIDS','CHAIN_SPROCKET','TRANSMISSION','ACCESSORIES','OTHER'];
-
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       try {
         if (!row.productName?.trim()) throw new Error('Product Name is required');
         if (!row.variantName?.trim()) throw new Error('Variant Name is required');
         if (!row.sellingPrice || isNaN(Number(row.sellingPrice))) throw new Error('Selling Price must be a number');
-
-        const type = (row.type || 'OTHER').toUpperCase().replace(/[^A-Z_]/g, '_');
-        if (!validTypes.includes(type)) throw new Error(`Invalid Type "${row.type}". Must be one of: ${validTypes.join(', ')}`);
 
         // Find or create category
         const catKey = (row.categoryName || 'Other').toLowerCase().trim();
@@ -267,10 +259,11 @@ export class InventoryService {
         const product = await this.prisma.product.create({
           data: {
             name: row.productName.trim(),
-            brand: row.brand?.trim() || 'Royal Enfield',
+            brand: row.brand?.trim() || null,
             partNumber: row.partNumber?.trim() || null,
-            compatibleModels: row.compatibleModels?.trim() || null,
-            type: type as any,
+            customFields: row.compatibleModels?.trim()
+              ? { compatible_models: row.compatibleModels.trim() }
+              : undefined,
             categoryId,
             hsnCode: row.hsnCode?.trim() || null,
             storeId,

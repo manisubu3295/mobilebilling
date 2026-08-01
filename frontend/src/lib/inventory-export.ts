@@ -5,7 +5,6 @@ export interface ExportRow {
   brand: string;
   partNumber: string;
   compatibleModels: string;
-  type: string;
   category: string;
   hsnCode: string;
   variantName: string;
@@ -24,7 +23,6 @@ export const CSV_HEADERS = [
   'Brand',
   'Part Number',
   'Compatible Models',
-  'Type',
   'Category',
   'HSN Code',
   'Variant Name',
@@ -38,10 +36,9 @@ export const CSV_HEADERS = [
 
 export const TEMPLATE_ROW = [
   'Air Filter',
-  'Royal Enfield',
-  'RE-500-39A01',
-  'Classic 350, Bullet 500',
-  'FILTERS_FLUIDS',
+  '',
+  'SKU-1001',
+  '',
   'Filters & Fluids',
   '84021900',
   'Standard',
@@ -51,11 +48,6 @@ export const TEMPLATE_ROW = [
   '18',
   '5',
   '10',
-];
-
-export const VALID_TYPES = [
-  'ENGINE', 'ELECTRICAL', 'BODY_FRAME', 'BRAKES_SUSPENSION',
-  'FILTERS_FLUIDS', 'CHAIN_SPROCKET', 'TRANSMISSION', 'ACCESSORIES', 'OTHER',
 ];
 
 function escapeCsv(val: string | number): string {
@@ -84,7 +76,7 @@ function triggerDownload(content: string | Blob, filename: string, mime = 'text/
 export function exportCsv(rows: ExportRow[]) {
   const data = rows.map((r) => [
     r.productName, r.brand, r.partNumber, r.compatibleModels,
-    r.type, r.category, r.hsnCode, r.variantName, r.unit,
+    r.category, r.hsnCode, r.variantName, r.unit,
     r.sellingPrice, r.costPrice, r.taxRate,
     r.lowStockThreshold, r.currentStock,
   ]);
@@ -95,9 +87,8 @@ export function exportCsv(rows: ExportRow[]) {
 /* ── Template ────────────────────────────────────────────────────────── */
 export function downloadTemplate() {
   const note = `# IMPORT TEMPLATE — Do NOT change column headers. Remove this comment row before importing.`;
-  const typeNote = `# Valid Types: ${VALID_TYPES.join(' | ')}`;
   const unitNote = `# Valid Units: PCS | SET | PAIR | LITER | METER | KG`;
-  const csv = [note, typeNote, unitNote, CSV_HEADERS.join(','), TEMPLATE_ROW.join(',')].join('\n');
+  const csv = [note, unitNote, CSV_HEADERS.join(','), TEMPLATE_ROW.join(',')].join('\n');
   triggerDownload(csv, 'inventory-import-template.csv', 'text/csv');
 }
 
@@ -109,7 +100,7 @@ export async function exportExcel(rows: ExportRow[]) {
     CSV_HEADERS,
     ...rows.map((r) => [
       r.productName, r.brand, r.partNumber, r.compatibleModels,
-      r.type, r.category, r.hsnCode, r.variantName, r.unit,
+      r.category, r.hsnCode, r.variantName, r.unit,
       r.sellingPrice, r.costPrice, r.taxRate,
       r.lowStockThreshold, r.currentStock,
     ]),
@@ -120,7 +111,7 @@ export async function exportExcel(rows: ExportRow[]) {
   // Column widths
   ws['!cols'] = [
     { wch: 28 }, { wch: 16 }, { wch: 18 }, { wch: 24 },
-    { wch: 18 }, { wch: 20 }, { wch: 12 }, { wch: 16 }, { wch: 8 },
+    { wch: 20 }, { wch: 12 }, { wch: 16 }, { wch: 8 },
     { wch: 12 }, { wch: 12 }, { wch: 10 }, { wch: 16 }, { wch: 14 },
   ];
 
@@ -130,8 +121,8 @@ export async function exportExcel(rows: ExportRow[]) {
 
   // Add a "Valid Values" reference sheet
   const refData = [
-    ['Type Values', 'Unit Values'],
-    ...VALID_TYPES.map((t, i) => [t, ['PCS', 'SET', 'PAIR', 'LITER', 'METER', 'KG'][i] ?? '']),
+    ['Unit Values'],
+    ...['PCS', 'SET', 'PAIR', 'LITER', 'METER', 'KG'].map((u) => [u]),
   ];
   const wsRef = utils.aoa_to_sheet(refData);
   utils.book_append_sheet(wb, wsRef, 'Reference');
@@ -147,28 +138,27 @@ export async function exportPdf(rows: ExportRow[], storeName: string) {
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
 
   // Header
-  doc.setFillColor(127, 29, 29); // RE dark red
+  doc.setFillColor(127, 29, 29);
   doc.rect(0, 0, 297, 18, 'F');
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(13);
   doc.setFont('helvetica', 'bold');
-  doc.text(storeName || 'Aadhirai Royal Enfield', 14, 8);
+  doc.text(storeName || 'Inventory Report', 14, 8);
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
-  doc.text('Parts Inventory Report', 14, 14);
+  doc.text('Inventory Report', 14, 14);
   doc.text(`Generated: ${new Date().toLocaleString('en-IN')}`, 200, 14);
 
   doc.setTextColor(0, 0, 0);
 
   autoTable(doc, {
     startY: 22,
-    head: [['#', 'Part Name', 'Part No.', 'Compatible', 'Type', 'Category', 'Variant', 'Unit', 'Sell ₹', 'Cost ₹', 'GST%', 'Stock']],
+    head: [['#', 'Product', 'Part No.', 'Compatible', 'Category', 'Variant', 'Unit', 'Sell ₹', 'Cost ₹', 'GST%', 'Stock']],
     body: rows.map((r, i) => [
       i + 1,
       r.productName,
       r.partNumber || '—',
       r.compatibleModels || '—',
-      r.type.replace(/_/g, ' '),
       r.category,
       r.variantName,
       r.unit,
@@ -187,17 +177,16 @@ export async function exportPdf(rows: ExportRow[], storeName: string) {
     alternateRowStyles: { fillColor: [249, 250, 251] },
     columnStyles: {
       0: { cellWidth: 8, halign: 'center' },
-      1: { cellWidth: 36 },
-      2: { cellWidth: 22 },
-      3: { cellWidth: 28 },
-      4: { cellWidth: 22 },
-      5: { cellWidth: 22 },
-      6: { cellWidth: 18 },
-      7: { cellWidth: 10, halign: 'center' },
+      1: { cellWidth: 40 },
+      2: { cellWidth: 24 },
+      3: { cellWidth: 32 },
+      4: { cellWidth: 24 },
+      5: { cellWidth: 20 },
+      6: { cellWidth: 10, halign: 'center' },
+      7: { cellWidth: 18, halign: 'right' },
       8: { cellWidth: 18, halign: 'right' },
-      9: { cellWidth: 18, halign: 'right' },
-      10: { cellWidth: 10, halign: 'center' },
-      11: { cellWidth: 14, halign: 'center' },
+      9: { cellWidth: 10, halign: 'center' },
+      10: { cellWidth: 14, halign: 'center' },
     },
     margin: { left: 10, right: 10 },
     didDrawPage: (data: any) => {
@@ -206,7 +195,7 @@ export async function exportPdf(rows: ExportRow[], storeName: string) {
       doc.setFontSize(7);
       doc.setTextColor(150);
       doc.text(
-        `Page ${data.pageNumber} of ${pageCount} · Aadhirai Royal Enfield Parts Inventory`,
+        `Page ${data.pageNumber} of ${pageCount} · ${storeName || 'Inventory Report'}`,
         10,
         (doc as any).internal.pageSize.height - 5,
       );

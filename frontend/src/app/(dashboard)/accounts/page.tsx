@@ -23,7 +23,7 @@ interface DayRow   { date: string; amount: string; count: number; }
 interface OutstandingInvoice {
   id: string;
   invoiceNumber: string;
-  customer: { name: string; phone: string; vehicleNo?: string } | null;
+  customer: { name: string; phone: string; customFields?: Record<string, any> } | null;
   createdBy: { name: string } | null;
   totalAmount: string;
   paidAmount: string;
@@ -149,7 +149,7 @@ export default function AccountsPage() {
   useEffect(() => { load(); }, [load]);
 
   const dateTag = new Date().toISOString().slice(0, 10);
-  const storeName = user?.store?.name || 'Aadhirai Royal Enfield';
+  const storeName = user?.store?.name || 'My Store';
 
   const rangeLabel = (() => {
     if (range !== 'custom') return RANGES.find((r) => r.id === range)?.label ?? range;
@@ -195,7 +195,7 @@ export default function AccountsPage() {
           inv.invoiceNumber,
           esc(inv.customer?.name || 'Walk-in'),
           esc(inv.customer?.phone || ''),
-          esc(inv.customer?.vehicleNo || ''),
+          esc(inv.customer?.customFields?.vehicle_no || ''),
           inv.totalAmount,
           inv.paidAmount,
           inv.balance,
@@ -367,7 +367,7 @@ export default function AccountsPage() {
             ...data.outstandingInvoices.map((inv) => [
               inv.invoiceNumber,
               inv.customer?.name || 'Walk-in',
-              inv.customer?.vehicleNo || '—',
+              inv.customer?.customFields?.vehicle_no || '—',
               fmtNum(inv.totalAmount),
               fmtNum(inv.paidAmount),
               fmtNum(inv.balance),
@@ -659,9 +659,9 @@ export default function AccountsPage() {
                         </div>
                         <p className="font-semibold text-sm text-gray-800">
                           {inv.customer?.name || 'Walk-in Customer'}
-                          {inv.customer?.vehicleNo && (
+                          {inv.customer?.customFields?.vehicle_no && (
                             <span className="ml-2 text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-mono">
-                              {inv.customer.vehicleNo}
+                              {inv.customer.customFields.vehicle_no}
                             </span>
                           )}
                         </p>
@@ -703,9 +703,9 @@ export default function AccountsPage() {
                               )}
                             </td>
                             <td className="px-4 py-3">
-                              {inv.customer?.vehicleNo ? (
+                              {inv.customer?.customFields?.vehicle_no ? (
                                 <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs font-mono font-semibold">
-                                  {inv.customer.vehicleNo}
+                                  {inv.customer.customFields.vehicle_no}
                                 </span>
                               ) : (
                                 <span className="text-gray-300">—</span>

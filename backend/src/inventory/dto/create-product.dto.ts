@@ -1,16 +1,15 @@
 import {
   IsArray,
   IsBoolean,
-  IsEnum,
   IsNotEmpty,
   IsNumber,
+  IsObject,
   IsOptional,
   IsString,
   Min,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { ProductType } from '@prisma/client';
 
 export class CreateSkuDto {
   @IsString()
@@ -60,18 +59,11 @@ export class CreateProductDto {
 
   @IsOptional()
   @IsString()
-  brand?: string;       // defaults to "Royal Enfield"
+  brand?: string;
 
   @IsOptional()
   @IsString()
-  partNumber?: string;  // OEM part number, e.g. "500-39A01"
-
-  @IsOptional()
-  @IsString()
-  compatibleModels?: string; // e.g. "Classic 350, Meteor 350"
-
-  @IsEnum(ProductType)
-  type: ProductType;
+  partNumber?: string;  // manufacturer part/SKU number
 
   @IsString()
   @IsNotEmpty()
@@ -84,6 +76,12 @@ export class CreateProductDto {
   @IsOptional()
   @IsString()
   hsnCode?: string;
+
+  // Business-defined fields (e.g. compatible models for a bike shop) — see the
+  // attributes module for how a store defines which keys are available here.
+  @IsOptional()
+  @IsObject()
+  customFields?: Record<string, any>;
 
   @IsArray()
   @ValidateNested({ each: true })

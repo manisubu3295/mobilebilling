@@ -11,8 +11,7 @@ interface Invoice {
     name?: string;
     phone?: string;
     email?: string;
-    vehicleNo?: string;
-    reModel?: string;
+    customFields?: Record<string, any>;
   } | null;
   items: Array<{
     sku: {
@@ -62,7 +61,6 @@ export function ThermalReceipt({ invoice }: { invoice: Invoice }) {
         {/* Header — red brand band */}
         <div className="receipt-brand-band">
           <div className="receipt-store-name">{invoice.store.name}</div>
-          <div className="receipt-store-sub">Royal Enfield Authorised Spare Parts</div>
         </div>
 
         {/* Store details */}
@@ -93,10 +91,10 @@ export function ThermalReceipt({ invoice }: { invoice: Invoice }) {
             <div className="receipt-customer-name">{invoice.customer.name || 'Walk-in Customer'}</div>
             {invoice.customer.phone && <div className="receipt-customer-detail">{invoice.customer.phone}</div>}
             {invoice.customer.email && <div className="receipt-customer-detail">{invoice.customer.email}</div>}
-            {(invoice.customer.vehicleNo || invoice.customer.reModel) && (
+            {(invoice.customer.customFields?.vehicle_no || invoice.customer.customFields?.re_model) && (
               <div className="receipt-vehicle-row">
-                {invoice.customer.vehicleNo && <span className="receipt-vehicle-badge">{invoice.customer.vehicleNo}</span>}
-                {invoice.customer.reModel && <span className="receipt-model-badge">{invoice.customer.reModel}</span>}
+                {invoice.customer.customFields?.vehicle_no && <span className="receipt-vehicle-badge">{invoice.customer.customFields.vehicle_no}</span>}
+                {invoice.customer.customFields?.re_model && <span className="receipt-model-badge">{invoice.customer.customFields.re_model}</span>}
               </div>
             )}
           </div>
@@ -185,7 +183,7 @@ export function ThermalReceipt({ invoice }: { invoice: Invoice }) {
 
         {/* Footer */}
         <div className="receipt-footer">
-          <div className="receipt-footer-line">✦ Thank you for choosing Aadhirai Royal Enfield ✦</div>
+          <div className="receipt-footer-line">✦ Thank you for your business ✦</div>
           <div className="receipt-footer-note">Parts sold are non-returnable.</div>
           <div className="receipt-footer-note">Warranty as per manufacturer terms.</div>
           {invoice.createdBy && (

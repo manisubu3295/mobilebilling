@@ -9,8 +9,7 @@ interface Customer {
   name: string;
   phone: string;
   email: string | null;
-  vehicleNo: string | null;
-  reModel: string | null;
+  customFields: Record<string, any> | null;
   createdAt: string;
   invoices?: { id: string; invoiceNumber: string; totalAmount: string; status: string; createdAt: string }[];
 }
@@ -112,9 +111,9 @@ export default function CustomersPage() {
                       <p className="text-sm text-gray-500 flex items-center gap-1 mt-0.5">
                         <Phone className="h-3.5 w-3.5" /> {c.phone}
                       </p>
-                      {(c.vehicleNo || c.reModel) && (
+                      {(c.customFields?.vehicle_no || c.customFields?.re_model) && (
                         <p className="text-xs text-red-600 flex items-center gap-1 mt-0.5">
-                          <Car className="h-3.5 w-3.5" /> {c.vehicleNo} {c.reModel && `· ${c.reModel}`}
+                          <Car className="h-3.5 w-3.5" /> {c.customFields?.vehicle_no} {c.customFields?.re_model && `· ${c.customFields.re_model}`}
                         </p>
                       )}
                     </div>
@@ -133,7 +132,7 @@ export default function CustomersPage() {
                     <th className="text-left px-4 py-3 font-medium text-gray-600">Phone</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-600">Email</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-600">Vehicle</th>
-                    <th className="text-left px-4 py-3 font-medium text-gray-600">RE Model</th>
+                    <th className="text-left px-4 py-3 font-medium text-gray-600">Model</th>
                     <th className="px-4 py-3 w-12"></th>
                   </tr>
                 </thead>
@@ -143,8 +142,8 @@ export default function CustomersPage() {
                       <td className="px-4 py-3 font-medium text-gray-900">{c.name}</td>
                       <td className="px-4 py-3 text-gray-600">{c.phone}</td>
                       <td className="px-4 py-3 text-gray-500">{c.email || '—'}</td>
-                      <td className="px-4 py-3 font-mono text-gray-600 text-xs">{c.vehicleNo || '—'}</td>
-                      <td className="px-4 py-3 text-gray-600">{c.reModel || '—'}</td>
+                      <td className="px-4 py-3 font-mono text-gray-600 text-xs">{c.customFields?.vehicle_no || '—'}</td>
+                      <td className="px-4 py-3 text-gray-600">{c.customFields?.re_model || '—'}</td>
                       <td className="px-4 py-3">
                         <ChevronRight className="h-4 w-4 text-gray-300" />
                       </td>
@@ -171,8 +170,8 @@ export default function CustomersPage() {
             <div className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-3 text-sm">
                 {selected.email && <div><span className="text-gray-500">Email:</span> <span className="font-medium">{selected.email}</span></div>}
-                {selected.vehicleNo && <div><span className="text-gray-500">Vehicle No:</span> <span className="font-medium font-mono">{selected.vehicleNo}</span></div>}
-                {selected.reModel && <div><span className="text-gray-500">RE Model:</span> <span className="font-medium">{selected.reModel}</span></div>}
+                {selected.customFields?.vehicle_no && <div><span className="text-gray-500">Vehicle No:</span> <span className="font-medium font-mono">{selected.customFields.vehicle_no}</span></div>}
+                {selected.customFields?.re_model && <div><span className="text-gray-500">Model:</span> <span className="font-medium">{selected.customFields.re_model}</span></div>}
                 <div><span className="text-gray-500">Since:</span> <span className="font-medium">{new Date(selected.createdAt).toLocaleDateString('en-IN', { dateStyle: 'medium' })}</span></div>
               </div>
               {selected.invoices && selected.invoices.length > 0 && (
@@ -216,7 +215,11 @@ function AddCustomerModal({ onClose, onSave }: { onClose: () => void; onSave: ()
     if (!form.name || !form.phone) { setError('Name and phone are required.'); return; }
     setSaving(true);
     try {
-      await api.post('/customers', form);
+      const { vehicleNo, reModel, ...rest } = form;
+      const customFields: Record<string, string> = {};
+      if (vehicleNo) customFields.vehicle_no = vehicleNo;
+      if (reModel) customFields.re_model = reModel;
+      await api.post('/customers', { ...rest, customFields: Object.keys(customFields).length ? customFields : undefined });
       onSave();
     } catch (e: any) {
       setError(e.response?.data?.message || 'Failed to create customer');
@@ -242,8 +245,8 @@ function AddCustomerModal({ onClose, onSave }: { onClose: () => void; onSave: ()
             { label: 'Full Name *', key: 'name', placeholder: '' },
             { label: 'Phone *', key: 'phone', placeholder: '9876543210' },
             { label: 'Email', key: 'email', placeholder: '' },
-            { label: 'Vehicle No.', key: 'vehicleNo', placeholder: 'TN01AB1234' },
-            { label: 'Royal Enfield Model', key: 'reModel', placeholder: 'Classic 350, Bullet 500…' },
+            { label: 'Vehicle No. (optional)', key: 'vehicleNo', placeholder: 'TN01AB1234' },
+            { label: 'Model (optional)', key: 'reModel', placeholder: 'e.g. Classic 350' },
           ].map(({ label, key, placeholder }) => (
             <div key={key}>
               <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>

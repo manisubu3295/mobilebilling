@@ -9,11 +9,20 @@ interface AuthUser {
   store: { id: string; name: string; logoUrl?: string; staticQrUrl?: string };
 }
 
+interface SignupInput {
+  businessName: string;
+  ownerName: string;
+  email: string;
+  phone: string;
+  password: string;
+}
+
 interface AuthState {
   user: AuthUser | null;
   accessToken: string | null;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
+  signup: (input: SignupInput) => Promise<void>;
   logout: () => Promise<void>;
   setToken: (token: string) => void;
 }
@@ -27,6 +36,12 @@ export const useAuthStore = create<AuthState>()(
 
       login: async (email, password) => {
         const { data } = await api.post('/auth/login', { email, password });
+        localStorage.setItem('access_token', data.accessToken);
+        set({ user: data.user, accessToken: data.accessToken, isAuthenticated: true });
+      },
+
+      signup: async (input) => {
+        const { data } = await api.post('/auth/signup', input);
         localStorage.setItem('access_token', data.accessToken);
         set({ user: data.user, accessToken: data.accessToken, isAuthenticated: true });
       },

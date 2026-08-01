@@ -1,6 +1,6 @@
-# Aadhirai RE Parts — Mobile Billing System
+# Aadhirai Billing — Multi-Tenant Billing & Inventory System
 
-A Royal Enfield spare parts billing and inventory management system.
+A billing and inventory management system for any retail business. Each signed-up business gets its own fully isolated database — no shared data between tenants.
 
 ---
 
@@ -10,7 +10,7 @@ A Royal Enfield spare parts billing and inventory management system.
 |----------|------------|
 | Frontend | Next.js 14 (App Router), Tailwind CSS |
 | Backend  | NestJS, Prisma ORM |
-| Database | PostgreSQL |
+| Database | PostgreSQL (one master DB + one database per tenant) |
 | Auth     | JWT (access + refresh tokens) |
 
 ---
@@ -20,7 +20,7 @@ A Royal Enfield spare parts billing and inventory management system.
 Install these before starting:
 
 - **Node.js** v18 or later → https://nodejs.org
-- **PostgreSQL** v14 or later → https://www.postgresql.org/download
+- **PostgreSQL** v14 or later, with a superuser role that can `CREATE DATABASE` → https://www.postgresql.org/download
 - **Git**
 
 ---
@@ -36,7 +36,13 @@ cd mobilebilling
 
 ## 2. Database setup
 
-Open **pgAdmin** or **psql** and create the database:
+Create the master database (tracks tenant accounts) — the per-tenant databases are created automatically when a business signs up:
+
+```sql
+CREATE DATABASE mobilebilling_master;
+```
+
+If you also want a local dev tenant seeded directly (skipping signup), create a database for it too:
 
 ```sql
 CREATE DATABASE mobilebilling;
@@ -62,18 +68,42 @@ Open `backend/.env` and update:
 
 ```env
 DATABASE_URL="postgresql://postgres:YOUR_PASSWORD@localhost:5432/mobilebilling?schema=public"
+MASTER_DATABASE_URL="postgresql://postgres:YOUR_PASSWORD@localhost:5432/mobilebilling_master?schema=public"
+PG_ADMIN_URL="postgresql://postgres:YOUR_PASSWORD@localhost:5432/postgres"
 JWT_ACCESS_SECRET="any-long-random-string-32-chars-min"
 JWT_REFRESH_SECRET="another-long-random-string-different"
+PLATFORM_ADMIN_JWT_SECRET="another-long-random-string-different-again"
 FRONTEND_URL="http://localhost:3000"
 PORT=4000
 NODE_ENV=development
+# Optional until you're ready to send real email:
+SMTP_HOST=""
+SMTP_PORT=587
+SMTP_USER=""
+SMTP_PASS=""
+SMTP_FROM="Aadhirai Billing <no-reply@example.com>"
+ADMIN_NOTIFY_EMAIL="you@example.com"
 ```
 
-Push the database schema and seed initial data:
+Set up both databases and generate both Prisma clients:
 
 ```bash
-npx prisma db push
-npx prisma db seed
+npx prisma migrate deploy
+npx prisma generate
+npm run prisma:migrate:master
+npm run prisma:generate:master
+```
+
+Create your platform admin login (used to resolve customer password-reset requests):
+
+```bash
+ADMIN_EMAIL=you@example.com ADMIN_PASSWORD=SomethingStrong123 ADMIN_NAME="Your Name" npm run prisma:seed:admin
+```
+
+(Optional) Seed a local dev tenant directly with sample demo data instead of going through signup:
+
+```bash
+npm run prisma:seed
 ```
 
 Start the backend:
@@ -102,7 +132,7 @@ copy .env.local.example .env.local        # Windows
 # cp .env.local.example .env.local        # Mac/Linux
 ```
 
-The default value in `.env.local` already points to the local backend — no change needed for local development.
+The default value in `.env.local` points at `http://localhost:4000/api/v1` — update it if your backend runs elsewhere (e.g. testing from another device on your network, use your machine's LAN IP instead of `localhost`).
 
 Start the frontend:
 
@@ -114,12 +144,16 @@ Frontend runs at **http://localhost:3000**
 
 ---
 
-## 5. Login
+## 5. Getting started
 
-| Role          | Email                    | Password    |
-|---------------|--------------------------|-------------|
-| Super Admin   | admin@aadhirai.com       | Admin@1234  |
-| Billing Clerk | clerk@aadhirai.com       | Clerk@1234  |
+- **New business**: go to `/login`, click **Create Account**, fill in business name/owner/email/phone/password. A new isolated database is provisioned automatically and you're logged in as that business's `SUPER_ADMIN`.
+- **Forgot password**: `/forgot-password` — this notifies the platform admin, who resets it from `/admin/login` → `/admin/requests` and emails the customer a new password.
+- **If you ran `npm run prisma:seed`**, log in with:
+
+  | Role          | Email                    | Password    |
+  |---------------|--------------------------|-------------|
+  | Super Admin   | admin@aadhirai.com       | Admin@1234  |
+  | Billing Clerk | clerk@aadhirai.com       | Clerk@1234  |
 
 ---
 
@@ -127,30 +161,40 @@ Frontend runs at **http://localhost:3000**
 
 ```
 mobilebilling/
-├── backend/                  # NestJS API
+├── backend/                       # NestJS API
 │   ├── prisma/
-│   │   ├── schema.prisma     # Database schema
-│   │   └── seed.ts           # Seed data
+│   │   ├── schema.prisma          # Tenant database schema (template for every business)
+│   │   └── seed.ts                # Optional demo data loader
+│   ├── prisma-master/
+│   │   └── schema.prisma          # Master database schema (account registry, reset queue)
 │   └── src/
-│       ├── auth/
+│       ├── auth/                  # Signup / login / forgot-password
+│       ├── platform-admin/        # Admin console API (resolve reset requests)
+│       ├── tenancy/               # Dynamic tenant database provisioning
+│       ├── prisma/                # Request-scoped tenant DB routing
+│       ├── mailer/
+│       ├── attributes/            # Per-tenant custom fields (products/customers)
 │       ├── billing/
 │       ├── customers/
 │       ├── inventory/
 │       ├── settings/
 │       └── users/
-└── frontend/                 # Next.js app
+└── frontend/                      # Next.js app
     └── src/
         ├── app/
+        │   ├── login/              # Sign in / create account
+        │   ├── forgot-password/
+        │   ├── admin/               # Platform admin console
         │   └── (dashboard)/
-        │       ├── accounts/       # Collections & revenue
-        │       ├── audit/          # Audit logs
+        │       ├── accounts/        # Collections & revenue
+        │       ├── audit/           # Audit logs
         │       ├── billing/
-        │       │   ├── checkout/   # POS billing screen
-        │       │   └── invoices/   # Invoice list & reprint
-        │       ├── customers/      # Customer CRM
-        │       ├── inventory/      # Parts inventory
-        │       ├── settings/       # Store settings
-        │       └── users/          # User management
+        │       │   ├── checkout/    # POS billing screen
+        │       │   └── invoices/    # Invoice list & reprint
+        │       ├── customers/       # Customer CRM
+        │       ├── inventory/       # Inventory management
+        │       ├── settings/        # Store settings
+        │       └── users/           # User management
         ├── components/
         └── lib/
 ```
@@ -170,10 +214,11 @@ mobilebilling/
 
 ## Key features
 
-- Parts billing with barcode / QR scan
-- Dual stock mode: serialized (high-value parts) and bulk quantity
+- Multi-tenant: every business gets its own isolated database, provisioned automatically at signup
+- Product/customer billing with barcode / QR scan
+- Dual stock mode: serialized (high-value items) and bulk quantity
+- Per-tenant custom fields on products/customers via the attributes API (`/api/v1/attributes`) — no dedicated Settings UI for managing these yet
 - GST invoice with thermal receipt printing
-- Customer CRM with vehicle history
 - Inventory with CSV/Excel/PDF export and CSV import
 - Accounts & Collections with daily/mode breakdown and PDF export
 - Invoice search by number, customer name, mobile, date, status
@@ -181,6 +226,7 @@ mobilebilling/
 - Offline draft saving (IndexedDB)
 - Audit logs for all actions
 - UPI QR code on receipts
+- Admin-mediated password reset
 
 ---
 
@@ -190,7 +236,7 @@ mobilebilling/
 # Backend
 cd backend
 npm run build
-node dist/src/main
+node dist/main
 
 # Frontend
 cd frontend

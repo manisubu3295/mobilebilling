@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, IsOptional, IsString, Matches } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsObject, IsOptional, IsString, Matches } from 'class-validator';
 
 export class CreateCustomerDto {
   @IsString()
@@ -21,11 +21,9 @@ export class CreateCustomerDto {
   @IsString()
   gstin?: string;
 
+  // Business-defined fields (e.g. vehicle no, RE model for a bike shop) — see the
+  // attributes module for how a store defines which keys are available here.
   @IsOptional()
-  @IsString()
-  vehicleNo?: string;  // e.g. TN01AB1234
-
-  @IsOptional()
-  @IsString()
-  reModel?: string;    // e.g. "Classic 350", "Meteor 350"
+  @IsObject()
+  customFields?: Record<string, any>;
 }
