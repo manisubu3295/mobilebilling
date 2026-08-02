@@ -226,7 +226,7 @@ export class InventoryService {
       productName: string;
       brand?: string;
       partNumber?: string;
-      compatibleModels?: string;
+      notes?: string;
       categoryName: string;
       hsnCode?: string;
       variantName: string;
@@ -269,8 +269,8 @@ export class InventoryService {
             name: row.productName.trim(),
             brand: row.brand?.trim() || null,
             partNumber: row.partNumber?.trim() || null,
-            customFields: row.compatibleModels?.trim()
-              ? { compatible_models: row.compatibleModels.trim() }
+            customFields: row.notes?.trim()
+              ? { notes: row.notes.trim() }
               : undefined,
             categoryId,
             hsnCode: row.hsnCode?.trim() || null,

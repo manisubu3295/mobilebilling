@@ -157,7 +157,7 @@ export default function InventoryPage() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
               <input
                 type="text"
-                placeholder="Search by name, part number…"
+                placeholder="Search by name, SKU, or code…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="w-full pl-9 pr-4 py-2.5 border rounded-lg bg-white text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
@@ -169,7 +169,7 @@ export default function InventoryPage() {
             ) : products.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-40 text-gray-400 gap-2">
                 <Package className="h-10 w-10 opacity-40" />
-                <p>No parts found</p>
+                <p>No products found</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -197,7 +197,7 @@ export default function InventoryPage() {
                           </div>
                           <p className="text-sm text-gray-500">
                             {product.category.name} · {product.skus.length} variant(s)
-                            {product.customFields?.compatible_models && ` · ${product.customFields.compatible_models}`}
+                            {product.customFields?.notes && ` · ${product.customFields.notes}`}
                           </p>
                         </div>
                         <div className="text-right shrink-0">
@@ -336,7 +336,7 @@ const UNITS = ['PCS', 'SET', 'PAIR', 'LITER', 'METER', 'KG'];
 /* ── Add Product Modal ──────────────────────────────────────────────── */
 function AddProductModal({ onClose, onSave }: { onClose: () => void; onSave: () => void }) {
   const [form, setForm] = useState({
-    name: '', brand: '', partNumber: '', compatibleModels: '',
+    name: '', brand: '', partNumber: '', notes: '',
     categoryId: '', hsnCode: '', description: '',
     skuName: 'Standard', unit: 'PCS', isSerialized: false,
     costPrice: '', sellingPrice: '', taxRate: '18', threshold: '5', barcode: '',
@@ -383,7 +383,7 @@ function AddProductModal({ onClose, onSave }: { onClose: () => void; onSave: () 
         name: form.name,
         brand: form.brand || undefined,
         partNumber: form.partNumber || undefined,
-        customFields: form.compatibleModels ? { compatible_models: form.compatibleModels } : undefined,
+        customFields: form.notes ? { notes: form.notes } : undefined,
         categoryId: form.categoryId,
         hsnCode: form.hsnCode || undefined,
         description: form.description || undefined,
@@ -422,10 +422,10 @@ function AddProductModal({ onClose, onSave }: { onClose: () => void; onSave: () 
           {error && <p className="text-sm text-red-600 bg-red-50 p-2 rounded">{error}</p>}
 
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Product Info</p>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Product Name *" value={form.name} onChange={f('name')} />
             <Field label="Brand" value={form.brand} onChange={f('brand')} />
-            <Field label="Part / SKU Number" value={form.partNumber} onChange={f('partNumber')} placeholder="e.g. SKU-1234" />
+            <Field label="SKU / Item Code" value={form.partNumber} onChange={f('partNumber')} placeholder="e.g. SKU-1234" />
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Category *</label>
               {!showNewCategory ? (
@@ -471,13 +471,13 @@ function AddProductModal({ onClose, onSave }: { onClose: () => void; onSave: () 
             </div>
             <Field label="HSN Code" value={form.hsnCode} onChange={f('hsnCode')} />
             <div className="col-span-2">
-              <Field label="Compatibility / Fitment Notes" value={form.compatibleModels} onChange={f('compatibleModels')} placeholder="Optional — e.g. compatible models, sizes, fits" />
+              <Field label="Notes" value={form.notes} onChange={f('notes')} placeholder="Optional — e.g. size, color, specifications" />
             </div>
           </div>
 
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide pt-2">Variant / SKU</p>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Variant Name" value={form.skuName} onChange={f('skuName')} placeholder="e.g. Standard OEM, BS6" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Field label="Variant Name" value={form.skuName} onChange={f('skuName')} placeholder="e.g. Standard, Large, Red" />
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Unit</label>
               <select value={form.unit} onChange={f('unit')} className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500">
@@ -496,7 +496,7 @@ function AddProductModal({ onClose, onSave }: { onClose: () => void; onSave: () 
                 onChange={(e) => setForm((p) => ({ ...p, isSerialized: e.target.value === 'serial' }))}
                 className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
               >
-                <option value="bulk">Bulk Qty (most parts)</option>
+                <option value="bulk">Bulk Qty (most items)</option>
                 <option value="serial">Serial-tracked (high-value)</option>
               </select>
             </div>
@@ -588,7 +588,7 @@ function AddStockModal({
                 Serial-tracked — enter one row per physical unit
               </p>
               {rows.map((row, i) => (
-                <div key={i} className="grid grid-cols-2 gap-2 p-3 bg-gray-50 rounded-lg">
+                <div key={i} className="grid grid-cols-1 sm:grid-cols-2 gap-2 p-3 bg-gray-50 rounded-lg">
                   <Field
                     label="Serial Number"
                     value={row.serialNumber}
@@ -656,7 +656,7 @@ function QrLabelModal({ data, storeName, onClose }: { data: QrLabelData; storeNa
         </div>
         <div style="font-size:9pt;font-weight:800;margin:1mm 0;line-height:1.2;">${data.productName}</div>
         <div style="font-size:7.5pt;color:#444;margin-bottom:1mm;">${data.variantName}</div>
-        ${data.partNumber ? `<div style="font-size:7pt;font-family:monospace;color:#7f1d1d;">Part# ${data.partNumber}</div>` : ''}
+        ${data.partNumber ? `<div style="font-size:7pt;font-family:monospace;color:#7f1d1d;">Code: ${data.partNumber}</div>` : ''}
         <div id="qr-${Math.random().toString(36).slice(2)}" style="margin:2mm auto;width:fit-content;"></div>
         <div style="font-size:7pt;font-family:monospace;color:#333;margin:1mm 0;">${data.qrValue}</div>
         <div style="font-size:10pt;font-weight:800;color:#111;">₹${parseFloat(data.price).toLocaleString('en-IN')} / ${data.unit}</div>
@@ -664,7 +664,7 @@ function QrLabelModal({ data, storeName, onClose }: { data: QrLabelData; storeNa
     `).join('');
 
     win.document.write(`<!DOCTYPE html><html><head>
-      <title>Part QR Labels</title>
+      <title>QR Labels</title>
       <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
       <style>
         body { margin: 4mm; background: #fff; }
@@ -691,7 +691,7 @@ function QrLabelModal({ data, storeName, onClose }: { data: QrLabelData; storeNa
         {/* Header */}
         <div className="flex items-center gap-2 p-5 border-b">
           <QrCode className="h-5 w-5 text-red-700" />
-          <h2 className="text-lg font-bold">Part QR Label</h2>
+          <h2 className="text-lg font-bold">QR Label</h2>
           <button onClick={onClose} className="ml-auto text-gray-400 hover:text-gray-700 text-2xl leading-none">&times;</button>
         </div>
 
@@ -702,7 +702,7 @@ function QrLabelModal({ data, storeName, onClose }: { data: QrLabelData; storeNa
             <p className="font-bold text-gray-900 text-center text-sm leading-tight">{data.productName}</p>
             <p className="text-xs text-gray-500">{data.variantName}</p>
             {data.partNumber && (
-              <p className="text-xs font-mono text-red-700">Part# {data.partNumber}</p>
+              <p className="text-xs font-mono text-red-700">Code: {data.partNumber}</p>
             )}
             <div className="p-1 bg-white border rounded-lg">
               <QRCodeSVG value={data.qrValue} size={100} level="H" includeMargin={false} />
@@ -718,8 +718,8 @@ function QrLabelModal({ data, storeName, onClose }: { data: QrLabelData; storeNa
             <span className="font-semibold">QR encodes: </span>
             {data.qrValue}
             {!data.qrValue.startsWith('SKU-')
-              ? ' (existing barcode / part number)'
-              : ' (auto-generated — scan this in checkout to find the part)'}
+              ? ' (existing barcode / item code)'
+              : ' (auto-generated — scan this in checkout to find the item)'}
           </div>
 
           {/* Copies */}

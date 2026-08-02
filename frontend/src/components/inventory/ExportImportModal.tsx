@@ -25,7 +25,7 @@ interface ParsedRow {
   productName: string;
   brand: string;
   partNumber: string;
-  compatibleModels: string;
+  notes: string;
   categoryName: string;
   hsnCode: string;
   variantName: string;
@@ -51,7 +51,7 @@ function buildExportRows(products: any[]): ExportRow[] {
         productName: p.name,
         brand: p.brand || '',
         partNumber: p.partNumber || '',
-        compatibleModels: p.customFields?.compatible_models || '',
+        notes: p.customFields?.notes || '',
         category: p.category?.name || '',
         hsnCode: p.hsnCode || '',
         variantName: sku.variantName || '',
@@ -126,8 +126,8 @@ export function ExportImportModal({ products, storeName, onClose, onImportDone }
           rows.push({
             productName: name,
             brand: raw['Brand']?.trim() || '',
-            partNumber: raw['Part Number']?.trim() || '',
-            compatibleModels: raw['Compatible Models']?.trim() || '',
+            partNumber: raw['Item Code']?.trim() || '',
+            notes: raw['Notes']?.trim() || '',
             categoryName: raw['Category']?.trim() || 'Other',
             hsnCode: raw['HSN Code']?.trim() || '',
             variantName: variant,
@@ -241,7 +241,7 @@ export function ExportImportModal({ products, storeName, onClose, onImportDone }
               </div>
 
               <div className="pt-2 border-t text-center">
-                <p className="text-xs text-gray-400 mb-2">Need to import new parts? Use the Import tab.</p>
+                <p className="text-xs text-gray-400 mb-2">Need to import new products? Use the Import tab.</p>
               </div>
             </div>
           )}
@@ -253,7 +253,7 @@ export function ExportImportModal({ products, storeName, onClose, onImportDone }
               <div className="flex items-center justify-between p-3 bg-amber-50 border border-amber-200 rounded-lg">
                 <div>
                   <p className="text-sm font-semibold text-amber-800">Step 1 — Download the template</p>
-                  <p className="text-xs text-amber-700 mt-0.5">Fill in your parts data using the exact column headers.</p>
+                  <p className="text-xs text-amber-700 mt-0.5">Fill in your product data using the exact column headers.</p>
                 </div>
                 <button onClick={downloadTemplate}
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 text-white rounded-lg text-xs font-semibold hover:bg-amber-700 shrink-0">
@@ -340,7 +340,7 @@ export function ExportImportModal({ products, storeName, onClose, onImportDone }
                         className="mt-3 w-full py-2.5 bg-red-700 text-white rounded-lg text-sm font-semibold hover:bg-red-800 disabled:opacity-50 flex items-center justify-center gap-2">
                         {importing
                           ? <><Loader2 className="h-4 w-4 animate-spin" /> Importing…</>
-                          : <><Upload className="h-4 w-4" /> Import {parsedRows.length} Parts</>}
+                          : <><Upload className="h-4 w-4" /> Import {parsedRows.length} Products</>}
                       </button>
                     </div>
                   )}
@@ -353,7 +353,7 @@ export function ExportImportModal({ products, storeName, onClose, onImportDone }
                   <div className="flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-xl">
                     <CheckCircle className="h-8 w-8 text-green-600 shrink-0" />
                     <div>
-                      <p className="font-bold text-green-800 text-base">{result.created} parts imported successfully</p>
+                      <p className="font-bold text-green-800 text-base">{result.created} products imported successfully</p>
                       {result.errors.length > 0 && (
                         <p className="text-sm text-amber-700 mt-0.5">{result.errors.length} rows had errors (see below)</p>
                       )}

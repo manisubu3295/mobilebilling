@@ -102,7 +102,7 @@ export default function CheckoutPage() {
     <div className="h-full flex flex-col bg-gray-50 overflow-hidden">
       {/* Header bar */}
       <div className="bg-white border-b px-4 py-3 flex items-center justify-between no-print shrink-0">
-        <h1 className="font-bold text-gray-900">Parts Billing</h1>
+        <h1 className="font-bold text-gray-900">Checkout</h1>
         {!isOnline && (
           <span className="px-2 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-medium">
             Offline
@@ -156,7 +156,7 @@ export default function CheckoutPage() {
               {isSubmitting
                 ? 'Processing…'
                 : store.items.length === 0
-                  ? 'Add parts to cart'
+                  ? 'Add items to cart'
                   : `Complete Sale — ₹${store.total().toFixed(2)}`}
             </button>
           </div>

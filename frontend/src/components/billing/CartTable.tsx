@@ -11,7 +11,7 @@ export function CartTable() {
     return (
       <div className="flex flex-col items-center justify-center h-32 text-gray-400 gap-1">
         <p className="text-sm">Cart is empty</p>
-        <p className="text-xs">Scan a barcode or enter a part number above</p>
+        <p className="text-xs">Scan a barcode or enter an item code above</p>
       </div>
     );
   }

@@ -23,7 +23,7 @@ export function CustomerSearch({ selectedId, onSelect }: CustomerSearchProps) {
   const [selected, setSelected] = useState<Customer | null>(null);
   const [loading, setLoading] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
-  const [newCustomer, setNewCustomer] = useState({ name: '', phone: '', email: '', vehicleNo: '', reModel: '' });
+  const [newCustomer, setNewCustomer] = useState({ name: '', phone: '', email: '' });
 
   const handleSearch = useCallback(async (val: string) => {
     if (val.length < 3) { setResults([]); return; }
@@ -53,17 +53,10 @@ export function CustomerSearch({ selectedId, onSelect }: CustomerSearchProps) {
   const handleCreate = async () => {
     if (!newCustomer.name || !newCustomer.phone) return;
     try {
-      const { name, phone, email, vehicleNo, reModel } = newCustomer;
-      const customFields: Record<string, string> = {};
-      if (vehicleNo) customFields.vehicle_no = vehicleNo;
-      if (reModel) customFields.re_model = reModel;
-      const { data } = await api.post('/customers', {
-        name, phone, email,
-        customFields: Object.keys(customFields).length ? customFields : undefined,
-      });
+      const { data } = await api.post('/customers', newCustomer);
       handleSelect(data);
       setShowCreate(false);
-      setNewCustomer({ name: '', phone: '', email: '', vehicleNo: '', reModel: '' });
+      setNewCustomer({ name: '', phone: '', email: '' });
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to create customer');
     }
@@ -143,18 +136,6 @@ export function CustomerSearch({ selectedId, onSelect }: CustomerSearchProps) {
               placeholder="Email (optional)"
               value={newCustomer.email}
               onChange={(e) => setNewCustomer((p) => ({ ...p, email: e.target.value }))}
-              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
-            />
-            <input
-              placeholder="Vehicle No. (optional)"
-              value={newCustomer.vehicleNo}
-              onChange={(e) => setNewCustomer((p) => ({ ...p, vehicleNo: e.target.value }))}
-              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
-            />
-            <input
-              placeholder="Model (optional)"
-              value={newCustomer.reModel}
-              onChange={(e) => setNewCustomer((p) => ({ ...p, reModel: e.target.value }))}
               className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
             />
             <div className="flex gap-2 pt-1">

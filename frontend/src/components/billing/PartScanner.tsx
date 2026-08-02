@@ -198,8 +198,8 @@ export function PartScanner() {
                 )}
               </p>
               <p className="text-xs text-gray-500">{selected.variantName}</p>
-              {selected.customFields?.compatible_models && (
-                <p className="text-xs text-gray-400">Fits: {selected.customFields.compatible_models}</p>
+              {selected.customFields?.notes && (
+                <p className="text-xs text-gray-400">Note: {selected.customFields.notes}</p>
               )}
               <p className="text-xs text-gray-500 font-mono mt-0.5">
                 {selected.type === 'serial'

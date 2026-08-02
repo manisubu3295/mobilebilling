@@ -189,13 +189,12 @@ export default function AccountsPage() {
       ...data.byMode.map((r) => [esc(MODE_LABEL[r.mode] || r.mode), r.amount].join(',')),
       '',
       '## Outstanding Invoices',
-      'Invoice No,Customer,Phone,Vehicle,Total (INR),Paid (INR),Balance (INR),Date,Status',
+      'Invoice No,Customer,Phone,Total (INR),Paid (INR),Balance (INR),Date,Status',
       ...data.outstandingInvoices.map((inv) =>
         [
           inv.invoiceNumber,
           esc(inv.customer?.name || 'Walk-in'),
           esc(inv.customer?.phone || ''),
-          esc(inv.customer?.customFields?.vehicle_no || ''),
           inv.totalAmount,
           inv.paidAmount,
           inv.balance,
@@ -362,18 +361,17 @@ export default function AccountsPage() {
 
         autoTable(doc, {
           startY: y,
-          head: [['Invoice No', 'Customer', 'Vehicle', 'Total', 'Paid', 'Balance Due', 'Date']],
+          head: [['Invoice No', 'Customer', 'Total', 'Paid', 'Balance Due', 'Date']],
           body: [
             ...data.outstandingInvoices.map((inv) => [
               inv.invoiceNumber,
               inv.customer?.name || 'Walk-in',
-              inv.customer?.customFields?.vehicle_no || '—',
               fmtNum(inv.totalAmount),
               fmtNum(inv.paidAmount),
               fmtNum(inv.balance),
               new Date(inv.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
             ]),
-            ['', 'TOTAL OUTSTANDING', '', '', '', fmtNum(outTotal.toFixed(2)), ''],
+            ['', 'TOTAL OUTSTANDING', '', '', fmtNum(outTotal.toFixed(2)), ''],
           ],
           theme: 'striped',
           headStyles: { fillColor: [31, 41, 55], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 7.5 },
@@ -381,12 +379,11 @@ export default function AccountsPage() {
           alternateRowStyles: { fillColor: [255, 251, 235] },
           columnStyles: {
             0: { cellWidth: 28, fontStyle: 'bold', textColor: [127, 29, 29] },
-            1: { cellWidth: 38 },
-            2: { cellWidth: 24, halign: 'center' },
-            3: { cellWidth: 26, halign: 'right' },
-            4: { cellWidth: 26, halign: 'right', textColor: [22, 163, 74] },
-            5: { cellWidth: 28, halign: 'right', fontStyle: 'bold', textColor: [180, 83, 9] },
-            6: { cellWidth: 24, halign: 'center' },
+            1: { cellWidth: 44 },
+            2: { cellWidth: 28, halign: 'right' },
+            3: { cellWidth: 28, halign: 'right', textColor: [22, 163, 74] },
+            4: { cellWidth: 30, halign: 'right', fontStyle: 'bold', textColor: [180, 83, 9] },
+            5: { cellWidth: 26, halign: 'center' },
           },
           margin: { left: 14, right: 14 },
           didParseCell: (d: any) => {
@@ -659,11 +656,6 @@ export default function AccountsPage() {
                         </div>
                         <p className="font-semibold text-sm text-gray-800">
                           {inv.customer?.name || 'Walk-in Customer'}
-                          {inv.customer?.customFields?.vehicle_no && (
-                            <span className="ml-2 text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-mono">
-                              {inv.customer.customFields.vehicle_no}
-                            </span>
-                          )}
                         </p>
                         {inv.customer?.phone && <p className="text-xs text-gray-500">{inv.customer.phone}</p>}
                         <div className="flex justify-between text-xs mt-1">
@@ -682,7 +674,6 @@ export default function AccountsPage() {
                         <tr>
                           <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase">Invoice</th>
                           <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase">Customer</th>
-                          <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase">Vehicle</th>
                           <th className="px-4 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase">Total</th>
                           <th className="px-4 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase">Paid</th>
                           <th className="px-4 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase">Balance Due</th>
@@ -700,15 +691,6 @@ export default function AccountsPage() {
                               <p className="font-medium text-gray-800">{inv.customer?.name || 'Walk-in'}</p>
                               {inv.customer?.phone && (
                                 <p className="text-xs text-gray-400">{inv.customer.phone}</p>
-                              )}
-                            </td>
-                            <td className="px-4 py-3">
-                              {inv.customer?.customFields?.vehicle_no ? (
-                                <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs font-mono font-semibold">
-                                  {inv.customer.customFields.vehicle_no}
-                                </span>
-                              ) : (
-                                <span className="text-gray-300">—</span>
                               )}
                             </td>
                             <td className="px-4 py-3 text-right font-medium text-gray-800">{fmt(inv.totalAmount)}</td>

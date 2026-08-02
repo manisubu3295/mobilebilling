@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { Search, Users, Plus, Phone, Car, ChevronRight, X } from 'lucide-react';
+import { Search, Users, Plus, Phone, ChevronRight, X } from 'lucide-react';
 import api from '@/lib/api';
 
 interface Customer {
@@ -111,11 +111,6 @@ export default function CustomersPage() {
                       <p className="text-sm text-gray-500 flex items-center gap-1 mt-0.5">
                         <Phone className="h-3.5 w-3.5" /> {c.phone}
                       </p>
-                      {(c.customFields?.vehicle_no || c.customFields?.re_model) && (
-                        <p className="text-xs text-red-600 flex items-center gap-1 mt-0.5">
-                          <Car className="h-3.5 w-3.5" /> {c.customFields?.vehicle_no} {c.customFields?.re_model && `· ${c.customFields.re_model}`}
-                        </p>
-                      )}
                     </div>
                     <ChevronRight className="h-5 w-5 text-gray-300 shrink-0" />
                   </div>
@@ -131,8 +126,6 @@ export default function CustomersPage() {
                     <th className="text-left px-4 py-3 font-medium text-gray-600">Name</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-600">Phone</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-600">Email</th>
-                    <th className="text-left px-4 py-3 font-medium text-gray-600">Vehicle</th>
-                    <th className="text-left px-4 py-3 font-medium text-gray-600">Model</th>
                     <th className="px-4 py-3 w-12"></th>
                   </tr>
                 </thead>
@@ -142,8 +135,6 @@ export default function CustomersPage() {
                       <td className="px-4 py-3 font-medium text-gray-900">{c.name}</td>
                       <td className="px-4 py-3 text-gray-600">{c.phone}</td>
                       <td className="px-4 py-3 text-gray-500">{c.email || '—'}</td>
-                      <td className="px-4 py-3 font-mono text-gray-600 text-xs">{c.customFields?.vehicle_no || '—'}</td>
-                      <td className="px-4 py-3 text-gray-600">{c.customFields?.re_model || '—'}</td>
                       <td className="px-4 py-3">
                         <ChevronRight className="h-4 w-4 text-gray-300" />
                       </td>
@@ -206,7 +197,7 @@ export default function CustomersPage() {
 }
 
 function AddCustomerModal({ onClose, onSave }: { onClose: () => void; onSave: () => void }) {
-  const [form, setForm] = useState({ name: '', phone: '', email: '', vehicleNo: '', reModel: '' });
+  const [form, setForm] = useState({ name: '', phone: '', email: '' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -215,11 +206,7 @@ function AddCustomerModal({ onClose, onSave }: { onClose: () => void; onSave: ()
     if (!form.name || !form.phone) { setError('Name and phone are required.'); return; }
     setSaving(true);
     try {
-      const { vehicleNo, reModel, ...rest } = form;
-      const customFields: Record<string, string> = {};
-      if (vehicleNo) customFields.vehicle_no = vehicleNo;
-      if (reModel) customFields.re_model = reModel;
-      await api.post('/customers', { ...rest, customFields: Object.keys(customFields).length ? customFields : undefined });
+      await api.post('/customers', form);
       onSave();
     } catch (e: any) {
       setError(e.response?.data?.message || 'Failed to create customer');
@@ -245,8 +232,6 @@ function AddCustomerModal({ onClose, onSave }: { onClose: () => void; onSave: ()
             { label: 'Full Name *', key: 'name', placeholder: '' },
             { label: 'Phone *', key: 'phone', placeholder: '9876543210' },
             { label: 'Email', key: 'email', placeholder: '' },
-            { label: 'Vehicle No. (optional)', key: 'vehicleNo', placeholder: 'TN01AB1234' },
-            { label: 'Model (optional)', key: 'reModel', placeholder: 'e.g. Classic 350' },
           ].map(({ label, key, placeholder }) => (
             <div key={key}>
               <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>

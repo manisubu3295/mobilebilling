@@ -4,7 +4,7 @@ export interface ExportRow {
   productName: string;
   brand: string;
   partNumber: string;
-  compatibleModels: string;
+  notes: string;
   category: string;
   hsnCode: string;
   variantName: string;
@@ -21,8 +21,8 @@ export interface ExportRow {
 export const CSV_HEADERS = [
   'Product Name',
   'Brand',
-  'Part Number',
-  'Compatible Models',
+  'Item Code',
+  'Notes',
   'Category',
   'HSN Code',
   'Variant Name',
@@ -75,7 +75,7 @@ function triggerDownload(content: string | Blob, filename: string, mime = 'text/
 /* ── CSV ─────────────────────────────────────────────────────────────── */
 export function exportCsv(rows: ExportRow[]) {
   const data = rows.map((r) => [
-    r.productName, r.brand, r.partNumber, r.compatibleModels,
+    r.productName, r.brand, r.partNumber, r.notes,
     r.category, r.hsnCode, r.variantName, r.unit,
     r.sellingPrice, r.costPrice, r.taxRate,
     r.lowStockThreshold, r.currentStock,
@@ -99,7 +99,7 @@ export async function exportExcel(rows: ExportRow[]) {
   const wsData = [
     CSV_HEADERS,
     ...rows.map((r) => [
-      r.productName, r.brand, r.partNumber, r.compatibleModels,
+      r.productName, r.brand, r.partNumber, r.notes,
       r.category, r.hsnCode, r.variantName, r.unit,
       r.sellingPrice, r.costPrice, r.taxRate,
       r.lowStockThreshold, r.currentStock,
@@ -153,12 +153,12 @@ export async function exportPdf(rows: ExportRow[], storeName: string) {
 
   autoTable(doc, {
     startY: 22,
-    head: [['#', 'Product', 'Part No.', 'Compatible', 'Category', 'Variant', 'Unit', 'Sell ₹', 'Cost ₹', 'GST%', 'Stock']],
+    head: [['#', 'Product', 'Code', 'Notes', 'Category', 'Variant', 'Unit', 'Sell ₹', 'Cost ₹', 'GST%', 'Stock']],
     body: rows.map((r, i) => [
       i + 1,
       r.productName,
       r.partNumber || '—',
-      r.compatibleModels || '—',
+      r.notes || '—',
       r.category,
       r.variantName,
       r.unit,
