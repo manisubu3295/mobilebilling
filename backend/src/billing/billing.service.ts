@@ -8,6 +8,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { Role, StockStatus, AuditAction, InvoiceStatus } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
+import { unitAllowsDecimal } from '../common/units';
 
 const INVOICE_PREFIX = 'INV';
 const DISCOUNT_HARD_CAP = 15;
@@ -51,11 +52,19 @@ export class BillingService {
     for (const item of dto.items) {
       const sku = skus.find((s) => s.id === item.skuId)!;
 
+      // Serial units are always sold one at a time; anything else stays whole
+      // unless its unit is measured by weight/volume/length (KG, LITER, METER).
+      if ((sku.isSerialized || !unitAllowsDecimal(sku.unit)) && !Number.isInteger(item.quantity)) {
+        throw new BadRequestException(
+          `"${sku.variantName}" is sold in whole ${sku.unit} — quantity must be a whole number`,
+        );
+      }
+
       if (!sku.isSerialized) {
         // Bulk: check stockQty
-        if (sku.stockQty < item.quantity) {
+        if (sku.stockQty.lessThan(item.quantity)) {
           throw new BadRequestException(
-            `Insufficient stock for "${sku.variantName}". Available: ${sku.stockQty}, requested: ${item.quantity}`,
+            `Insufficient stock for "${sku.variantName}". Available: ${Number(sku.stockQty)}, requested: ${item.quantity}`,
           );
         }
       } else if (item.serialIds && item.serialIds.length > 0) {
@@ -98,7 +107,7 @@ export class BillingService {
             where: { id: sku.id },
             data: { stockQty: { decrement: item.quantity } },
           });
-          if (updated.stockQty < 0) {
+          if (updated.stockQty.lessThan(0)) {
             throw new BadRequestException(
               `Race condition: "${sku.variantName}" ran out of stock. Please try again.`,
             );
@@ -254,7 +263,7 @@ export class BillingService {
       return newInvoice;
     });
 
-    return this.prisma.invoice.findUnique({
+    const created = await this.prisma.invoice.findUnique({
       where: { id: invoice.id },
       include: {
         items: {
@@ -269,6 +278,7 @@ export class BillingService {
         createdBy: { select: { name: true, role: true } },
       },
     });
+    return this._serializeInvoiceItemQuantities(created);
   }
 
   async getInvoice(id: string, storeId: string) {
@@ -288,7 +298,24 @@ export class BillingService {
       },
     });
     if (!invoice) throw new NotFoundException('Invoice not found');
-    return invoice;
+    return this._serializeInvoiceItemQuantities(invoice);
+  }
+
+  // InvoiceItem.quantity/returnedQty are Decimal columns (fractional for
+  // KG/LITER/METER) but the frontend's contract has always been plain JSON
+  // numbers for these two fields — normalize on the way out.
+  private _serializeInvoiceItemQuantities<T extends { items: Array<{ quantity: any; returnedQty: any }> }>(
+    invoice: T | null,
+  ): T | null {
+    if (!invoice) return invoice;
+    return {
+      ...invoice,
+      items: invoice.items.map((item) => ({
+        ...item,
+        quantity: Number(item.quantity),
+        returnedQty: Number(item.returnedQty),
+      })),
+    };
   }
 
   async listInvoices(
@@ -361,7 +388,7 @@ export class BillingService {
         const item = invoice.items.find((i) => i.id === ret.itemId);
         if (!item) throw new BadRequestException(`Item ${ret.itemId} not found in invoice`);
 
-        const maxReturn = item.quantity - item.returnedQty;
+        const maxReturn = Number(item.quantity) - Number(item.returnedQty);
         if (ret.qty > maxReturn) {
           throw new BadRequestException(
             `Cannot return ${ret.qty} — only ${maxReturn} returnable for "${item.sku.variantName}"`,
@@ -565,7 +592,11 @@ export class BillingService {
         sellingPrice: sku.sellingPrice,
         taxRate: sku.taxRate,
         hsnCode: sku.product.hsnCode,
-        stockQty: sku.stockQty,
+        // stockQty is a Decimal column now (fractional stock for KG/LITER/METER)
+        // but this response's contract has always been a plain JSON number —
+        // normalize it here rather than pushing a Decimal-as-string onto every
+        // consumer (PartScanner etc.) the way money fields already are.
+        stockQty: Number(sku.stockQty),
       };
     }
   }

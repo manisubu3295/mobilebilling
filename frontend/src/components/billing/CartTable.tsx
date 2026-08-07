@@ -1,8 +1,49 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Trash2, Minus, Plus } from 'lucide-react';
-import { useBillingStore } from '@/store/billing.store';
+import { useBillingStore, type CartItem } from '@/store/billing.store';
+import { unitAllowsDecimal } from '@/lib/units';
+
+// KG/LITER/METER items need precise fractional entry (2.25, 0.5, …) that +/-
+// buttons alone can't reach — an editable field, kept as its own draft string
+// so mid-typing states like "2." don't get clobbered by the numeric store
+// value on every keystroke. PCS/SET/PAIR items keep the plain read-only
+// display they've always had; only decimal-eligible units get this input.
+function QtyValue({ item, className }: { item: CartItem; className: string }) {
+  const updateQuantity = useBillingStore((s) => s.updateQuantity);
+  const decimal = !item.isSerialized && unitAllowsDecimal(item.unit);
+  const [text, setText] = useState(String(item.quantity));
+
+  useEffect(() => {
+    if (parseFloat(text) !== item.quantity) setText(String(item.quantity));
+  }, [item.quantity]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!decimal) return <span className={className}>{item.quantity} {item.unit}</span>;
+
+  const commit = (val: string) => {
+    const n = parseFloat(val);
+    if (!isNaN(n) && n > 0) updateQuantity(item.skuId, n);
+    else setText(String(item.quantity)); // invalid entry — revert to last known-good value
+  };
+
+  return (
+    <span className="inline-flex items-center gap-1">
+      <input
+        type="number"
+        inputMode="decimal"
+        step="0.01"
+        min="0.01"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={(e) => commit(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+        className={`${className} border rounded text-center`}
+      />
+      <span className="text-xs text-gray-500">{item.unit}</span>
+    </span>
+  );
+}
 
 export function CartTable() {
   const { items, removeItem, updateQuantity } = useBillingStore();
@@ -24,6 +65,7 @@ export function CartTable() {
           const lineBase = item.unitPrice * item.quantity;
           const lineTax = (lineBase * item.taxRate) / 100;
           const lineTotal = lineBase + lineTax;
+          const atMaxStock = !item.isSerialized && item.stockQty !== undefined && item.quantity >= item.stockQty;
 
           return (
             <div key={item.skuId} className="p-3 flex items-start gap-3">
@@ -46,10 +88,10 @@ export function CartTable() {
                     >
                       <Minus className="h-3 w-3" />
                     </button>
-                    <span className="px-2 text-sm font-semibold">{item.quantity} {item.unit}</span>
+                    <QtyValue item={item} className="px-2 text-sm font-semibold w-16" />
                     <button
                       onClick={() => updateQuantity(item.skuId, item.quantity + 1)}
-                      disabled={item.isSerialized}
+                      disabled={item.isSerialized || atMaxStock}
                       className="px-2 py-1 bg-gray-100 hover:bg-gray-200 disabled:opacity-30"
                     >
                       <Plus className="h-3 w-3" />
@@ -57,6 +99,9 @@ export function CartTable() {
                   </div>
                   <span className="text-xs text-gray-400">× ₹{item.unitPrice.toFixed(0)}</span>
                 </div>
+                {atMaxStock && (
+                  <p className="text-[11px] text-amber-600 mt-1">Only {item.stockQty} {item.unit} in stock</p>
+                )}
               </div>
               <div className="text-right shrink-0">
                 <p className="font-bold text-gray-900 text-sm">₹{lineTotal.toFixed(2)}</p>
@@ -90,6 +135,7 @@ export function CartTable() {
             const lineBase = item.unitPrice * item.quantity;
             const lineTax = (lineBase * item.taxRate) / 100;
             const lineTotal = lineBase + lineTax;
+            const atMaxStock = !item.isSerialized && item.stockQty !== undefined && item.quantity >= item.stockQty;
 
             return (
               <tr key={item.skuId} className="hover:bg-gray-50">
@@ -112,15 +158,18 @@ export function CartTable() {
                     >
                       <Minus className="h-3 w-3" />
                     </button>
-                    <span className="w-12 text-center font-medium text-xs">{item.quantity} {item.unit}</span>
+                    <QtyValue item={item} className="w-12 text-center font-medium text-xs" />
                     <button
                       onClick={() => updateQuantity(item.skuId, item.quantity + 1)}
-                      disabled={item.isSerialized}
+                      disabled={item.isSerialized || atMaxStock}
                       className="p-1 rounded hover:bg-gray-200 disabled:opacity-30"
                     >
                       <Plus className="h-3 w-3" />
                     </button>
                   </div>
+                  {atMaxStock && (
+                    <p className="text-[11px] text-amber-600 text-center mt-0.5">Only {item.stockQty} in stock</p>
+                  )}
                 </td>
                 <td className="px-4 py-3 text-right text-gray-700">
                   ₹{item.unitPrice.toFixed(2)}<span className="text-xs text-gray-400">/{item.unit}</span>

@@ -6,6 +6,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import api from '@/lib/api';
 import { ExportImportModal } from '@/components/inventory/ExportImportModal';
 import { useAuthStore } from '@/store/auth.store';
+import { unitAllowsDecimal } from '@/lib/units';
 
 interface SKU {
   id: string;
@@ -377,6 +378,11 @@ function AddProductModal({ onClose, onSave }: { onClose: () => void; onSave: () 
     if (!form.name || !form.categoryId || !form.sellingPrice || !form.costPrice) {
       setError('Please fill all required fields (*).'); return;
     }
+    const initialStock = parseFloat(form.initialStock) || 0;
+    if (!form.isSerialized && !unitAllowsDecimal(form.unit) && !Number.isInteger(initialStock)) {
+      setError(`"${form.unit}" is stocked in whole numbers — opening stock must be a whole number.`);
+      return;
+    }
     setSaving(true);
     try {
       await api.post('/inventory/products', {
@@ -391,7 +397,7 @@ function AddProductModal({ onClose, onSave }: { onClose: () => void; onSave: () 
           variantName: form.skuName || 'Standard',
           unit: form.unit,
           isSerialized: form.isSerialized,
-          stockQty: form.isSerialized ? 0 : parseInt(form.initialStock) || 0,
+          stockQty: form.isSerialized ? 0 : initialStock,
           costPrice: +form.costPrice,
           sellingPrice: +form.sellingPrice,
           taxRate: +form.taxRate,
@@ -538,8 +544,13 @@ function AddStockModal({
     setSaving(true);
     try {
       if (!sku.isSerialized) {
-        const qty = parseInt(bulkQty);
-        if (!qty || qty < 1) { setError('Enter a valid quantity.'); setSaving(false); return; }
+        const qty = parseFloat(bulkQty);
+        if (!qty || qty <= 0) { setError('Enter a valid quantity.'); setSaving(false); return; }
+        if (!unitAllowsDecimal(sku.unit) && !Number.isInteger(qty)) {
+          setError(`"${sku.unit}" is stocked in whole numbers — enter a whole quantity.`);
+          setSaving(false);
+          return;
+        }
         const { data } = await api.post('/inventory/serial-units', { skuId: sku.id, bulkQty: qty });
         alert(`✓ Added ${data.added} ${sku.unit} to stock`);
       } else {

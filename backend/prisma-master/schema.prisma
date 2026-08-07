@@ -35,8 +35,27 @@ model PlatformAccount {
   updatedAt    DateTime      @updatedAt @map("updated_at")
 
   resetRequests PasswordResetRequest[]
+  userEmails    PlatformUserEmail[]
 
   @@map("platform_accounts")
+}
+
+// Login only knows an email — it has to resolve that to a tenant DB before it
+// can even check a password. PlatformAccount.email only covers the person who
+// signed up; every user added afterwards via the in-app User Management
+// module (any store's staff, any tenant) also needs an entry here so login
+// can route their email to the right account. One row per login-capable user
+// across the whole platform, email globally unique the same way it is for
+// PlatformAccount itself.
+model PlatformUserEmail {
+  id        String          @id @default(cuid())
+  email     String          @unique
+  accountId String          @map("account_id")
+  account   PlatformAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  createdAt DateTime        @default(now()) @map("created_at")
+
+  @@index([accountId])
+  @@map("platform_user_emails")
 }
 
 // Single-row table (id is always "singleton") for platform-wide settings that used

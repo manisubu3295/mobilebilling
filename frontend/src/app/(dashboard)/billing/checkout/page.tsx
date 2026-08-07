@@ -2,6 +2,7 @@
 
 import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { useBillingStore } from '@/store/billing.store';
+import { useAuthStore } from '@/store/auth.store';
 import { PartScanner } from '@/components/billing/PartScanner';
 import { CartTable } from '@/components/billing/CartTable';
 import { PaymentPanel } from '@/components/billing/PaymentPanel';
@@ -16,6 +17,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 export default function CheckoutPage() {
   const store = useBillingStore();
+  const { user } = useAuthStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [createdInvoice, setCreatedInvoice] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +52,12 @@ export default function CheckoutPage() {
     };
 
     if (!isOnline) {
-      await saveDraftInvoice(uuidv4(), payload);
+      if (!user?.store?.id) {
+        setError('Offline: cannot save draft — no active session.');
+        setIsSubmitting(false);
+        return;
+      }
+      await saveDraftInvoice(uuidv4(), payload, user.store.id);
       setError('Offline: Invoice saved as draft. Will sync when connected.');
       setIsSubmitting(false);
       return;
@@ -65,7 +72,7 @@ export default function CheckoutPage() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [store, isOnline]);
+  }, [store, isOnline, user]);
 
   /* ── Receipt view ───────────────────────────────────────────────── */
   if (createdInvoice) {

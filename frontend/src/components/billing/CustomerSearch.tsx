@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Search, UserPlus, X } from 'lucide-react';
 import api from '@/lib/api';
 
@@ -25,18 +25,54 @@ export function CustomerSearch({ selectedId, onSelect }: CustomerSearchProps) {
   const [showCreate, setShowCreate] = useState(false);
   const [newCustomer, setNewCustomer] = useState({ name: '', phone: '', email: '' });
 
+  const selectedRef = useRef<Customer | null>(null);
+  useEffect(() => { selectedRef.current = selected; }, [selected]);
+
+  // Keep the selected-customer chip in sync with the store's customerId —
+  // covers page reload / persisted cart where this component remounts
+  // with no local `selected` state even though a customer was already chosen.
+  useEffect(() => {
+    if (!selectedId) {
+      if (selectedRef.current) setSelected(null);
+      return;
+    }
+    if (selectedRef.current?.id === selectedId) return;
+
+    let cancelled = false;
+    api.get(`/customers/${selectedId}`)
+      .then(({ data }) => { if (!cancelled) setSelected(data); })
+      .catch(() => { if (!cancelled) onSelect(null); }); // stale/invalid id — drop it
+    return () => { cancelled = true; };
+  }, [selectedId, onSelect]);
+
+  const searchIdRef = useRef(0);
+
   const handleSearch = useCallback(async (val: string) => {
-    if (val.length < 3) { setResults([]); return; }
+    const requestId = ++searchIdRef.current;
     setLoading(true);
     try {
-      const { data } = await api.get(`/customers?search=${val}`);
-      setResults(data || []);
+      const { data } = await api.get('/customers', { params: { search: val } });
+      if (requestId === searchIdRef.current) setResults(data || []);
     } catch {
-      setResults([]);
+      if (requestId === searchIdRef.current) setResults([]);
     } finally {
-      setLoading(false);
+      if (requestId === searchIdRef.current) setLoading(false);
     }
   }, []);
+
+  // Debounce so we don't fire a request per keystroke — avoids hammering the
+  // API (and tripping its rate limit) and out-of-order responses clobbering
+  // the results for whatever was most recently typed.
+  useEffect(() => {
+    if (query.trim().length < 3) {
+      searchIdRef.current++; // invalidate any in-flight request
+      setResults([]);
+      setLoading(false);
+      return;
+    }
+    const timer = setTimeout(() => handleSearch(query.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [query, handleSearch]);
 
   const handleSelect = (customer: Customer) => {
     setSelected(customer);
@@ -53,7 +89,12 @@ export function CustomerSearch({ selectedId, onSelect }: CustomerSearchProps) {
   const handleCreate = async () => {
     if (!newCustomer.name || !newCustomer.phone) return;
     try {
-      const { data } = await api.post('/customers', newCustomer);
+      // Email is optional — send undefined rather than '' when left blank so
+      // the backend's format validation doesn't run against an empty string.
+      const { data } = await api.post('/customers', {
+        ...newCustomer,
+        email: newCustomer.email.trim() || undefined,
+      });
       handleSelect(data);
       setShowCreate(false);
       setNewCustomer({ name: '', phone: '', email: '' });
@@ -88,7 +129,7 @@ export function CustomerSearch({ selectedId, onSelect }: CustomerSearchProps) {
           <input
             type="text"
             value={query}
-            onChange={(e) => { setQuery(e.target.value); handleSearch(e.target.value); }}
+            onChange={(e) => setQuery(e.target.value)}
             placeholder="Search customer by name or phone..."
             className="w-full pl-9 pr-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
           />
@@ -101,8 +142,11 @@ export function CustomerSearch({ selectedId, onSelect }: CustomerSearchProps) {
         </button>
       </div>
 
-      {results.length > 0 && (
+      {query.trim().length >= 3 && (loading || results.length > 0) && (
         <div className="absolute top-full left-0 right-0 z-10 mt-1 bg-white border rounded-lg shadow-lg max-h-40 overflow-auto">
+          {loading && results.length === 0 && (
+            <p className="px-3 py-2 text-sm text-gray-400">Searching…</p>
+          )}
           {results.map((c) => (
             <button
               key={c.id}

@@ -36,6 +36,12 @@ export class AuthService {
       const field = existing.email === dto.email ? 'email' : 'phone';
       throw new ConflictException(`An account with this ${field} already exists`);
     }
+    // Also reject an email already claimed by some other tenant's staff user
+    // (added via User Management, not necessarily that tenant's own signup
+    // email) — otherwise we'd provision a whole new tenant DB before finding
+    // out the PlatformUserEmail insert below can never succeed.
+    const emailTaken = await this.master.platformUserEmail.findUnique({ where: { email: dto.email } });
+    if (emailTaken) throw new ConflictException('An account with this email already exists');
 
     const accountId = uuidv4().replace(/-/g, '');
     const { dbName, dbUrl } = await this.tenantProvisioning.provisionTenantDatabase(accountId);
@@ -65,6 +71,10 @@ export class AuthService {
         tenantDbUrl: dbUrl,
       },
     });
+    // Login resolves a tenant purely from email -> PlatformUserEmail -> accountId,
+    // so the owner's own login email needs a row here too (see UsersService.createUser
+    // for how every other staff login gets registered the same way).
+    await this.master.platformUserEmail.create({ data: { email: dto.email, accountId } });
 
     const tokens = await this.generateTokens(user.id, user.role, user.storeId, accountId);
     await this.storeRefreshToken(tenantClient, user.id, tokens.refreshToken);
@@ -73,7 +83,14 @@ export class AuthService {
   }
 
   async login(dto: LoginDto, ipAddress: string) {
-    const account = await this.master.platformAccount.findUnique({ where: { email: dto.email } });
+    // PlatformAccount.email is only the original signer-upper — any user
+    // (including staff added later via User Management) resolves their
+    // tenant through PlatformUserEmail instead.
+    const userEmail = await this.master.platformUserEmail.findUnique({
+      where: { email: dto.email },
+      include: { account: true },
+    });
+    const account = userEmail?.account;
     if (!account || account.status !== 'ACTIVE') {
       throw new UnauthorizedException('Invalid credentials');
     }
@@ -132,8 +149,13 @@ export class AuthService {
 
   async forgotPassword(dto: ForgotPasswordDto) {
     // Always return the same generic response regardless of whether the account
-    // exists — avoids leaking which emails are registered.
-    const account = await this.master.platformAccount.findUnique({ where: { email: dto.email } });
+    // exists — avoids leaking which emails are registered. Resolved the same way
+    // login resolves a tenant: via PlatformUserEmail, not just the account owner.
+    const userEmail = await this.master.platformUserEmail.findUnique({
+      where: { email: dto.email },
+      include: { account: true },
+    });
+    const account = userEmail?.account;
     if (account && account.status === 'ACTIVE') {
       await this.master.passwordResetRequest.create({
         data: { accountId: account.id, requestedEmail: dto.email },

@@ -4,12 +4,20 @@ import { AuditAction } from '@prisma/client';
 import { CreateProductDto } from './dto/create-product.dto';
 import { AddSerialUnitsDto } from './dto/add-serial-units.dto';
 import { Decimal } from '@prisma/client/runtime/library';
+import { unitAllowsDecimal } from '../common/units';
 
 @Injectable()
 export class InventoryService {
   constructor(private prisma: PrismaService) {}
 
   async createProduct(dto: CreateProductDto, userId: string, storeId: string) {
+    for (const sku of dto.skus) {
+      const unit = sku.unit || 'PCS';
+      if (!sku.isSerialized && sku.stockQty != null && !unitAllowsDecimal(unit) && !Number.isInteger(sku.stockQty)) {
+        throw new BadRequestException(`"${unit}" is stocked in whole numbers — opening stock must be a whole number`);
+      }
+    }
+
     const product = await this.prisma.product.create({
       data: {
         name: dto.name,
@@ -49,7 +57,16 @@ export class InventoryService {
       },
     });
 
-    return product;
+    return this._serializeProductStock(product);
+  }
+
+  // SKU.stockQty is a Decimal column (fractional stock for KG/LITER/METER) but
+  // this module's response contract has always been a plain JSON number —
+  // normalize it on the way out rather than pushing a Decimal-as-string onto
+  // every consumer (inventory page, low-stock alerts, CSV export) the way
+  // money fields already are.
+  private _serializeProductStock<T extends { skus: Array<{ stockQty: any }> }>(product: T): T {
+    return { ...product, skus: product.skus.map((s) => ({ ...s, stockQty: Number(s.stockQty) })) };
   }
 
   async listProducts(
@@ -79,16 +96,16 @@ export class InventoryService {
       orderBy: { updatedAt: 'desc' },
     });
 
-    if (filters.lowStock) {
-      return products.filter((p) =>
-        p.skus.some((s) => {
-          const effectiveStock = s.isSerialized ? s._count.serialInventory : s.stockQty;
-          return effectiveStock <= s.lowStockThreshold;
-        }),
-      );
-    }
+    const filtered = filters.lowStock
+      ? products.filter((p) =>
+          p.skus.some((s) => {
+            const effectiveStock = s.isSerialized ? s._count.serialInventory : Number(s.stockQty);
+            return effectiveStock <= s.lowStockThreshold;
+          }),
+        )
+      : products;
 
-    return products;
+    return filtered.map((p) => this._serializeProductStock(p));
   }
 
   async getProduct(id: string, storeId: string) {
@@ -106,7 +123,7 @@ export class InventoryService {
     });
 
     if (!product) throw new NotFoundException('Product not found');
-    return product;
+    return this._serializeProductStock(product);
   }
 
   async addSerialUnits(dto: AddSerialUnitsDto, userId: string, storeId: string) {
@@ -116,7 +133,10 @@ export class InventoryService {
     if (!sku.isSerialized) {
       // Non-serialized: bulk qty increment
       const qty = dto.bulkQty;
-      if (!qty || qty < 1) throw new BadRequestException('Provide bulkQty > 0 for non-serialized SKUs');
+      if (!qty || qty <= 0) throw new BadRequestException('Provide bulkQty > 0 for non-serialized SKUs');
+      if (!unitAllowsDecimal(sku.unit) && !Number.isInteger(qty)) {
+        throw new BadRequestException(`"${sku.variantName}" is stocked in whole ${sku.unit} — bulkQty must be a whole number`);
+      }
 
       await this.prisma.sKU.update({
         where: { id: sku.id },
@@ -130,7 +150,7 @@ export class InventoryService {
           action: AuditAction.STOCK_IN,
           entityType: 'SKU',
           entityId: dto.skuId,
-          newValues: { addedQty: qty, newStockQty: sku.stockQty + qty },
+          newValues: { addedQty: qty, newStockQty: Number(sku.stockQty) + qty },
         },
       });
 
@@ -203,7 +223,9 @@ export class InventoryService {
         partNumber: s.product.partNumber,
         isSerialized: s.isSerialized,
         unit: s.unit,
-        currentStock: s.isSerialized ? s._count.serialInventory : s.stockQty,
+        // Decimal column now (fractional stock for KG/LITER/METER) — normalize
+        // to a plain number, matching this endpoint's existing contract.
+        currentStock: s.isSerialized ? s._count.serialInventory : Number(s.stockQty),
         threshold: s.lowStockThreshold,
       }))
       .filter((s) => s.currentStock <= s.threshold);
@@ -341,6 +363,6 @@ export class InventoryService {
       },
     });
 
-    return updated;
+    return { ...updated, stockQty: Number(updated.stockQty) };
   }
 }

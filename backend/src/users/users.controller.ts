@@ -22,8 +22,12 @@ export class UsersController {
 
   @Post()
   @Roles(Role.SUPER_ADMIN, Role.STORE_MANAGER)
-  createUser(@Body() dto: CreateUserDto, @CurrentUser('storeId') storeId: string) {
-    return this.usersService.createUser({ ...dto, storeId });
+  createUser(
+    @Body() dto: CreateUserDto,
+    @CurrentUser('storeId') storeId: string,
+    @CurrentUser('accountId') accountId: string,
+  ) {
+    return this.usersService.createUser({ ...dto, storeId, accountId });
   }
 
   @Get()

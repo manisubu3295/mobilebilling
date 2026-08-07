@@ -195,7 +195,7 @@ model SKU {
   variantName       String   @map("variant_name")   // e.g. "Standard", "BS6", "Chrome"
   unit              String   @default("PCS")         // PCS, SET, LITER, PAIR, METER
   isSerialized      Boolean  @default(false) @map("is_serialized") // false = bulk qty tracking
-  stockQty          Int      @default(0) @map("stock_qty")         // for non-serialized parts
+  stockQty          Decimal  @default(0) @db.Decimal(10, 3) @map("stock_qty") // for non-serialized parts — Decimal so weight/volume/length units (KG, LITER, METER) can hold fractional stock
   costPrice         Decimal  @map("cost_price") @db.Decimal(10, 2)
   sellingPrice      Decimal  @map("selling_price") @db.Decimal(10, 2)
   taxRate           Decimal  @default(18) @map("tax_rate") @db.Decimal(5, 2)
@@ -328,8 +328,8 @@ model InvoiceItem {
   invoice      Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   skuId        String  @map("sku_id")
   sku          SKU     @relation(fields: [skuId], references: [id])
-  quantity     Int
-  returnedQty  Int     @default(0) @map("returned_qty")
+  quantity     Decimal @db.Decimal(10, 3)                          // Decimal so weight/volume/length units can be sold in fractional amounts
+  returnedQty  Decimal @default(0) @db.Decimal(10, 3) @map("returned_qty")
   unitPrice    Decimal @map("unit_price") @db.Decimal(10, 2)
   taxRate      Decimal @map("tax_rate") @db.Decimal(5, 2)
   taxAmount    Decimal @map("tax_amount") @db.Decimal(10, 2)

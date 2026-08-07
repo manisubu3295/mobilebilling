@@ -8,6 +8,7 @@ import {
   BarChart2, Settings, LogOut, Store, Menu, X, UserCircle, Landmark, BookOpen,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
+import { useBillingStore } from '@/store/billing.store';
 
 const NAV = [
   { href: '/billing/checkout', label: 'Checkout', icon: ShoppingCart, roles: ['SUPER_ADMIN', 'STORE_MANAGER', 'BILLING_CLERK'] },
@@ -29,6 +30,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   useEffect(() => {
     if (!isAuthenticated) router.replace('/login');
   }, [isAuthenticated, router]);
+
+  // The billing cart persists to a single fixed localStorage entry — on a
+  // shared browser, reconcile it against whoever is actually signed in now
+  // so one store's in-progress checkout can never leak into another
+  // store's session (see BillingState.resetForStore).
+  useEffect(() => {
+    if (user?.store?.id) useBillingStore.getState().resetForStore(user.store.id);
+  }, [user?.store?.id]);
 
   const visibleNav = NAV.filter((n) => !user || n.roles.includes(user.role));
 

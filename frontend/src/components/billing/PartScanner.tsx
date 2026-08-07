@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Search, ScanLine, X, Plus, Minus, ChevronRight } from 'lucide-react';
 import { useBillingStore } from '@/store/billing.store';
+import { unitAllowsDecimal } from '@/lib/units';
 import api from '@/lib/api';
 
 interface PartResult {
@@ -23,6 +24,38 @@ interface PartResult {
   customFields?: Record<string, any>;
 }
 
+// KG/LITER/METER items need precise fractional entry (2.25, 0.5, …) — a plain
+// controlled input bound straight to the numeric qty state would clobber a
+// mid-typed "2." back to "2" on every render, so this keeps its own draft
+// string and only commits a parsed value back out on blur.
+function QtyDraftInput({
+  value, onCommit, className,
+}: { value: number; onCommit: (n: number) => void; className: string }) {
+  const [text, setText] = useState(String(value));
+
+  useEffect(() => {
+    if (parseFloat(text) !== value) setText(String(value));
+  }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <input
+      type="number"
+      inputMode="decimal"
+      step="0.01"
+      min="0.01"
+      value={text}
+      onChange={(e) => setText(e.target.value)}
+      onBlur={(e) => {
+        const n = parseFloat(e.target.value);
+        if (!isNaN(n) && n > 0) onCommit(n);
+        else setText(String(value)); // invalid entry — revert to last known-good value
+      }}
+      onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+      className={className}
+    />
+  );
+}
+
 export function PartScanner() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -31,7 +64,7 @@ export function PartScanner() {
   const [selected, setSelected] = useState<PartResult | null>(null);
   const [qty, setQty] = useState(1);
   const inputRef = useRef<HTMLInputElement>(null);
-  const { addItem } = useBillingStore();
+  const { addItem, items } = useBillingStore();
 
   const handleSearch = useCallback(async (value: string) => {
     const query = value.trim();
@@ -71,12 +104,33 @@ export function PartScanner() {
     if (e.key === 'Enter') handleSearch(input);
   };
 
+  // stockQty reflects total inventory, not what's left after this SKU's
+  // existing cart quantity — account for that so the same units can't be
+  // reserved twice by scanning the same part again.
+  // Rounded to 3dp (matches the backend's Decimal(10,3) column) to avoid
+  // floating-point noise like 1.2000000000000002 showing up in error text.
+  const remainingStock = useCallback((part: PartResult) => {
+    if (part.type !== 'bulk') return Infinity;
+    const inCart = items
+      .filter((i) => i.skuId === part.skuId && !i.isSerialized)
+      .reduce((sum, i) => sum + i.quantity, 0);
+    return Math.max(0, Math.round((part.stockQty - inCart) * 1000) / 1000);
+  }, [items]);
+
   const handleAddToCart = (part: PartResult = selected!) => {
     if (!part) return;
     const addQty = part.type === 'serial' ? 1 : qty;
-    if (part.type === 'bulk' && addQty > part.stockQty) {
-      setError(`Only ${part.stockQty} ${part.unit} in stock.`);
-      return;
+    if (part.type === 'bulk') {
+      const remaining = remainingStock(part);
+      if (addQty > remaining) {
+        const inCart = part.stockQty - remaining;
+        setError(
+          remaining > 0
+            ? `Only ${remaining} ${part.unit} left in stock (${inCart} already in cart).`
+            : `All ${part.stockQty} ${part.unit} in stock are already in the cart.`,
+        );
+        return;
+      }
     }
 
     addItem({
@@ -92,6 +146,7 @@ export function PartScanner() {
       serialIds: part.serialUnitId ? [part.serialUnitId] : [],
       serialNumber: part.serialNumber ?? undefined,
       hsnCode: part.hsnCode ?? undefined,
+      stockQty: part.type === 'bulk' ? part.stockQty : undefined,
     });
 
     setInput('');
@@ -219,14 +274,22 @@ export function PartScanner() {
             {selected.type === 'bulk' && (
               <div className="flex items-center gap-1 border rounded-lg overflow-hidden bg-white">
                 <button
-                  onClick={() => setQty((q) => Math.max(1, q - 1))}
+                  onClick={() => setQty((q) => Math.max(unitAllowsDecimal(selected.unit) ? 0.01 : 1, q - 1))}
                   className="px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200"
                 >
                   <Minus className="h-3 w-3" />
                 </button>
-                <span className="px-3 text-sm font-semibold min-w-[2rem] text-center">{qty}</span>
+                {unitAllowsDecimal(selected.unit) ? (
+                  <QtyDraftInput
+                    value={qty}
+                    onCommit={(n) => setQty(Math.min(remainingStock(selected), n))}
+                    className="w-16 px-1 py-1 text-sm font-semibold text-center border-x"
+                  />
+                ) : (
+                  <span className="px-3 text-sm font-semibold min-w-[2rem] text-center">{qty}</span>
+                )}
                 <button
-                  onClick={() => setQty((q) => Math.min(selected.stockQty, q + 1))}
+                  onClick={() => setQty((q) => Math.min(remainingStock(selected), q + 1))}
                   className="px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200"
                 >
                   <Plus className="h-3 w-3" />

@@ -32,10 +32,12 @@ export class AddSerialUnitsDto {
   @IsString()
   purchasedAt?: string;
 
-  // For non-serialized (bulk) SKUs — just increment stockQty by this amount
+  // For non-serialized (bulk) SKUs — just increment stockQty by this amount.
+  // 0.001 (not 1) so weight/volume/length SKUs can be restocked in fractional
+  // amounts — InventoryService rejects non-integer amounts for other units.
   @IsOptional()
   @IsNumber()
-  @Min(1)
+  @Min(0.001)
   bulkQty?: number;
 
   // For serialized SKUs — one entry per physical unit

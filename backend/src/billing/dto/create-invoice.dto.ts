@@ -18,8 +18,11 @@ export class InvoiceItemDto {
   @IsNotEmpty()
   skuId: string;
 
+  // 0.001 (not 1) so weight/volume/length units (KG, LITER, METER) can be sold
+  // in fractional amounts — BillingService rejects non-integer quantities for
+  // any other unit, since @Min here has no knowledge of which SKU this is.
   @IsNumber()
-  @Min(1)
+  @Min(0.001)
   quantity: number;
 
   // For serialized items: provide IMEI or serial number

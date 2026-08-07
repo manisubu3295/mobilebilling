@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, IsObject, IsOptional, IsString, Matches } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsObject, IsOptional, IsString, Matches, ValidateIf } from 'class-validator';
 
 export class CreateCustomerDto {
   @IsString()
@@ -9,7 +9,11 @@ export class CreateCustomerDto {
   @Matches(/^[0-9+\-\s]{7,15}$/, { message: 'Invalid phone number' })
   phone: string;
 
-  @IsOptional()
+  // @IsOptional() alone only skips validation for undefined/null — an empty
+  // string (what the "New Customer" form sends when the field is left blank)
+  // would still hit @IsEmail() and fail. Only validate the format when a
+  // non-empty value was actually entered.
+  @ValidateIf((dto) => dto.email !== undefined && dto.email !== null && dto.email !== '')
   @IsEmail()
   email?: string;
 

@@ -7,6 +7,7 @@ interface BillingDB extends DBSchema {
     key: string;
     value: {
       id: string;
+      storeId: string;   // owning store — IndexedDB is shared across all logins on this browser
       data: any;
       createdAt: number;
       synced: boolean;
@@ -27,14 +28,17 @@ export async function getDb() {
   });
 }
 
-export async function saveDraftInvoice(id: string, data: any) {
+export async function saveDraftInvoice(id: string, data: any, storeId: string) {
   const db = await getDb();
-  await db.put('draft_invoices', { id, data, createdAt: Date.now(), synced: false });
+  await db.put('draft_invoices', { id, storeId, data, createdAt: Date.now(), synced: false });
 }
 
-export async function getDraftInvoices() {
+// storeId is required so one store's login can never see another store's
+// offline drafts — IndexedDB is scoped to the browser origin, not per login.
+export async function getDraftInvoices(storeId: string) {
   const db = await getDb();
-  return db.getAll('draft_invoices');
+  const all = await db.getAll('draft_invoices');
+  return all.filter((d) => d.storeId === storeId);
 }
 
 export async function deleteDraftInvoice(id: string) {
