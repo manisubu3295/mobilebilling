@@ -1,10 +1,17 @@
 'use client';
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Search, ScanLine, X, Plus, Minus, ChevronRight } from 'lucide-react';
+import { Search, ScanLine, Camera, X, Plus, Minus, ChevronRight } from 'lucide-react';
 import { useBillingStore } from '@/store/billing.store';
 import { unitAllowsDecimal } from '@/lib/units';
+import { BarcodeScannerModal } from './BarcodeScannerModal';
 import api from '@/lib/api';
+
+// Camera scanning needs getUserMedia (and a secure context) — feature-detect
+// rather than assume every browser/deployment supports it, so the button
+// simply doesn't appear where it can't work instead of erroring on tap.
+const supportsCameraScan =
+  typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia;
 
 interface PartResult {
   type: 'bulk' | 'serial';
@@ -63,6 +70,7 @@ export function PartScanner() {
   const [results, setResults] = useState<PartResult[]>([]);
   const [selected, setSelected] = useState<PartResult | null>(null);
   const [qty, setQty] = useState(1);
+  const [showScanner, setShowScanner] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const { addItem, items } = useBillingStore();
   const searchIdRef = useRef(0);
@@ -215,6 +223,15 @@ export function PartScanner() {
             </button>
           )}
         </div>
+        {supportsCameraScan && (
+          <button
+            onClick={() => setShowScanner(true)}
+            title="Scan with camera"
+            className="px-3 py-2.5 border rounded-lg hover:bg-gray-50 text-gray-600 shrink-0"
+          >
+            <Camera className="h-4 w-4" />
+          </button>
+        )}
         <button
           onClick={() => handleSearch(input)}
           disabled={loading || !input.trim()}
@@ -225,6 +242,17 @@ export function PartScanner() {
           <span className="hidden sm:inline">{loading ? '…' : 'Find'}</span>
         </button>
       </div>
+
+      {showScanner && (
+        <BarcodeScannerModal
+          onDetected={(text) => {
+            setShowScanner(false);
+            setInput(text);
+            handleSearch(text);
+          }}
+          onClose={() => setShowScanner(false)}
+        />
+      )}
 
       {error && (
         <div className="p-2.5 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
