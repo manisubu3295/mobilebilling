@@ -65,25 +65,34 @@ export function PartScanner() {
   const [qty, setQty] = useState(1);
   const inputRef = useRef<HTMLInputElement>(null);
   const { addItem, items } = useBillingStore();
+  const searchIdRef = useRef(0);
 
-  const handleSearch = useCallback(async (value: string) => {
+  // `auto` distinguishes a debounced live-typing search from an explicit one
+  // (Enter / "Find" click): a live search always shows the picker list for
+  // the user to choose from, even for a single match — jumping straight to
+  // the add-to-cart panel on every keystroke that happens to narrow to one
+  // result would be jarring. Enter/Find keep today's fast single-match path
+  // (important for a barcode scanner's scan-then-Enter workflow).
+  const handleSearch = useCallback(async (value: string, { auto }: { auto?: boolean } = {}) => {
     const query = value.trim();
     if (!query) return;
+    const requestId = ++searchIdRef.current;
     setLoading(true);
-    setError(null);
-    setResults([]);
+    if (!auto) setError(null);
     setSelected(null);
     setQty(1);
 
     try {
       const { data } = await api.get<PartResult[]>(`/billing/lookup/search?q=${encodeURIComponent(query)}`);
+      if (requestId !== searchIdRef.current) return; // superseded by a newer search
 
       if (!data || data.length === 0) {
-        setError('Product not found. Try the product name, number, or barcode.');
+        setResults([]);
+        if (!auto) setError('Product not found. Try the product name, number, or barcode.');
         return;
       }
 
-      if (data.length === 1) {
+      if (!auto && data.length === 1) {
         const r = data[0];
         if (!r.found) {
           setError(`"${r.productName}" is out of stock.`);
@@ -91,14 +100,32 @@ export function PartScanner() {
         }
         setSelected(r);
       } else {
+        setError(null);
         setResults(data);
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Search failed. Check connection.');
+      if (requestId !== searchIdRef.current) return;
+      setResults([]);
+      if (!auto) setError(err.response?.data?.message || 'Search failed. Check connection.');
     } finally {
-      setLoading(false);
+      if (requestId === searchIdRef.current) setLoading(false);
     }
   }, []);
+
+  // Live search-as-you-type — mirrors CustomerSearch.tsx's debounce so
+  // suggestions show up without requiring an explicit "Find" click, without
+  // firing a request per keystroke.
+  useEffect(() => {
+    if (input.trim().length < 2) {
+      searchIdRef.current++; // invalidate any in-flight request
+      setResults([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true); // instant "Searching…" feedback while the debounce timer runs
+    const timer = setTimeout(() => handleSearch(input, { auto: true }), 300);
+    return () => clearTimeout(timer);
+  }, [input, handleSearch]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') handleSearch(input);
@@ -205,12 +232,21 @@ export function PartScanner() {
         </div>
       )}
 
-      {/* Multiple results — show picker list */}
-      {results.length > 1 && !selected && (
+      {/* Live suggestions as you type, and the multi-match picker for an
+          explicit search — tap one to select */}
+      {!selected && input.trim().length >= 2 && (
         <div className="border rounded-lg divide-y bg-white shadow-sm max-h-56 overflow-auto">
-          <p className="px-3 py-2 text-xs text-gray-500 font-medium bg-gray-50">
-            {results.length} results found — tap one to select
-          </p>
+          {loading && results.length === 0 && (
+            <p className="px-3 py-2 text-sm text-gray-400">Searching…</p>
+          )}
+          {!loading && results.length === 0 && (
+            <p className="px-3 py-2 text-sm text-gray-400">No matches for &ldquo;{input.trim()}&rdquo;</p>
+          )}
+          {results.length > 0 && (
+            <p className="px-3 py-2 text-xs text-gray-500 font-medium bg-gray-50">
+              {results.length === 1 ? '1 match' : `${results.length} matches`} — tap to select
+            </p>
+          )}
           {results.map((r, i) => (
             <button
               key={i}
