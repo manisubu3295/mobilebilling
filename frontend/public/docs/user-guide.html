@@ -93,6 +93,7 @@
   <a href="#users">7. Users</a>
   <a href="#audit">8. Audit Logs</a>
   <a href="#settings">9. Settings</a>
+  <a href="#mobile-app">10. Mobile App</a>
   <a href="#faq">FAQ</a>
 </div>
 
@@ -335,6 +336,43 @@
         <li><span>Under <strong>Payment QR Configuration</strong>, upload a static UPI QR image to show on invoices.</span></li>
       </ol>
       <div class="tip"><strong>Dynamic UPI QR:</strong> For automatic per-invoice QR codes (exact amount), set your UPI VPA (e.g. aadhirai@upi) in the server's backend/.env file under STORE_UPI_VPA.</div>
+    </div>
+  </div>
+
+  <!-- ── 10. MOBILE APP ── -->
+  <div class="section" id="mobile-app">
+    <div class="section-header">
+      <div class="section-num">10</div>
+      <div>
+        <h2>Mobile App (Android)</h2>
+        <p>Install Aadhirai Billing as an app on your phone — same login, same data</p>
+      </div>
+    </div>
+    <div class="section-body">
+      <p style="font-size: 14px; line-height: 1.7; color: #333;">
+        This is the same website wrapped as an installable Android app — useful mainly for
+        checkout, since it gives the in-app barcode/QR scanner reliable access to your phone's
+        camera. It isn't on the Google Play Store; you install the file directly.
+      </p>
+
+      <div style="text-align: center; margin: 20px 0;">
+        <a href="/downloads/aadhirai-billing.apk" download
+           style="display: inline-flex; align-items: center; gap: 8px; background: #c0392b; color: #fff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">
+          ⬇ Download for Android
+        </a>
+      </div>
+
+      <h3 style="margin: 20px 0 10px; font-size: 15px;">Installing it</h3>
+      <ol class="steps">
+        <li><span>Open this page <strong>on your Android phone</strong> and tap <strong>Download for Android</strong> above. (Tapping it on a desktop just saves the file — you need to move it to the phone, or open this page in the phone's own browser instead.)</span></li>
+        <li><span>Android will likely warn that it <strong>blocked an install from an unknown source</strong> — this is expected, since the app isn't distributed through the Play Store. Tap <strong>Settings</strong> on that warning, then allow installs from this app (usually Chrome or your Files app).</span></li>
+        <li><span>Go back and open the downloaded file again, then tap <strong>Install</strong>.</span></li>
+        <li><span>Open <strong>Aadhirai Billing</strong> from your app drawer and sign in with the same email and password you use on the website.</span></li>
+        <li><span>When the in-app scanner asks for <strong>camera permission</strong>, allow it — needed for scanning barcodes/QR codes during checkout.</span></li>
+      </ol>
+
+      <div class="tip"><strong>Tip:</strong> The app always loads the live website, so any update to the site shows up automatically — you only need to reinstall if the app itself changes (icon, permissions).</div>
+      <div class="note"><strong>Not seeing the "unknown sources" prompt, or install fails?</strong> Make sure you downloaded the file with your phone's own browser (not transferred some other way that strips it), and that you're running a reasonably current version of Android.</div>
     </div>
   </div>
 

@@ -1,0 +1,9 @@
+{
+  "appId": "com.aadhirai.billing",
+  "appName": "Aadhirai Billing",
+  "webDir": "www",
+  "server": {
+    "url": "https://billing.aadhiraiinnovations.com/",
+    "allowNavigation": ["billing.aadhiraiinnovations.com"]
+  }
+}

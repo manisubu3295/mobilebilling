@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   ShoppingCart, Package, Users, FileText,
-  BarChart2, Settings, LogOut, Store, Menu, X, UserCircle, Landmark, BookOpen,
+  BarChart2, Settings, LogOut, Store, Menu, X, UserCircle, Landmark, BookOpen, Smartphone,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
 import { useBillingStore } from '@/store/billing.store';
@@ -117,6 +117,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                        hover:bg-gray-800 hover:text-white transition-colors"
           >
             <BookOpen className="h-4 w-4" /> User Guide
+          </a>
+          <a
+            href="/docs/user-guide.html#mobile-app"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-gray-400
+                       hover:bg-gray-800 hover:text-white transition-colors"
+          >
+            <Smartphone className="h-4 w-4" /> Get Android App
           </a>
           <button
             onClick={async () => { await logout(); router.replace('/login'); }}
