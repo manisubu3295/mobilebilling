@@ -1,11 +1,29 @@
 'use client';
 
+import { useEffect } from 'react';
+
 // Ported from the H2O landing page artifact. The markup is static and
 // author-controlled (no user input), so dangerouslySetInnerHTML is the
 // pragmatic way to bring it in 1:1 without hand-converting every kebab-case
 // SVG attribute and inline style string to JSX -- a large, error-prone job
 // for content that never needs React state or interactivity.
 export default function Home() {
+  useEffect(() => {
+    // Mobile Safari (and some Android WebViews) don't reliably honour the
+    // `muted` HTML *attribute* on a <video> that was inserted via innerHTML
+    // rather than present in the originally-parsed document -- it needs the
+    // `.muted` *property* set in JS, or autoplay silently falls back to a
+    // paused video with a play button, which is exactly what this fixes.
+    const video = document.querySelector<HTMLVideoElement>('.hero-bg video');
+    if (video) {
+      video.muted = true;
+      video.play().catch(() => {
+        // Still blocked (e.g. Low Power Mode) -- the poster image and
+        // native play button are an acceptable fallback in that case.
+      });
+    }
+  }, []);
+
   return <div dangerouslySetInnerHTML={{ __html: pageHtml }} />;
 }
 
