@@ -9,6 +9,7 @@ interface Customer {
   name: string;
   phone: string;
   email: string | null;
+  address: string | null;
   customFields: Record<string, any> | null;
   createdAt: string;
   invoices?: { id: string; invoiceNumber: string; totalAmount: string; status: string; createdAt: string }[];
@@ -197,7 +198,7 @@ export default function CustomersPage() {
 }
 
 function AddCustomerModal({ onClose, onSave }: { onClose: () => void; onSave: () => void }) {
-  const [form, setForm] = useState({ name: '', phone: '', email: '' });
+  const [form, setForm] = useState({ name: '', phone: '', email: '',address:'' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -232,6 +233,7 @@ function AddCustomerModal({ onClose, onSave }: { onClose: () => void; onSave: ()
             { label: 'Full Name *', key: 'name', placeholder: '' },
             { label: 'Phone *', key: 'phone', placeholder: '9876543210' },
             { label: 'Email', key: 'email', placeholder: '' },
+            { label: 'Address', key: 'address', placeholder: '' },
           ].map(({ label, key, placeholder }) => (
             <div key={key}>
               <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
