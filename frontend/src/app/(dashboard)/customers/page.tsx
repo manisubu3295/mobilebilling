@@ -9,6 +9,7 @@ interface Customer {
   name: string;
   phone: string;
   email: string | null;
+  address: string | null;
   customFields: Record<string, any> | null;
   createdAt: string;
   invoices?: { id: string; invoiceNumber: string; totalAmount: string; status: string; createdAt: string }[];
@@ -161,6 +162,7 @@ export default function CustomersPage() {
             <div className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-3 text-sm">
                 {selected.email && <div><span className="text-gray-500">Email:</span> <span className="font-medium">{selected.email}</span></div>}
+                {selected.address && <div><span className="text-gray-500">Address:</span> <span className="font-medium">{selected.address}</span></div>}
                 {selected.customFields?.vehicle_no && <div><span className="text-gray-500">Vehicle No:</span> <span className="font-medium font-mono">{selected.customFields.vehicle_no}</span></div>}
                 {selected.customFields?.re_model && <div><span className="text-gray-500">Model:</span> <span className="font-medium">{selected.customFields.re_model}</span></div>}
                 <div><span className="text-gray-500">Since:</span> <span className="font-medium">{new Date(selected.createdAt).toLocaleDateString('en-IN', { dateStyle: 'medium' })}</span></div>
@@ -197,7 +199,7 @@ export default function CustomersPage() {
 }
 
 function AddCustomerModal({ onClose, onSave }: { onClose: () => void; onSave: () => void }) {
-  const [form, setForm] = useState({ name: '', phone: '', email: '' });
+  const [form, setForm] = useState({ name: '', phone: '', email: '', address: ''});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -232,6 +234,7 @@ function AddCustomerModal({ onClose, onSave }: { onClose: () => void; onSave: ()
             { label: 'Full Name *', key: 'name', placeholder: '' },
             { label: 'Phone *', key: 'phone', placeholder: '9876543210' },
             { label: 'Email', key: 'email', placeholder: '' },
+            { label: 'Address', key: 'address', placeholder: '' },
           ].map(({ label, key, placeholder }) => (
             <div key={key}>
               <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
