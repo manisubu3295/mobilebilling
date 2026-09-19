@@ -16,6 +16,8 @@ interface PlatformAccount {
   status: 'ACTIVE' | 'SUSPENDED';
   licenseExpiresAt: string | null;
   serviceModuleEnabled: boolean;
+  websiteEnabled: boolean;
+  siteKey: string | null;
   createdAt: string;
 }
 
@@ -43,7 +45,7 @@ export default function AdminAccountsPage() {
     load();
   }, [load, router]);
 
-  const updateAccount = async (id: string, patch: Partial<Pick<PlatformAccount, 'licenseExpiresAt' | 'serviceModuleEnabled'>>) => {
+  const updateAccount = async (id: string, patch: Partial<Pick<PlatformAccount, 'licenseExpiresAt' | 'serviceModuleEnabled' | 'websiteEnabled' | 'siteKey'>>) => {
     // Optimistic update — this is an internal admin tool, a failed PATCH is rare and the next load() will resync.
     setAccounts((prev) => prev.map((a) => (a.id === id ? { ...a, ...patch } : a)));
     await adminApi.patch(`/platform-admin/accounts/${id}`, patch).catch(() => load());
@@ -95,6 +97,8 @@ export default function AdminAccountsPage() {
                   <th className="px-4 py-3 font-medium">Status</th>
                   <th className="px-4 py-3 font-medium">License Expiry</th>
                   <th className="px-4 py-3 font-medium">Service Module</th>
+                  <th className="px-4 py-3 font-medium">Website</th>
+                  <th className="px-4 py-3 font-medium">Site Key</th>
                   <th className="px-4 py-3 font-medium">Signed Up</th>
                 </tr>
               </thead>
@@ -137,6 +141,28 @@ export default function AdminAccountsPage() {
                       >
                         {a.serviceModuleEnabled ? 'Enabled' : 'Disabled'}
                       </button>
+                    </td>
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={() => updateAccount(a.id, { websiteEnabled: !a.websiteEnabled })}
+                        className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                          a.websiteEnabled ? 'bg-teal-100 text-teal-700' : 'bg-gray-100 text-gray-500'
+                        }`}
+                      >
+                        {a.websiteEnabled ? 'Enabled' : 'Disabled'}
+                      </button>
+                    </td>
+                    <td className="px-4 py-3">
+                      <input
+                        type="text"
+                        defaultValue={a.siteKey || ''}
+                        placeholder="e.g. h2o-water-care"
+                        onBlur={(e) => {
+                          const value = e.target.value.trim();
+                          if (value !== (a.siteKey || '')) updateAccount(a.id, { siteKey: value || null });
+                        }}
+                        className="border rounded px-2 py-1 text-xs font-mono w-36 focus:outline-none focus:ring-2 focus:ring-red-500"
+                      />
                     </td>
                     <td className="px-4 py-3 text-gray-500">{new Date(a.createdAt).toLocaleString()}</td>
                   </tr>

@@ -106,7 +106,10 @@ export default function ProductsPage() {
   const openCart = useCartStore((s) => s.open);
 
   useEffect(() => {
-    fetchProducts().then((data) => { setProducts(data); setLoading(false); });
+    fetchProducts()
+      .then((data) => setProducts(data))
+      .catch(() => setProducts([]))
+      .finally(() => setLoading(false));
   }, []);
 
   const categories = useMemo(() => ['All', ...Array.from(new Set(products.map((p) => p.category)))], [products]);

@@ -72,6 +72,8 @@ export class PlatformAdminService {
         status: true,
         licenseExpiresAt: true,
         serviceModuleEnabled: true,
+        websiteEnabled: true,
+        siteKey: true,
         createdAt: true,
       },
       orderBy: { createdAt: 'desc' },
@@ -87,6 +89,8 @@ export class PlatformAdminService {
       data: {
         ...(dto.licenseExpiresAt !== undefined ? { licenseExpiresAt: dto.licenseExpiresAt ? new Date(dto.licenseExpiresAt) : null } : {}),
         ...(dto.serviceModuleEnabled !== undefined ? { serviceModuleEnabled: dto.serviceModuleEnabled } : {}),
+        ...(dto.websiteEnabled !== undefined ? { websiteEnabled: dto.websiteEnabled } : {}),
+        ...(dto.siteKey !== undefined ? { siteKey: dto.siteKey || null } : {}),
         ...(dto.status !== undefined ? { status: dto.status } : {}),
       },
       select: {
@@ -95,6 +99,8 @@ export class PlatformAdminService {
         status: true,
         licenseExpiresAt: true,
         serviceModuleEnabled: true,
+        websiteEnabled: true,
+        siteKey: true,
       },
     });
   }
