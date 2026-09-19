@@ -12,10 +12,13 @@
     "start:prod": "node dist/main",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
+    "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:seed": "ts-node prisma/seed.ts",
     "prisma:generate:master": "prisma generate --schema=prisma-master/schema.prisma",
     "prisma:migrate:master": "prisma migrate dev --schema=prisma-master/schema.prisma",
-    "prisma:seed:admin": "ts-node prisma-master/seed-admin.ts"
+    "prisma:migrate:master:deploy": "prisma migrate deploy --schema=prisma-master/schema.prisma",
+    "prisma:seed:admin": "ts-node prisma-master/seed-admin.ts",
+    "prisma:migrate:deploy:all": "npm run prisma:migrate:deploy && npm run prisma:migrate:master:deploy"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",
