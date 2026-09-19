@@ -19,40 +19,68 @@ function ProductCard({ product }: { product: WebsiteProduct }) {
   const discount = mrp && selling && mrp > selling ? Math.round((1 - selling / mrp) * 100) : null;
 
   return (
-    <div className="bg-white rounded-2xl border overflow-hidden flex flex-col" style={{ borderColor: 'var(--border)' }}>
-      <div className="aspect-[4/3] bg-gray-50 relative">
+    <div
+      className="bg-white border flex flex-col overflow-hidden"
+      style={{ borderColor: 'var(--border)', borderRadius: 'var(--radius-card)' }}
+    >
+      {/* Square tile, cropped from the top — these are real phone photos from
+          installs (portrait wall units, boxier plant equipment), and a square
+          top-anchored crop is the one ratio that keeps the unit itself in
+          frame across both without stretching or overriding the ratio via a
+          flex min-height quirk (hence min-h-0 below). */}
+      <div className="aspect-square relative min-h-0 shrink-0" style={{ background: 'var(--bg-soft)' }}>
         {image ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={image} alt={product.name} className="w-full h-full object-cover" />
+          <img src={image} alt={product.name} className="w-full h-full object-cover object-top" />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-gray-300 text-sm">No photo yet</div>
+          <div className="w-full h-full flex items-center justify-center text-sm" style={{ color: 'var(--ink-faint)' }}>
+            Photo coming soon
+          </div>
         )}
-        {discount ? (
-          <span className="absolute top-2 left-2 text-xs font-bold px-2 py-0.5 rounded-full text-white" style={{ background: 'var(--brand)' }}>
-            {discount}% OFF
-          </span>
-        ) : null}
-        {product.capacityLph ? (
-          <span className="absolute top-2 right-2 text-xs font-semibold px-2 py-0.5 rounded-full bg-white/90" style={{ color: 'var(--ink)' }}>
-            {product.capacityLph} LPH
-          </span>
-        ) : null}
+        {image && (
+          <div
+            className="absolute inset-x-0 bottom-0 px-2.5 py-1.5 text-[11px] font-medium text-white"
+            style={{ background: 'linear-gradient(to top, rgba(11,31,110,0.65), transparent)' }}
+          >
+            Real install &middot; Kumbakonam
+          </div>
+        )}
       </div>
-      <div className="p-4 flex flex-col gap-1.5 flex-1">
-        <h3 className="font-semibold" style={{ color: 'var(--ink)' }}>{product.name}</h3>
-        {product.shortDescription && <p className="text-sm text-gray-500 line-clamp-2">{product.shortDescription}</p>}
-        <div className="mt-auto pt-2 flex items-center justify-between gap-2">
+
+      <div className="p-4 flex flex-col gap-2 flex-1">
+        <div className="flex items-start justify-between gap-2">
+          <h3 className="font-semibold leading-snug" style={{ fontFamily: 'var(--font-sora), sans-serif', color: 'var(--ink)' }}>
+            {product.name}
+          </h3>
+          {product.capacityLph && (
+            <span
+              className="shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded-full"
+              style={{ background: 'var(--bg-soft)', color: 'var(--brand)' }}
+            >
+              {product.capacityLph} LPH
+            </span>
+          )}
+        </div>
+
+        {product.shortDescription && (
+          <p className="text-sm line-clamp-2" style={{ color: 'var(--ink-muted)' }}>{product.shortDescription}</p>
+        )}
+
+        <div className="mt-auto pt-2 flex items-end justify-between gap-2">
           <div>
             {selling != null ? (
-              <div className="flex items-baseline gap-1.5">
-                <span className="font-bold" style={{ color: 'var(--brand)' }}>{fmt(product.sellingPrice)}</span>
-                {mrp && discount ? <span className="text-xs text-gray-400 line-through">{fmt(product.mrpPrice)}</span> : null}
-              </div>
+              <>
+                <div className="flex items-baseline gap-1.5">
+                  <span className="font-bold text-lg" style={{ color: 'var(--brand)' }}>{fmt(product.sellingPrice)}</span>
+                  {mrp && discount ? <span className="text-xs line-through" style={{ color: 'var(--ink-faint)' }}>{fmt(product.mrpPrice)}</span> : null}
+                </div>
+                {discount ? <span className="text-xs font-semibold" style={{ color: 'var(--safe)' }}>{discount}% off</span> : null}
+              </>
             ) : (
-              <span className="text-sm text-gray-400">Price on enquiry</span>
+              <span className="text-sm" style={{ color: 'var(--ink-faint)' }}>Price on enquiry</span>
             )}
             {product.specSheetUrl && (
-              <a href={product.specSheetUrl} target="_blank" rel="noopener noreferrer" className="block text-xs underline mt-0.5" style={{ color: 'var(--fresh-glow)' }}>
+              <a href={product.specSheetUrl} target="_blank" rel="noopener noreferrer" className="block text-xs underline mt-1" style={{ color: 'var(--fresh-glow)' }}>
                 Spec sheet (PDF)
               </a>
             )}
@@ -103,7 +131,13 @@ export default function ProductsPage() {
         </div>
       </header>
 
-      <div className="wrap py-8 grid grid-cols-1 md:grid-cols-[200px_1fr] gap-8">
+      <div className="wrap pt-6">
+        <p className="text-sm" style={{ color: 'var(--ink-muted)' }}>
+          Priced systems and plants, sized for Kumbakonam water — add what you need and send it to us for a firm quote.
+        </p>
+      </div>
+
+      <div className="wrap py-6 grid grid-cols-1 md:grid-cols-[200px_1fr] gap-8">
         <aside>
           <h2 className="text-xs font-semibold uppercase tracking-wide mb-2 text-gray-400">Categories</h2>
           <div className="flex md:flex-col gap-2 overflow-x-auto md:overflow-visible pb-2 md:pb-0">
