@@ -28,16 +28,36 @@ export const metadata: Metadata = {
   metadataBase: new URL('https://h2owaterpurifier.com/'),
   title: 'H2O Water Care',
   description:
-    'H2O is a Kumbakonam water filter supplier — sales, installation, AMC and repair service for all types of water filters and purifiers (RO, UV, UF and softeners). Free on-site water test, doorstep installation, genuine filters. Call +91 87548 16289.',
+    'H2O is Kumbakonam\'s water expert — water filter supplier and RO service near you for every type of water purifier, including Aquaguard, Kent and other brands. Iron removal, DM/zero-TDS plants, softeners, AMC and repair. Free on-site water test, doorstep installation. Call +91 87548 16289.',
   keywords: [
     'water filter supplier Kumbakonam',
     'water filter sales and service Kumbakonam',
     'water purifier Kumbakonam',
+    'water purifier for home',
+    'water filter for home',
     'RO service Kumbakonam',
+    'RO service near me',
+    'RO water purifier service',
+    'RO water purifier',
+    'water purifier repair',
     'water purifier repair Kumbakonam',
+    'water filter service',
     'AMC water purifier Tamil Nadu',
     'RO purifier installation Kumbakonam',
     'UV UF water filter Kumbakonam',
+    'Aquaguard service Kumbakonam',
+    'Aquaguard RO service',
+    'Kent RO service',
+    'iron removal filter',
+    'iron removal filter Kumbakonam',
+    'yellow water borewell Tamil Nadu',
+    'DM plant service',
+    'DM water plant Kumbakonam',
+    'zero TDS water service',
+    'zero TDS water service near me',
+    'distilled water machine service',
+    'water purification company Kumbakonam',
+    'the water expert Kumbakonam',
     'Thanjavur Main Road water purifier',
     'Bakkiyanathan Street Kumbakonam',
   ],
@@ -48,7 +68,7 @@ export const metadata: Metadata = {
     type: 'website',
     title: 'H2O Water Care — Kumbakonam',
     description:
-      'Water filter supplier in Kumbakonam — sales, installation and AMC service for all types of water filters and purifiers: RO, UV, UF and softeners.',
+      'Water filter supplier and RO service near you in Kumbakonam — sales, installation, repair and AMC for RO, UV, UF, softeners, iron removal filters and DM/zero-TDS plants, any brand.',
     locale: 'en_IN',
     url: 'https://h2owaterpurifier.com/',
     siteName: 'H2O Water Care',
@@ -56,7 +76,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary',
     title: 'H2O Water Care — Kumbakonam',
-    description: 'Water filter supplier in Kumbakonam — sales and service for all types of water filters and purifiers.',
+    description: 'Water filter supplier and RO service near you in Kumbakonam — sales and service for every type of water purifier, any brand.',
   },
   other: {
     'geo.region': 'IN-TN',
@@ -72,7 +92,7 @@ const localBusinessJsonLd = {
   name: 'H2O Water Care',
   url: 'https://h2owaterpurifier.com/',
   description:
-    'Water filter supplier offering sales, installation, AMC and repair service for all types of water filters and purifiers — RO, UV, UF and softener systems — for homes in Kumbakonam, Tamil Nadu.',
+    'Water filter supplier and RO service near Kumbakonam offering sales, installation, AMC and repair for every type of water purifier — RO, UV, UF, softeners, iron removal filters and DM/zero-TDS plants — any brand, including Aquaguard and Kent, for homes and businesses in Kumbakonam, Tamil Nadu.',
   address: {
     '@type': 'PostalAddress',
     streetAddress: 'No. 38/1077, Bakkiyanathan Street, Thanjavur Main Road',
@@ -105,10 +125,13 @@ const localBusinessJsonLd = {
   },
   makesOffer: [
     { '@type': 'Offer', itemOffered: { '@type': 'Service', name: 'Water filter sales, all types' } },
-    { '@type': 'Offer', itemOffered: { '@type': 'Service', name: 'RO water purifier installation' } },
+    { '@type': 'Offer', itemOffered: { '@type': 'Service', name: 'RO water purifier installation and service' } },
     { '@type': 'Offer', itemOffered: { '@type': 'Service', name: 'UV/UF water purifier installation' } },
-    { '@type': 'Offer', itemOffered: { '@type': 'Service', name: 'Water purifier AMC and repair service' } },
+    { '@type': 'Offer', itemOffered: { '@type': 'Service', name: 'Water purifier AMC and repair service, any brand' } },
+    { '@type': 'Offer', itemOffered: { '@type': 'Service', name: 'Aquaguard and Kent water purifier service' } },
     { '@type': 'Offer', itemOffered: { '@type': 'Service', name: 'Water softener installation' } },
+    { '@type': 'Offer', itemOffered: { '@type': 'Service', name: 'Iron removal filter installation' } },
+    { '@type': 'Offer', itemOffered: { '@type': 'Service', name: 'DM plant and zero-TDS water system service' } },
   ],
 };
 
@@ -121,7 +144,15 @@ const faqJsonLd = {
       name: 'Do you service every brand of water filter, or only what you sell?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'Every brand. We install and sell RO, UV, UF and softener systems, but our service and AMC plans cover any water filter already in your home, whichever company fitted it.',
+        text: 'Every brand — Aquaguard, Kent, Livpure and any other make, not just what we sell. We install and sell RO, UV, UF and softener systems ourselves, but our repair and AMC service covers whichever water purifier is already in your home.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'Why does my tap or borewell water look yellow or taste metallic?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: "That's usually dissolved iron, common in Kumbakonam's borewell water. An iron removal filter fitted ahead of your RO or softener clears it before it reaches your taps — we test for it on the same free site visit.",
       },
     },
     {

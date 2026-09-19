@@ -84,7 +84,7 @@ const pageHtml = `
   <div class="wrap">
     <div class="hero-grid">
       <h1>Kumbakonam's water,<br>engineered pure.</h1>
-      <p class="lede">H2O is Kumbakonam's water filter supplier — sales and service for every type of water filter and purifier, RO, UV, UF and softeners, for homes across the city, from raw water at the tap to a glass you don't have to think twice about.</p>
+      <p class="lede">H2O is Kumbakonam's water filter supplier and RO service near you — sales, repair and AMC for every type of water purifier, any brand: RO, UV, UF, softeners and iron removal filters, for homes and businesses across the city, from raw water at the tap to a glass you don't have to think twice about.</p>
       <div class="hero-actions">
         <a class="btn btn-primary" href="tel:+918754816289">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C10.6 21 3 13.4 3 4c0-.6.4-1 1-1h3.4c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.4 0 .8-.2 1L6.6 10.8Z" fill="currentColor"/></svg>
@@ -238,8 +238,8 @@ const pageHtml = `
     <div class="service-grid">
       <div class="service-card">
         <div class="service-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M4 12a8 8 0 0 1 16 0" stroke="currentColor" stroke-width="1.7"/><path d="M4 12a8 8 0 0 0 16 0" stroke="currentColor" stroke-width="1.7" stroke-dasharray="1.5 3"/></svg></div>
-        <h3>RO Purifiers</h3>
-        <p>Reverse-osmosis systems sized for your household and source water hardness.</p>
+        <h3>RO Water Purifiers</h3>
+        <p>Reverse-osmosis systems sized for your household and source water hardness — sales, installation and repair.</p>
       </div>
       <div class="service-card">
         <div class="service-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3v3M12 18v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M3 12h3M18 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="12" cy="12" r="3.4" stroke="currentColor" stroke-width="1.6"/></svg></div>
@@ -250,6 +250,16 @@ const pageHtml = `
         <div class="service-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M6 3h12l-2 9H8L6 3Z" stroke="currentColor" stroke-width="1.6"/><path d="M8 12v6a4 4 0 0 0 8 0v-6" stroke="currentColor" stroke-width="1.6"/></svg></div>
         <h3>Water Softeners</h3>
         <p>Softening units for hard-water areas, protecting pipes, geysers and appliances.</p>
+      </div>
+      <div class="service-card">
+        <div class="service-icon"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="1.6"/><path d="M12 11c-2.5 3-4 5.8-4 7.5a4 4 0 0 0 8 0c0-1.7-1.5-4.5-4-7.5Z" stroke="currentColor" stroke-width="1.6"/></svg></div>
+        <h3>Iron Removal Filters</h3>
+        <p>For borewell water running yellow or metallic-tasting — dedicated iron and rust removal filtration.</p>
+      </div>
+      <div class="service-card">
+        <div class="service-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3 4 6v6c0 4.5 3.2 8 8 9 4.8-1 8-4.5 8-9V6l-8-3Z" stroke="currentColor" stroke-width="1.6"/><path d="M9 12l2 2 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <h3>DM &amp; Zero-TDS Plants</h3>
+        <p>Demineralised and zero-TDS water systems for labs, industrial use and specialised equipment.</p>
       </div>
       <div class="service-card">
         <div class="service-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M12 21a8 8 0 0 0 0-16 8 8 0 0 0 0 16Z" stroke="currentColor" stroke-width="1.6"/><path d="M12 8v4l2.5 1.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></div>
@@ -387,7 +397,11 @@ const pageHtml = `
     <div class="faq-list">
       <details class="faq-item" open>
         <summary>Do you service every brand of water filter, or only what you sell?</summary>
-        <p>Every brand. We install and sell RO, UV, UF and softener systems, but our service and AMC plans cover any water filter already in your home, whichever company fitted it.</p>
+        <p>Every brand — Aquaguard, Kent, Livpure and any other make, not just what we sell. We install and sell RO, UV, UF and softener systems ourselves, but our repair and AMC service covers whichever water purifier is already in your home.</p>
+      </details>
+      <details class="faq-item">
+        <summary>Why does my tap or borewell water look yellow or taste metallic?</summary>
+        <p>That's usually dissolved iron, common in Kumbakonam's borewell water. An iron removal filter fitted ahead of your RO or softener clears it before it reaches your taps — we test for it on the same free site visit.</p>
       </details>
       <details class="faq-item">
         <summary>Is the water test really free?</summary>
