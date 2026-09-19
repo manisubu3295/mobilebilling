@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Wrench, CheckCircle, UserPlus, Plus, CalendarClock, Search, Phone, MessageCircle, MapPin, XCircle, AlertTriangle, Receipt, Pencil, RotateCcw } from 'lucide-react';
+import { Wrench, CheckCircle, UserPlus, Plus, CalendarClock, Search, Phone, MessageCircle, MapPin, XCircle, AlertTriangle, Receipt, Pencil, RotateCcw, MessageSquare, Eye } from 'lucide-react';
 import api from '@/lib/api';
 import { printReceipt } from '@/lib/print-receipt';
 import { AmcOnboardModal } from '@/components/service/AmcOnboardModal';
@@ -37,9 +37,15 @@ interface ServiceJobPart {
 interface ServiceJob {
   id: string;
   dueDate: string;
+  visitDate: string | null;
+  closedAt: string | null;
   status: 'SCHEDULED' | 'ASSIGNED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
   assignedTo: { id: string; name: string } | null;
+  customerFeedback: string | null;
+  staffExpenseAmount: string | null;
+  staffExpenseNotes: string | null;
   customerChargeAmount: string | null;
+  customerChargeNotes: string | null;
   invoiceId: string | null;
   invoice: { id: string; invoiceNumber: string; totalAmount: string } | null;
   parts: ServiceJobPart[];
@@ -195,6 +201,17 @@ export default function ServiceAdminPage() {
       return s + line + (line * parseFloat(p.taxRate)) / 100;
     }, 0);
     return partsTotal + parseFloat(j.customerChargeAmount || '0');
+  };
+
+  const [viewingInvoiceId, setViewingInvoiceId] = useState<string | null>(null);
+  const handleViewInvoice = async (invoiceId: string) => {
+    setViewingInvoiceId(invoiceId);
+    try {
+      const { data } = await api.get(`/billing/invoices/${invoiceId}`);
+      printReceipt(data);
+    } finally {
+      setViewingInvoiceId(null);
+    }
   };
 
   const visibleJobs = useMemo(() => {
@@ -408,7 +425,8 @@ export default function ServiceAdminPage() {
                   const overdue = isOverdue(j);
                   const serial = j.warranty.invoiceItem?.serialUnits?.[0]?.serialNumber;
                   return (
-              <div key={j.id} className={`bg-white rounded-xl border p-4 flex items-center justify-between gap-3 ${overdue ? 'border-l-4 border-l-red-500' : ''}`}>
+              <div key={j.id} className={`bg-white rounded-xl border p-4 ${overdue ? 'border-l-4 border-l-red-500' : ''}`}>
+                <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <p className="font-semibold text-gray-900">
                     {j.warranty.product.name}
@@ -431,9 +449,14 @@ export default function ServiceAdminPage() {
                       </span>
                     )}
                     {j.invoice ? (
-                      <span className="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full font-medium bg-green-100 text-green-700">
+                      <button
+                        onClick={() => handleViewInvoice(j.invoice!.id)}
+                        disabled={viewingInvoiceId === j.invoice.id}
+                        className="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full font-medium bg-green-100 text-green-700 hover:bg-green-200 disabled:opacity-50"
+                        title="View / print this invoice"
+                      >
                         <Receipt className="h-3 w-3" /> {j.invoice.invoiceNumber}
-                      </span>
+                      </button>
                     ) : jobBillTotal(j) > 0 ? (
                       <span className="text-xs px-1.5 py-0.5 rounded-full font-medium bg-amber-100 text-amber-700">
                         ₹{jobBillTotal(j).toLocaleString('en-IN')} not yet billed
@@ -474,6 +497,29 @@ export default function ServiceAdminPage() {
                     </>
                   )}
                 </div>
+                </div>
+                {(j.customerFeedback || j.staffExpenseAmount || j.customerChargeNotes) && (
+                  <div className="mt-3 pt-3 border-t space-y-1.5">
+                    {j.customerFeedback && (
+                      <p className="flex items-start gap-1.5 text-sm text-gray-700">
+                        <MessageSquare className="h-3.5 w-3.5 mt-0.5 shrink-0 text-gray-400" />
+                        <span><span className="font-medium">Feedback:</span> {j.customerFeedback}</span>
+                      </p>
+                    )}
+                    {j.staffExpenseAmount && parseFloat(j.staffExpenseAmount) > 0 && (
+                      <p className="text-xs text-gray-500">
+                        <span className="font-medium">Staff expense:</span> ₹{parseFloat(j.staffExpenseAmount).toLocaleString('en-IN')}
+                        {j.staffExpenseNotes && ` — ${j.staffExpenseNotes}`}
+                      </p>
+                    )}
+                    {j.customerChargeNotes && (
+                      <p className="text-xs text-gray-500"><span className="font-medium">Charge notes:</span> {j.customerChargeNotes}</p>
+                    )}
+                    {j.visitDate && (
+                      <p className="text-xs text-gray-400">Visited {new Date(j.visitDate).toLocaleDateString('en-IN', { dateStyle: 'medium' })}</p>
+                    )}
+                  </div>
+                )}
               </div>
                   );
                 })}

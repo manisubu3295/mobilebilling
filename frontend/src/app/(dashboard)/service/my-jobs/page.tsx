@@ -238,6 +238,10 @@ function JobDetailSheet({ job, onClose, onSaved }: { job: ServiceJob; onClose: (
     setError('');
     setBilling(true);
     try {
+      // Persist the visit date/feedback/expense fields first — billing only
+      // submits payment info, so without this the technician's notes never
+      // reach the server if they go straight to Bill without Save Progress.
+      await api.patch(`/warranty/service-jobs/${job.id}/update`, buildPayload());
       const { data } = await api.patch(`/warranty/service-jobs/${job.id}/bill`, {
         payments: [{ mode: billMode, amount: billTotal }],
       });
