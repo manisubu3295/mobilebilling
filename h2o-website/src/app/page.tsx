@@ -487,6 +487,9 @@ const pageHtml = `
       <span style="font-size:12px;">GSTIN: 33GVQPS8564A1Z2</span>
     </div>
   </div>
+  <div class="wrap footer-credit">
+    <span>Website crafted by <a href="https://aadhiraiinnovations.com/" target="_blank" rel="noopener noreferrer">Aadhirai Innovations</a></span>
+  </div>
 </footer>
 
 <div class="call-bar">
