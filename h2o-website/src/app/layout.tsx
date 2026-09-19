@@ -38,7 +38,8 @@ export const metadata: Metadata = {
     'AMC water purifier Tamil Nadu',
     'RO purifier installation Kumbakonam',
     'UV UF water filter Kumbakonam',
-    'Kambattu Viswanathar Street water purifier',
+    'Thanjavur Main Road water purifier',
+    'Bakkiyanathan Street Kumbakonam',
   ],
   alternates: {
     canonical: 'https://h2owaterpurifier.com/',
@@ -74,7 +75,7 @@ const localBusinessJsonLd = {
     'Water filter supplier offering sales, installation, AMC and repair service for all types of water filters and purifiers — RO, UV, UF and softener systems — for homes in Kumbakonam, Tamil Nadu.',
   address: {
     '@type': 'PostalAddress',
-    streetAddress: 'Near Arignar Anna School, Kambattu Viswanathar Street, Kumbakonam',
+    streetAddress: 'No. 38/1077, Bakkiyanathan Street, Thanjavur Main Road',
     addressLocality: 'Kumbakonam',
     addressRegion: 'Tamil Nadu',
     postalCode: '612001',
@@ -82,6 +83,7 @@ const localBusinessJsonLd = {
   },
   geo: { '@type': 'GeoCoordinates', latitude: 10.9601, longitude: 79.3788 },
   telephone: '+91-87548-16289',
+  taxID: '33GVQPS8564A1Z2',
   aggregateRating: {
     '@type': 'AggregateRating',
     ratingValue: '5.0',

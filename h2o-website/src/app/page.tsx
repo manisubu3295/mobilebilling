@@ -98,7 +98,7 @@ const pageHtml = `
       <div class="hero-meta">
         <span>
           <svg viewBox="0 0 24 24" fill="none"><path d="M12 21s7-6.1 7-11.5C19 5.9 15.9 3 12 3S5 5.9 5 9.5C5 14.9 12 21 12 21Z" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="9.5" r="2.4" stroke="currentColor" stroke-width="1.6"/></svg>
-          Near Arignar Anna School, Kambattu Viswanathar Street, Kumbakonam
+          No. 38/1077, Bakkiyanathan Street, Thanjavur Main Road, Kumbakonam
         </span>
         <span>
           <svg viewBox="0 0 24 24" fill="none"><path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C10.6 21 3 13.4 3 4c0-.6.4-1 1-1h3.4c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.4 0 .8-.2 1L6.6 10.8Z" stroke="currentColor" stroke-width="1.6"/></svg>
@@ -211,7 +211,7 @@ const pageHtml = `
       </div>
       <div class="row">
         <div class="icon-orb icon-orb--sm"><svg viewBox="0 0 24 24" fill="none"><path d="M12 21s7-6.1 7-11.5C19 5.9 15.9 3 12 3S5 5.9 5 9.5C5 14.9 12 21 12 21Z" stroke="currentColor" stroke-width="1.8"/></svg></div>
-        <div><strong>Based in Kumbakonam</strong><span>Near Arignar Anna School, Kambattu Viswanathar Street, Kumbakonam</span></div>
+        <div><strong>Based in Kumbakonam</strong><span>No. 38/1077, Bakkiyanathan Street, Thanjavur Main Road, Kumbakonam</span></div>
       </div>
       <div class="row">
         <div class="icon-orb icon-orb--sm"><svg viewBox="0 0 24 24" fill="none"><path d="M12 8v4l2.5 1.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/></svg></div>
@@ -428,7 +428,7 @@ const pageHtml = `
       <div class="contact-card">
         <div class="contact-row">
           <div class="icon-orb icon-orb--sm" style="--orb-a: var(--fresh-glow); --orb-b: var(--brand); --orb-shadow: var(--fresh-glow);"><svg viewBox="0 0 24 24" fill="none"><path d="M12 21s7-6.1 7-11.5C19 5.9 15.9 3 12 3S5 5.9 5 9.5C5 14.9 12 21 12 21Z" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="9.5" r="2.4" stroke="currentColor" stroke-width="1.8"/></svg></div>
-          <div><strong>Address</strong><span>Near Arignar Anna School,<br>Kambattu Viswanathar Street,<br>Kumbakonam, Tamil Nadu 612001</span></div>
+          <div><strong>Address</strong><span>No. 38/1077, Bakkiyanathan Street,<br>Thanjavur Main Road,<br>Kumbakonam, Tamil Nadu 612001</span></div>
         </div>
         <div class="contact-row">
           <div class="icon-orb icon-orb--sm" style="--orb-a: var(--fresh-glow); --orb-b: var(--brand); --orb-shadow: var(--fresh-glow);"><svg viewBox="0 0 24 24" fill="none"><path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C10.6 21 3 13.4 3 4c0-.6.4-1 1-1h3.4c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.4 0 .8-.2 1L6.6 10.8Z" stroke="currentColor" stroke-width="1.8"/></svg></div>
@@ -438,16 +438,20 @@ const pageHtml = `
           <div class="icon-orb icon-orb--sm" style="--orb-a: var(--fresh-glow); --orb-b: var(--brand); --orb-shadow: var(--fresh-glow);"><svg viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="16" height="16" rx="3" stroke="currentColor" stroke-width="1.8"/><path d="M8 2v4M16 2v4M4 10h16" stroke="currentColor" stroke-width="1.8"/></svg></div>
           <div><strong>Service hours</strong><span>Call anytime to schedule a visit that works for you</span></div>
         </div>
+        <div class="contact-row">
+          <div class="icon-orb icon-orb--sm" style="--orb-a: var(--fresh-glow); --orb-b: var(--brand); --orb-shadow: var(--fresh-glow);"><svg viewBox="0 0 24 24" fill="none"><path d="M9 12h6M9 16h6M9 8h2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M7 3h10a2 2 0 0 1 2 2v14a1 1 0 0 1-1.4.9L15 18l-2.6 1.9a1 1 0 0 1-1.2 0L8.6 18l-2.6 1.9A1 1 0 0 1 5 19V5a2 2 0 0 1 2-2Z" stroke="currentColor" stroke-width="1.8"/></svg></div>
+          <div><strong>GSTIN</strong><span>33GVQPS8564A1Z2</span></div>
+        </div>
       </div>
     </div>
     <div class="map-embed">
       <iframe
-        src="https://www.google.com/maps?q=Near+Arignar+Anna+School%2C+Kambattu+Viswanathar+Street%2C+Kumbakonam%2C+Tamil+Nadu+612001&output=embed"
+        src="https://www.google.com/maps?q=No+38%2F1077+Bakkiyanathan+Street+Thanjavur+Main+Road+Kumbakonam+Tamil+Nadu+612001&output=embed"
         loading="lazy"
         referrerpolicy="no-referrer-when-downgrade"
         title="H2O Water Care location in Kumbakonam"
       ></iframe>
-      <a class="btn btn-outline map-embed-cta" href="https://www.google.com/maps/search/?api=1&query=Near+Arignar+Anna+School%2C+Kambattu+Viswanathar+Street%2C+Kumbakonam%2C+Tamil+Nadu+612001" target="_blank" rel="noopener noreferrer">Get Directions</a>
+      <a class="btn btn-outline map-embed-cta" href="https://www.google.com/maps/search/?api=1&query=No+38%2F1077+Bakkiyanathan+Street+Thanjavur+Main+Road+Kumbakonam+Tamil+Nadu+612001" target="_blank" rel="noopener noreferrer">Get Directions</a>
     </div>
   </div>
 </section>
@@ -467,8 +471,9 @@ const pageHtml = `
       <a href="https://billing.h2owaterpurifier.com/login" target="_blank" rel="noopener noreferrer" style="font-size:12px; text-decoration:none;">Staff Login</a>
     </div>
     <div class="footer-contact">
-      <span>Near Arignar Anna School, Kambattu Viswanathar Street, Kumbakonam, Tamil Nadu 612001</span>
+      <span>No. 38/1077, Bakkiyanathan Street, Thanjavur Main Road, Kumbakonam, Tamil Nadu 612001</span>
       <a href="tel:+918754816289">+91 87548 16289</a>
+      <span style="font-size:12px;">GSTIN: 33GVQPS8564A1Z2</span>
     </div>
   </div>
 </footer>

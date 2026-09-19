@@ -1,8 +1,49 @@
 'use client';
 
-import React, { useCallback, useEffect, useState } from 'react';
-import { Globe, Plus, Pencil, Trash2, Star, EyeOff } from 'lucide-react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Globe, Plus, Pencil, Trash2, Star, EyeOff, Upload, X, FileText } from 'lucide-react';
 import api from '@/lib/api';
+
+const MAX_IMAGES = 6;
+const MAX_PDF_BYTES = 8 * 1024 * 1024; // 8MB — spec sheets go straight to base64, no resizing possible
+
+// Uploads are stored as base64 data URLs directly on the product row — same
+// no-file-storage pattern Settings already uses for the store's QR image, so
+// this needed no new backend storage. Images are downscaled client-side
+// first (phone camera photos are routinely 3000px+ and several MB, which
+// would otherwise bloat every catalog page load) — a PDF can't be resized,
+// so those go through as-is under MAX_PDF_BYTES.
+function resizeImageToDataUrl(file: File, maxDimension = 1600, quality = 0.82): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Could not read the image'));
+    reader.onload = () => {
+      const img = new window.Image();
+      img.onerror = () => reject(new Error('Could not decode the image'));
+      img.onload = () => {
+        const scale = Math.min(1, maxDimension / Math.max(img.width, img.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { reject(new Error('Canvas not supported')); return; }
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.src = reader.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Could not read the file'));
+    reader.onload = () => resolve(reader.result as string);
+    reader.readAsDataURL(file);
+  });
+}
 
 interface WebsiteProduct {
   id: string;
@@ -28,8 +69,9 @@ type FormState = {
   mrpPrice: string;
   sellingPrice: string;
   capacityLph: string;
-  images: string; // comma-separated in the form, split to an array on save
+  images: string[];
   specSheetUrl: string;
+  specSheetName: string;
   isFeatured: boolean;
   isActive: boolean;
   sortOrder: string;
@@ -43,8 +85,9 @@ const EMPTY_FORM: FormState = {
   mrpPrice: '',
   sellingPrice: '',
   capacityLph: '',
-  images: '',
+  images: [],
   specSheetUrl: '',
+  specSheetName: '',
   isFeatured: false,
   isActive: true,
   sortOrder: '0',
@@ -64,6 +107,10 @@ export default function WebsiteProductsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [uploadingImages, setUploadingImages] = useState(false);
+  const [uploadingPdf, setUploadingPdf] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -88,8 +135,9 @@ export default function WebsiteProductsPage() {
       mrpPrice: p.mrpPrice || '',
       sellingPrice: p.sellingPrice || '',
       capacityLph: p.capacityLph != null ? String(p.capacityLph) : '',
-      images: (p.images || []).join(', '),
+      images: p.images || [],
       specSheetUrl: p.specSheetUrl || '',
+      specSheetName: p.specSheetUrl ? 'Current spec sheet' : '',
       isFeatured: p.isFeatured,
       isActive: p.isActive,
       sortOrder: String(p.sortOrder),
@@ -110,7 +158,7 @@ export default function WebsiteProductsPage() {
       mrpPrice: form.mrpPrice ? parseFloat(form.mrpPrice) : undefined,
       sellingPrice: form.sellingPrice ? parseFloat(form.sellingPrice) : undefined,
       capacityLph: form.capacityLph ? parseInt(form.capacityLph, 10) : undefined,
-      images: form.images.split(',').map((s) => s.trim()).filter(Boolean),
+      images: form.images,
       specSheetUrl: form.specSheetUrl.trim() || undefined,
       isFeatured: form.isFeatured,
       isActive: form.isActive,
@@ -128,6 +176,41 @@ export default function WebsiteProductsPage() {
       setError(e.response?.data?.message || 'Failed to save product');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleImageFiles = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const room = MAX_IMAGES - form.images.length;
+    if (room <= 0) { setError(`Up to ${MAX_IMAGES} photos per product.`); return; }
+    setError('');
+    setUploadingImages(true);
+    try {
+      const picked = Array.from(files).slice(0, room);
+      const resized = await Promise.all(picked.map((f) => resizeImageToDataUrl(f)));
+      setForm((f) => ({ ...f, images: [...f.images, ...resized] }));
+    } catch (e: any) {
+      setError(e.message || 'Failed to process one of the images');
+    } finally {
+      setUploadingImages(false);
+      if (imageInputRef.current) imageInputRef.current.value = '';
+    }
+  };
+
+  const handlePdfFile = async (files: FileList | null) => {
+    const file = files?.[0];
+    if (!file) return;
+    if (file.size > MAX_PDF_BYTES) { setError('Spec sheet PDF must be under 8MB.'); return; }
+    setError('');
+    setUploadingPdf(true);
+    try {
+      const dataUrl = await fileToDataUrl(file);
+      setForm((f) => ({ ...f, specSheetUrl: dataUrl, specSheetName: file.name }));
+    } catch (e: any) {
+      setError(e.message || 'Failed to read the PDF');
+    } finally {
+      setUploadingPdf(false);
+      if (pdfInputRef.current) pdfInputRef.current.value = '';
     }
   };
 
@@ -279,18 +362,71 @@ export default function WebsiteProductsPage() {
                 <input type="number" min={1} value={form.capacityLph} onChange={(e) => setForm((f) => ({ ...f, capacityLph: e.target.value }))} className="w-full border rounded-lg px-3 py-2 text-sm" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Image paths (comma-separated)</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Photos ({form.images.length}/{MAX_IMAGES})</label>
+                {form.images.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {form.images.map((src, i) => (
+                      <div key={i} className="relative w-16 h-16 rounded-lg overflow-hidden border shrink-0 group">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={src} alt="" className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => setForm((f) => ({ ...f, images: f.images.filter((_, idx) => idx !== i) }))}
+                          className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white transition-opacity"
+                        >
+                          <X className="h-5 w-5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <input
-                  value={form.images}
-                  onChange={(e) => setForm((f) => ({ ...f, images: e.target.value }))}
-                  placeholder="/images/WhatsApp Image ....jpeg"
-                  className="w-full border rounded-lg px-3 py-2 text-sm"
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={(e) => handleImageFiles(e.target.files)}
+                  disabled={uploadingImages || form.images.length >= MAX_IMAGES}
+                  className="hidden"
+                  id="product-image-upload"
                 />
-                <p className="text-xs text-gray-400 mt-1">Paths under the website's own /images folder, or full URLs.</p>
+                <label
+                  htmlFor="product-image-upload"
+                  className={`flex items-center justify-center gap-2 px-3 py-2 border border-dashed rounded-lg text-sm text-gray-600 cursor-pointer hover:bg-gray-50 ${
+                    (uploadingImages || form.images.length >= MAX_IMAGES) ? 'opacity-50 pointer-events-none' : ''
+                  }`}
+                >
+                  <Upload className="h-4 w-4" /> {uploadingImages ? 'Processing…' : 'Upload photos'}
+                </label>
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Spec sheet PDF URL</label>
-                <input value={form.specSheetUrl} onChange={(e) => setForm((f) => ({ ...f, specSheetUrl: e.target.value }))} placeholder="/images/500 LPH CLASSIC.pdf" className="w-full border rounded-lg px-3 py-2 text-sm" />
+                <label className="block text-xs font-medium text-gray-600 mb-1">Spec sheet PDF</label>
+                {form.specSheetUrl ? (
+                  <div className="flex items-center justify-between gap-2 border rounded-lg px-3 py-2 text-sm">
+                    <span className="flex items-center gap-1.5 text-gray-700 truncate"><FileText className="h-4 w-4 shrink-0" /> {form.specSheetName || 'Spec sheet attached'}</span>
+                    <button type="button" onClick={() => setForm((f) => ({ ...f, specSheetUrl: '', specSheetName: '' }))} className="text-gray-400 hover:text-red-600 shrink-0">
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <input
+                      ref={pdfInputRef}
+                      type="file"
+                      accept="application/pdf"
+                      onChange={(e) => handlePdfFile(e.target.files)}
+                      disabled={uploadingPdf}
+                      className="hidden"
+                      id="product-pdf-upload"
+                    />
+                    <label
+                      htmlFor="product-pdf-upload"
+                      className={`flex items-center justify-center gap-2 px-3 py-2 border border-dashed rounded-lg text-sm text-gray-600 cursor-pointer hover:bg-gray-50 ${uploadingPdf ? 'opacity-50 pointer-events-none' : ''}`}
+                    >
+                      <Upload className="h-4 w-4" /> {uploadingPdf ? 'Uploading…' : 'Upload spec sheet (PDF, max 8MB)'}
+                    </label>
+                  </>
+                )}
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Sort order</label>
