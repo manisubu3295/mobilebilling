@@ -118,6 +118,7 @@ export class AuthService {
         licenseExpiresAt: account.licenseExpiresAt,
         serviceModuleEnabled: account.serviceModuleEnabled,
         websiteEnabled: account.websiteEnabled,
+        siteKey: account.siteKey,
       },
       ...tokens,
     };

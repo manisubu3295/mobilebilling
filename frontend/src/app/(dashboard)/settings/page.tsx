@@ -1,18 +1,24 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Save, Store, QrCode, Upload, X, CheckCircle, CalendarClock } from 'lucide-react';
+import { Save, Store, QrCode, Upload, X, CheckCircle, CalendarClock, Globe } from 'lucide-react';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
 
 export default function SettingsPage() {
-  const { user, account } = useAuthStore();
+  const { user, account, setAccount } = useAuthStore();
   const [form, setForm] = useState({ name: '', address: '', phone: '', gstNumber: '', staticQrUrl: '' });
   const [lookaheadDays, setLookaheadDays] = useState('30');
+  const [siteKey, setSiteKey] = useState('');
+  const [savingWebsite, setSavingWebsite] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setSiteKey(account?.siteKey || '');
+  }, [account?.siteKey]);
 
   useEffect(() => {
     api.get('/settings/store').then(({ data }) => {
@@ -81,6 +87,35 @@ export default function SettingsPage() {
   const clearQr = () => {
     setForm((f) => ({ ...f, staticQrUrl: '' }));
     if (fileRef.current) fileRef.current.value = '';
+  };
+
+  const handleToggleWebsite = async () => {
+    setError(''); setSavingWebsite(true);
+    try {
+      const { data } = await api.patch('/settings/website', { websiteEnabled: !account?.websiteEnabled });
+      setAccount(data);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch (e: any) {
+      setError(e.response?.data?.message || 'Save failed');
+    } finally {
+      setSavingWebsite(false);
+    }
+  };
+
+  const handleSaveSiteKey = async () => {
+    setError(''); setSavingWebsite(true);
+    try {
+      const { data } = await api.patch('/settings/website', { siteKey: siteKey.trim() || null });
+      setAccount(data);
+      setSiteKey(data.siteKey || '');
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch (e: any) {
+      setError(e.response?.data?.message || 'Save failed');
+    } finally {
+      setSavingWebsite(false);
+    }
   };
 
   const f = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
@@ -157,6 +192,48 @@ export default function SettingsPage() {
             <button onClick={handleSaveLookahead} disabled={saving}
               className="flex items-center gap-2 px-4 py-2 bg-red-700 text-white rounded-lg text-sm font-medium hover:bg-red-800 disabled:opacity-50">
               <Save className="h-4 w-4" /> {saving ? 'Saving…' : 'Save Changes'}
+            </button>
+          </div>
+        )}
+
+        {/* Website Settings */}
+        {user?.role === 'SUPER_ADMIN' && (
+          <div className="bg-white rounded-xl border p-6 space-y-4">
+            <div className="flex items-center gap-2">
+              <Globe className="h-5 w-5 text-red-700" />
+              <h2 className="font-semibold text-gray-900">Website</h2>
+            </div>
+            <div className="flex items-center justify-between max-w-md">
+              <div>
+                <p className="text-sm font-medium text-gray-700">Storefront module</p>
+                <p className="text-xs text-gray-400">Enables the public product catalog and Leads/Products screens.</p>
+              </div>
+              <button
+                onClick={handleToggleWebsite}
+                disabled={savingWebsite}
+                className={`text-xs px-3 py-1 rounded-full font-medium disabled:opacity-50 ${
+                  account?.websiteEnabled ? 'bg-teal-100 text-teal-700' : 'bg-gray-100 text-gray-500'
+                }`}
+              >
+                {account?.websiteEnabled ? 'Enabled' : 'Disabled'}
+              </button>
+            </div>
+            <div className="max-w-xs">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Site Key</label>
+              <input
+                type="text"
+                value={siteKey}
+                onChange={(e) => setSiteKey(e.target.value)}
+                placeholder="e.g. h2o-water-care"
+                className="w-full border rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-red-500"
+              />
+              <p className="text-xs text-gray-400 mt-1">
+                Must match NEXT_PUBLIC_API_BASE on the storefront site.
+              </p>
+            </div>
+            <button onClick={handleSaveSiteKey} disabled={savingWebsite}
+              className="flex items-center gap-2 px-4 py-2 bg-red-700 text-white rounded-lg text-sm font-medium hover:bg-red-800 disabled:opacity-50">
+              <Save className="h-4 w-4" /> {savingWebsite ? 'Saving…' : 'Save Site Key'}
             </button>
           </div>
         )}

@@ -13,6 +13,7 @@ interface AccountInfo {
   licenseExpiresAt: string | null;
   serviceModuleEnabled: boolean;
   websiteEnabled: boolean;
+  siteKey: string | null;
 }
 
 interface SignupInput {
@@ -33,6 +34,7 @@ interface AuthState {
   signup: (input: SignupInput) => Promise<void>;
   logout: () => Promise<void>;
   setToken: (token: string) => void;
+  setAccount: (patch: Partial<AccountInfo>) => void;
   setHasHydrated: (v: boolean) => void;
 }
 
@@ -71,6 +73,8 @@ export const useAuthStore = create<AuthState>()(
         localStorage.setItem('access_token', token);
         set({ accessToken: token });
       },
+
+      setAccount: (patch) => set((s) => ({ account: s.account ? { ...s.account, ...patch } : s.account })),
 
       setHasHydrated: (v) => set({ hasHydrated: v }),
     }),
