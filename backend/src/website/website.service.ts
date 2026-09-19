@@ -8,6 +8,13 @@ import { UpdateLeadDto } from './dto/update-lead.dto';
 import { CreateWebsiteProductDto } from './dto/create-website-product.dto';
 import { UpdateWebsiteProductDto } from './dto/update-website-product.dto';
 
+function itemsSignature(items: { productId: string; qty: number }[] | null | undefined) {
+  return (items || [])
+    .map((i) => `${i.productId}:${i.qty}`)
+    .sort()
+    .join(',');
+}
+
 @Injectable()
 export class WebsiteService {
   constructor(
@@ -42,6 +49,24 @@ export class WebsiteService {
     const tenant = await this.tenantConnections.getClientForAccount(account.id);
     const store = await tenant.store.findFirst();
     if (!store) throw new NotFoundException('Site not found');
+
+    // Dedup guard: a double-click on Submit/WhatsApp, or a network retry after
+    // a slow response, fires this same request twice in quick succession.
+    // Rather than creating two Lead rows for one enquiry, treat an identical
+    // (same phone + same cart) submission within a short window as the same
+    // lead and hand back the one already created. A genuinely new enquiry
+    // from the same customer minutes later still creates its own lead.
+    const dedupWindow = new Date(Date.now() - 3 * 60 * 1000);
+    const normalizedPhone = dto.phone.replace(/\D/g, '');
+    const itemsKey = itemsSignature(dto.items);
+    const recentLeads = await tenant.lead.findMany({
+      where: { storeId: store.id, createdAt: { gte: dedupWindow } },
+      orderBy: { createdAt: 'desc' },
+    });
+    const duplicate = recentLeads.find(
+      (l) => l.phone.replace(/\D/g, '') === normalizedPhone && itemsSignature(l.items as any) === itemsKey,
+    );
+    if (duplicate) return duplicate;
 
     return tenant.lead.create({
       data: {

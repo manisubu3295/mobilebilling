@@ -214,7 +214,8 @@ export default function WebsiteProductsPage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string, name: string) => {
+    if (!window.confirm(`Delete "${name}"? This removes it from the live website immediately.`)) return;
     setDeletingId(id);
     try {
       await api.delete(`/website-products/${id}`);
@@ -296,7 +297,7 @@ export default function WebsiteProductsPage() {
                           <Pencil className="h-4 w-4" /> <span className="hidden sm:inline">Edit</span>
                         </button>
                         <button
-                          onClick={() => handleDelete(p.id)}
+                          onClick={() => handleDelete(p.id, p.name)}
                           disabled={deletingId === p.id}
                           className="flex items-center gap-1.5 px-3 py-2 border border-red-200 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
                         >

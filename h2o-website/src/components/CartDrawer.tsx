@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useCartStore } from '@/store/cart.store';
 import { submitLead } from '@/lib/site-api';
 
@@ -112,6 +112,10 @@ function EnquiryModal({ onClose, onDone }: { onClose: () => void; onDone: () => 
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  // A `disabled` prop only takes effect after React re-renders, so a fast
+  // double-click can fire the handler twice before that happens. This ref is
+  // checked synchronously, so the second click is dropped immediately.
+  const inFlight = useRef(false);
 
   const leadItems = items.map((i) => ({ productId: i.productId, name: i.name, qty: i.qty }));
   const valid = name.trim().length > 1 && phone.trim().length >= 8;
@@ -120,7 +124,9 @@ function EnquiryModal({ onClose, onDone }: { onClose: () => void; onDone: () => 
     items.map((i) => `• ${i.name} × ${i.qty}`).join('\n');
 
   const handleWhatsApp = async () => {
+    if (inFlight.current) return;
     if (!valid) { setError('Enter your name and phone number first.'); return; }
+    inFlight.current = true;
     setError('');
     setSubmitting(true);
     await submitLead({ customerName: name, phone, email: email || undefined, address: address || undefined, message: message || undefined, items: leadItems, source: 'WHATSAPP' });
@@ -132,12 +138,14 @@ function EnquiryModal({ onClose, onDone }: { onClose: () => void; onDone: () => 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (inFlight.current) return;
     if (!valid) { setError('Enter your name and phone number.'); return; }
+    inFlight.current = true;
     setError('');
     setSubmitting(true);
     const ok = await submitLead({ customerName: name, phone, email: email || undefined, address: address || undefined, message: message || undefined, items: leadItems, source: 'FORM' });
     setSubmitting(false);
-    if (!ok) { setError('Could not submit right now — please try WhatsApp instead, or call us.'); return; }
+    if (!ok) { inFlight.current = false; setError('Could not submit right now — please try WhatsApp instead, or call us.'); return; }
     onDone();
   };
 
