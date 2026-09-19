@@ -207,7 +207,7 @@ const pageHtml = `
     </div>
     <div class="about-panel">
       <div class="about-photo">
-        <img src="/images/WhatsApp%20Image%202026-09-19%20at%209.03.35%20AM.jpeg" alt="An H2O RO purifier installed in a customer's kitchen in Kumbakonam" />
+        <img src="/images/install-household-01.jpeg" alt="An H2O RO purifier installed in a customer's kitchen in Kumbakonam" />
       </div>
       <div class="row">
         <div class="icon-orb icon-orb--sm"><svg viewBox="0 0 24 24" fill="none"><path d="M12 21s7-6.1 7-11.5C19 5.9 15.9 3 12 3S5 5.9 5 9.5C5 14.9 12 21 12 21Z" stroke="currentColor" stroke-width="1.8"/></svg></div>
@@ -314,7 +314,7 @@ const pageHtml = `
 
 <section id="showcase" class="media-block">
   <div class="media-block-bg" aria-hidden="true">
-    <img src="/images/WhatsApp%20Image%202026-09-19%20at%209.04.17%20AM.jpeg" alt="A commercial RO plant installed by H2O Water Care" />
+    <img src="/images/install-commercial-21.jpeg" alt="A commercial RO plant installed by H2O Water Care" />
   </div>
   <div class="wrap media-block-inner">
     <h2>Every installation, done properly.</h2>
@@ -360,7 +360,7 @@ const pageHtml = `
     </div>
     <div class="process-layout">
       <div class="process-photo">
-        <img src="/images/WhatsApp%20Image%202026-09-19%20at%209.04.30%20AM%20(1).jpeg" alt="A water softener installed by H2O Water Care in a Kumbakonam home" />
+        <img src="/images/install-household-18.jpeg" alt="A water purifier installed by H2O Water Care in a Kumbakonam home" />
       </div>
       <div class="steps">
         <div class="step">
