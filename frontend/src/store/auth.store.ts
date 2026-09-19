@@ -12,6 +12,7 @@ interface AuthUser {
 interface AccountInfo {
   licenseExpiresAt: string | null;
   serviceModuleEnabled: boolean;
+  websiteEnabled: boolean;
 }
 
 interface SignupInput {

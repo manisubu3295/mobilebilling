@@ -7,6 +7,7 @@ import {
   ShoppingCart, Package, Users, FileText,
   BarChart2, Settings, LogOut, Store, Menu, X, UserCircle, Landmark, BookOpen, Smartphone,
   ClipboardList, Wrench, Bell, AlertTriangle, TrendingUp, ClipboardCheck, LayoutDashboard, KeyRound, CalendarClock,
+  Globe, UserPlus,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
 import { useBillingStore } from '@/store/billing.store';
@@ -19,6 +20,7 @@ interface NavItem {
   icon: React.ComponentType<{ className?: string }>;
   roles: string[];
   serviceModule?: true;
+  websiteModule?: true;
 }
 
 // Grouped so the sidebar reads as sections rather than one long flat list —
@@ -44,6 +46,13 @@ const NAV_SECTIONS: { label: string | null; items: NavItem[] }[] = [
       { href: '/service/my-jobs', label: 'My Service Jobs', icon: ClipboardCheck, roles: ['SERVICE_STAFF'], serviceModule: true },
       { href: '/service/next-service', label: 'Next Service', icon: CalendarClock, roles: ['SUPER_ADMIN', 'STORE_MANAGER'], serviceModule: true },
       { href: '/service/reports', label: 'Service Reports', icon: TrendingUp, roles: ['SUPER_ADMIN', 'STORE_MANAGER'], serviceModule: true },
+    ],
+  },
+  {
+    label: 'Website',
+    items: [
+      { href: '/website/leads', label: 'Leads', icon: UserPlus, roles: ['SUPER_ADMIN', 'STORE_MANAGER'], websiteModule: true },
+      { href: '/website/products', label: 'Products', icon: Globe, roles: ['SUPER_ADMIN', 'STORE_MANAGER'], websiteModule: true },
     ],
   },
   {
@@ -125,7 +134,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     .map((section) => ({
       ...section,
       items: section.items.filter(
-        (n) => (!user || n.roles.includes(user.role)) && (!n.serviceModule || account?.serviceModuleEnabled),
+        (n) =>
+          (!user || n.roles.includes(user.role)) &&
+          (!n.serviceModule || account?.serviceModuleEnabled) &&
+          (!n.websiteModule || account?.websiteEnabled),
       ),
     }))
     .filter((section) => section.items.length > 0);

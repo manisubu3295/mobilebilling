@@ -114,7 +114,11 @@ export class AuthService {
 
     return {
       user: { id: user.id, name: user.name, role: user.role, store: user.store },
-      account: { licenseExpiresAt: account.licenseExpiresAt, serviceModuleEnabled: account.serviceModuleEnabled },
+      account: {
+        licenseExpiresAt: account.licenseExpiresAt,
+        serviceModuleEnabled: account.serviceModuleEnabled,
+        websiteEnabled: account.websiteEnabled,
+      },
       ...tokens,
     };
   }

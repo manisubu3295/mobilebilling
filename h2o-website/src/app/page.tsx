@@ -41,6 +41,7 @@ const pageHtml = `
     </a>
     <nav>
       <ul class="nav-links">
+        <li><a href="/products">Shop</a></li>
         <li><a href="#about">About</a></li>
         <li><a href="#services">Services</a></li>
         <li><a href="#pricing">Pricing</a></li>
@@ -51,7 +52,7 @@ const pageHtml = `
       </ul>
     </nav>
     <div class="nav-cta">
-      <a class="staff-login" href="http://localhost:3000/login" target="_blank" rel="noopener noreferrer">Staff Login</a>
+      <a class="staff-login" href="https://billing.h2owaterpurifier.com/login" target="_blank" rel="noopener noreferrer">Staff Login</a>
       <a class="nav-phone" href="tel:+918754816289">+91 87548 16289</a>
       <a class="btn btn-outline" href="tel:+918754816289">Call Now</a>
       <label for="menu-toggle" class="menu-toggle" aria-label="Toggle menu">
@@ -60,6 +61,7 @@ const pageHtml = `
     </div>
   </div>
   <nav id="mobile-nav" class="mobile-nav" aria-label="Mobile">
+    <a href="/products">Shop</a>
     <a href="#about">About</a>
     <a href="#services">Services</a>
     <a href="#pricing">Pricing</a>
@@ -67,7 +69,7 @@ const pageHtml = `
     <a href="#process">Process</a>
     <a href="#faq">FAQ</a>
     <a href="#contact">Contact</a>
-    <a href="http://localhost:3000/login" target="_blank" rel="noopener noreferrer">Staff Login</a>
+    <a href="https://billing.h2owaterpurifier.com/login" target="_blank" rel="noopener noreferrer">Staff Login</a>
     <a class="btn btn-primary" href="tel:+918754816289">Call +91 87548 16289</a>
     <a class="btn btn-outline" href="https://wa.me/918754816289?text=Hi%2C%20I%27d%20like%20to%20book%20a%20free%20water%20test" target="_blank" rel="noopener noreferrer">WhatsApp Us</a>
   </nav>
@@ -205,8 +207,7 @@ const pageHtml = `
     </div>
     <div class="about-panel">
       <div class="about-photo">
-        <img src="/images/placeholders/kitchen-sm.jpg" alt="" />
-        <span class="photo-tag">Sample photo — for layout only</span>
+        <img src="/images/WhatsApp%20Image%202026-09-19%20at%209.03.35%20AM.jpeg" alt="An H2O RO purifier installed in a customer's kitchen in Kumbakonam" />
       </div>
       <div class="row">
         <div class="icon-orb icon-orb--sm"><svg viewBox="0 0 24 24" fill="none"><path d="M12 21s7-6.1 7-11.5C19 5.9 15.9 3 12 3S5 5.9 5 9.5C5 14.9 12 21 12 21Z" stroke="currentColor" stroke-width="1.8"/></svg></div>
@@ -303,10 +304,9 @@ const pageHtml = `
 
 <section id="showcase" class="media-block">
   <div class="media-block-bg" aria-hidden="true">
-    <img src="/images/placeholders/technician-sm.jpg" alt="" />
+    <img src="/images/WhatsApp%20Image%202026-09-19%20at%209.04.17%20AM.jpeg" alt="A commercial RO plant installed by H2O Water Care" />
   </div>
   <div class="wrap media-block-inner">
-    <span class="photo-tag photo-tag--light">Sample photo — for layout only</span>
     <h2>Every installation, done properly.</h2>
     <p class="media-caption">Site survey, fitting, and a full walkthrough of your new system at your home — nothing rushed, nothing left unexplained.</p>
     <a class="btn btn-primary" href="tel:+918754816289">Call +91 87548 16289</a>
@@ -350,8 +350,7 @@ const pageHtml = `
     </div>
     <div class="process-layout">
       <div class="process-photo">
-        <img src="/images/placeholders/plumber-sm.jpg" alt="" />
-        <span class="photo-tag">Sample photo — for layout only</span>
+        <img src="/images/WhatsApp%20Image%202026-09-19%20at%209.04.30%20AM%20(1).jpeg" alt="A water softener installed by H2O Water Care in a Kumbakonam home" />
       </div>
       <div class="steps">
         <div class="step">
@@ -465,7 +464,7 @@ const pageHtml = `
     <div class="footer-brand">
       <span class="logo-word" style="font-family:'Sora',sans-serif; font-weight:800;">H2O Water Care</span>
       <span>&copy; 2026 H2O Water Care</span>
-      <a href="http://localhost:3000/login" target="_blank" rel="noopener noreferrer" style="font-size:12px; text-decoration:none;">Staff Login</a>
+      <a href="https://billing.h2owaterpurifier.com/login" target="_blank" rel="noopener noreferrer" style="font-size:12px; text-decoration:none;">Staff Login</a>
     </div>
     <div class="footer-contact">
       <span>Near Arignar Anna School, Kambattu Viswanathar Street, Kumbakonam, Tamil Nadu 612001</span>

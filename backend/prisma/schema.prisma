@@ -64,6 +64,19 @@ enum QuotationStatus {
   CANCELLED
 }
 
+enum LeadSource {
+  WHATSAPP
+  FORM
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUOTED
+  CONVERTED
+  CLOSED
+}
+
 enum AttributeFieldType {
   TEXT
   NUMBER
@@ -139,6 +152,8 @@ model Store {
   serviceJobParts      ServiceJobPart[]
   quotations           Quotation[]
   notifications        Notification[]
+  websiteProducts      WebsiteProduct[]
+  leads                Lead[]
 
   @@map("stores")
 }
@@ -606,4 +621,53 @@ model QuotationItem {
   lineTotal   Decimal   @map("line_total") @db.Decimal(10, 2)
 
   @@map("quotation_items")
+}
+
+// ─── Public Website (catalog + leads) ────────────────────────────────────────
+// Powers the marketing/ecommerce site's product catalog and cart-to-lead flow.
+// Reached two ways: an unauthenticated public API (resolved via
+// PlatformAccount.siteKey in the master DB, not a JWT) for the storefront
+// itself, and the normal authenticated tenant API for admin management here.
+
+model WebsiteProduct {
+  id               String   @id @default(cuid())
+  storeId          String   @map("store_id")
+  store            Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  category         String   // e.g. "Household RO/UV/Softener", "Commercial RO Plants"
+  name             String
+  shortDescription String?  @map("short_description")
+  description      String?
+  mrpPrice         Decimal? @map("mrp_price") @db.Decimal(10, 2)
+  sellingPrice     Decimal? @map("selling_price") @db.Decimal(10, 2)
+  capacityLph      Int?     @map("capacity_lph") // commercial plants only
+  images           Json     @default("[]") // string[] of /images paths
+  specSheetUrl     String?  @map("spec_sheet_url")
+  isFeatured       Boolean  @default(false) @map("is_featured")
+  isActive         Boolean  @default(true) @map("is_active")
+  sortOrder        Int      @default(0) @map("sort_order")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@index([storeId, isActive])
+  @@map("website_products")
+}
+
+model Lead {
+  id           String     @id @default(cuid())
+  storeId      String     @map("store_id")
+  store        Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  customerName String     @map("customer_name")
+  phone        String
+  email        String?
+  address      String?
+  message      String?
+  items        Json       @default("[]") // [{ productId, name, qty }]
+  source       LeadSource
+  status       LeadStatus @default(NEW)
+  notes        String?
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+
+  @@index([storeId, status])
+  @@map("leads")
 }

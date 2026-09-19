@@ -33,6 +33,11 @@ model PlatformAccount {
   status       AccountStatus @default(ACTIVE)
   licenseExpiresAt     DateTime? @map("license_expires_at")
   serviceModuleEnabled Boolean   @default(false) @map("service_module_enabled")
+  // Public, non-secret identifier used ONLY to resolve this account from the
+  // unauthenticated website storefront API (see backend/src/website) — never
+  // used for anything requiring real auth.
+  siteKey              String?   @unique @map("site_key")
+  websiteEnabled       Boolean   @default(false) @map("website_enabled")
   createdAt    DateTime      @default(now()) @map("created_at")
   updatedAt    DateTime      @updatedAt @map("updated_at")
 

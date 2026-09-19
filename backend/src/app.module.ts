@@ -18,6 +18,7 @@ import { PlatformAdminModule } from './platform-admin/platform-admin.module';
 import { WarrantyModule } from './warranty/warranty.module';
 import { QuotationsModule } from './quotations/quotations.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { WebsiteModule } from './website/website.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     WarrantyModule,
     QuotationsModule,
     NotificationsModule,
+    WebsiteModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
@@ -53,6 +55,7 @@ export class AppModule implements NestModule {
         { path: 'auth/refresh', method: RequestMethod.POST },
         { path: 'auth/forgot-password', method: RequestMethod.POST },
         { path: 'platform-admin/(.*)', method: RequestMethod.ALL },
+        { path: 'public/site/(.*)', method: RequestMethod.ALL },
       )
       .forRoutes('*');
   }
