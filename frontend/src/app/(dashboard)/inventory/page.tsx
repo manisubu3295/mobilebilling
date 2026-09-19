@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { Plus, AlertTriangle, Package, Search, ChevronDown, ChevronRight, Tag, QrCode, Printer, ArrowUpDown } from 'lucide-react';
+import { Plus, AlertTriangle, Package, Search, ChevronDown, ChevronRight, Tag, QrCode, Printer, ArrowUpDown, Pencil, Power } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import api from '@/lib/api';
 import { ExportImportModal } from '@/components/inventory/ExportImportModal';
@@ -29,6 +29,9 @@ interface Product {
   partNumber: string | null;
   customFields: Record<string, any> | null;
   hsnCode: string | null;
+  requiresService: boolean;
+  type: 'PHYSICAL' | 'SERVICE';
+  isActive: boolean;
   category: { name: string };
   skus: SKU[];
 }
@@ -68,6 +71,8 @@ export default function InventoryPage() {
   const [search, setSearch] = useState('');
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [showAddProduct, setShowAddProduct] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [editingSku, setEditingSku] = useState<{ sku: SKU; productName: string } | null>(null);
   const [showAddStock, setShowAddStock] = useState<SelectedSku | null>(null);
   const [showQrLabel, setShowQrLabel] = useState<QrLabelData | null>(null);
   const [showExportImport, setShowExportImport] = useState(false);
@@ -78,7 +83,7 @@ export default function InventoryPage() {
     setLoading(true);
     try {
       const [prodRes, alertRes] = await Promise.all([
-        api.get(`/inventory/products${search ? `?search=${encodeURIComponent(search)}` : ''}`),
+        api.get('/inventory/products', { params: { search: search || undefined, includeInactive: true } }),
         api.get('/inventory/low-stock'),
       ]);
       setProducts(prodRes.data);
@@ -100,6 +105,11 @@ export default function InventoryPage() {
 
   const effectiveStock = (sku: SKU) =>
     sku.isSerialized ? sku._count.serialInventory : sku.stockQty;
+
+  const handleToggleActive = async (id: string) => {
+    await api.patch(`/inventory/products/${id}/toggle`);
+    load();
+  };
 
   return (
     <div className="h-full flex flex-col bg-gray-50">
@@ -175,37 +185,66 @@ export default function InventoryPage() {
             ) : (
               <div className="space-y-3">
                 {products.map((product) => {
+                  const isService = product.type === 'SERVICE';
                   const totalStock = product.skus.reduce((s, sku) => s + effectiveStock(sku), 0);
                   const isExpanded = expanded.has(product.id);
 
                   return (
-                    <div key={product.id} className="bg-white rounded-xl border overflow-hidden">
-                      <button
-                        onClick={() => toggleExpand(product.id)}
-                        className="w-full flex items-center gap-3 px-5 py-4 hover:bg-gray-50 text-left"
-                      >
-                        {isExpanded
-                          ? <ChevronDown className="h-4 w-4 text-gray-400 shrink-0" />
-                          : <ChevronRight className="h-4 w-4 text-gray-400 shrink-0" />}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <p className="font-semibold text-gray-900">{product.name}</p>
-                            {product.partNumber && (
-                              <span className="flex items-center gap-0.5 text-xs text-gray-400 font-mono">
-                                <Tag className="h-3 w-3" /> {product.partNumber}
-                              </span>
-                            )}
+                    <div key={product.id} className={`bg-white rounded-xl border overflow-hidden ${!product.isActive ? 'opacity-60' : ''}`}>
+                      <div className="w-full flex items-center gap-3 px-5 py-4 hover:bg-gray-50">
+                        <button
+                          onClick={() => toggleExpand(product.id)}
+                          className="flex-1 min-w-0 flex items-center gap-3 text-left"
+                        >
+                          {isExpanded
+                            ? <ChevronDown className="h-4 w-4 text-gray-400 shrink-0" />
+                            : <ChevronRight className="h-4 w-4 text-gray-400 shrink-0" />}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="font-semibold text-gray-900">{product.name}</p>
+                              {isService && (
+                                <span className="text-xs px-1.5 py-0.5 rounded-full font-medium bg-blue-50 text-blue-700">Service</span>
+                              )}
+                              {!product.isActive && (
+                                <span className="text-xs px-1.5 py-0.5 rounded-full font-medium bg-red-100 text-red-600">Inactive</span>
+                              )}
+                              {product.partNumber && (
+                                <span className="flex items-center gap-0.5 text-xs text-gray-400 font-mono">
+                                  <Tag className="h-3 w-3" /> {product.partNumber}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-sm text-gray-500">
+                              {product.category.name} · {product.skus.length} variant(s)
+                              {product.customFields?.notes && ` · ${product.customFields.notes}`}
+                            </p>
                           </div>
-                          <p className="text-sm text-gray-500">
-                            {product.category.name} · {product.skus.length} variant(s)
-                            {product.customFields?.notes && ` · ${product.customFields.notes}`}
-                          </p>
-                        </div>
+                        </button>
                         <div className="text-right shrink-0">
-                          <p className="font-bold text-gray-900">{totalStock}</p>
-                          <p className="text-xs text-gray-500">in stock</p>
+                          {isService ? (
+                            <p className="text-xs text-gray-400 italic">no stock</p>
+                          ) : (
+                            <>
+                              <p className="font-bold text-gray-900">{totalStock}</p>
+                              <p className="text-xs text-gray-500">in stock</p>
+                            </>
+                          )}
                         </div>
-                      </button>
+                        <button
+                          onClick={() => setEditingProduct(product)}
+                          className="p-1.5 text-gray-400 hover:text-red-700 hover:bg-red-50 rounded-lg shrink-0"
+                          title="Edit product"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleToggleActive(product.id)}
+                          className={`p-1.5 rounded-lg shrink-0 ${product.isActive ? 'text-gray-400 hover:text-red-700 hover:bg-red-50' : 'text-gray-400 hover:text-green-700 hover:bg-green-50'}`}
+                          title={product.isActive ? 'Deactivate product' : 'Activate product'}
+                        >
+                          <Power className="h-4 w-4" />
+                        </button>
+                      </div>
 
                       {isExpanded && (
                         <div className="border-t bg-gray-50 divide-y">
@@ -220,29 +259,40 @@ export default function InventoryPage() {
                                     Sell: ₹{parseFloat(sku.sellingPrice).toLocaleString('en-IN')}/{sku.unit}
                                     {' · '}Cost: ₹{parseFloat(sku.costPrice).toLocaleString('en-IN')}
                                     {' · '}GST: {sku.taxRate}%
-                                    {' · '}{sku.isSerialized ? 'Serial-tracked' : `Bulk (${sku.unit})`}
+                                    {' · '}{isService ? 'Service — no stock' : sku.isSerialized ? 'Serial-tracked' : `Bulk (${sku.unit})`}
                                     {sku.barcode && ` · Barcode: ${sku.barcode}`}
                                   </p>
                                 </div>
                                 <div className="flex items-center gap-3 shrink-0 flex-wrap">
-                                  <div className="text-right">
-                                    <p className={`font-bold text-sm ${isLow ? 'text-red-600' : 'text-green-700'}`}>
-                                      {stock} {sku.unit}
-                                    </p>
-                                    <p className="text-xs text-gray-400">min: {sku.lowStockThreshold}</p>
-                                  </div>
-                                  {isLow && <AlertTriangle className="h-4 w-4 text-red-500" />}
+                                  {!isService && (
+                                    <div className="text-right">
+                                      <p className={`font-bold text-sm ${isLow ? 'text-red-600' : 'text-green-700'}`}>
+                                        {stock} {sku.unit}
+                                      </p>
+                                      <p className="text-xs text-gray-400">min: {sku.lowStockThreshold}</p>
+                                    </div>
+                                  )}
+                                  {!isService && isLow && <AlertTriangle className="h-4 w-4 text-red-500" />}
                                   <button
-                                    onClick={() => setShowAddStock({
-                                      id: sku.id,
-                                      isSerialized: sku.isSerialized,
-                                      variantName: sku.variantName,
-                                      unit: sku.unit,
-                                    })}
-                                    className="px-2.5 py-1 border border-red-300 text-red-700 text-xs rounded-lg hover:bg-red-50 font-medium"
+                                    onClick={() => setEditingSku({ sku, productName: product.name })}
+                                    className="p-1.5 border border-gray-300 text-gray-500 rounded-lg hover:bg-gray-50 hover:text-red-700 hover:border-red-300"
+                                    title="Edit variant"
                                   >
-                                    + Stock
+                                    <Pencil className="h-3.5 w-3.5" />
                                   </button>
+                                  {!isService && (
+                                    <button
+                                      onClick={() => setShowAddStock({
+                                        id: sku.id,
+                                        isSerialized: sku.isSerialized,
+                                        variantName: sku.variantName,
+                                        unit: sku.unit,
+                                      })}
+                                      className="px-2.5 py-1 border border-red-300 text-red-700 text-xs rounded-lg hover:bg-red-50 font-medium"
+                                    >
+                                      + Stock
+                                    </button>
+                                  )}
                                   <button
                                     onClick={() => {
                                       const qrValue = sku.barcode || product.partNumber || `SKU-${sku.id.slice(-8).toUpperCase()}`;
@@ -314,6 +364,22 @@ export default function InventoryPage() {
       </div>
 
       {showAddProduct && <AddProductModal onClose={() => setShowAddProduct(false)} onSave={load} />}
+      {editingProduct && (
+        <EditProductModal
+          product={editingProduct}
+          onClose={() => setEditingProduct(null)}
+          onSave={() => { setEditingProduct(null); load(); }}
+          onRefresh={load}
+        />
+      )}
+      {editingSku && (
+        <EditSkuModal
+          sku={editingSku.sku}
+          productName={editingSku.productName}
+          onClose={() => setEditingSku(null)}
+          onSave={() => { setEditingSku(null); load(); }}
+        />
+      )}
       {showAddStock && (
         <AddStockModal sku={showAddStock} onClose={() => setShowAddStock(null)} onSave={load} />
       )}
@@ -336,13 +402,16 @@ const UNITS = ['PCS', 'SET', 'PAIR', 'LITER', 'METER', 'KG'];
 
 /* ── Add Product Modal ──────────────────────────────────────────────── */
 function AddProductModal({ onClose, onSave }: { onClose: () => void; onSave: () => void }) {
+  const { account } = useAuthStore();
   const [form, setForm] = useState({
     name: '', brand: '', partNumber: '', notes: '',
     categoryId: '', hsnCode: '', description: '',
     skuName: 'Standard', unit: 'PCS', isSerialized: false,
     costPrice: '', sellingPrice: '', taxRate: '18', threshold: '5', barcode: '',
-    initialStock: '0',
+    initialStock: '0', requiresService: false,
+    type: 'PHYSICAL' as 'PHYSICAL' | 'SERVICE',
   });
+  const isServiceType = form.type === 'SERVICE';
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -379,7 +448,7 @@ function AddProductModal({ onClose, onSave }: { onClose: () => void; onSave: () 
       setError('Please fill all required fields (*).'); return;
     }
     const initialStock = parseFloat(form.initialStock) || 0;
-    if (!form.isSerialized && !unitAllowsDecimal(form.unit) && !Number.isInteger(initialStock)) {
+    if (!isServiceType && !form.isSerialized && !unitAllowsDecimal(form.unit) && !Number.isInteger(initialStock)) {
       setError(`"${form.unit}" is stocked in whole numbers — opening stock must be a whole number.`);
       return;
     }
@@ -393,11 +462,13 @@ function AddProductModal({ onClose, onSave }: { onClose: () => void; onSave: () 
         categoryId: form.categoryId,
         hsnCode: form.hsnCode || undefined,
         description: form.description || undefined,
+        requiresService: isServiceType ? false : form.requiresService,
+        type: form.type,
         skus: [{
           variantName: form.skuName || 'Standard',
           unit: form.unit,
-          isSerialized: form.isSerialized,
-          stockQty: form.isSerialized ? 0 : initialStock,
+          isSerialized: isServiceType ? false : form.isSerialized,
+          stockQty: isServiceType || form.isSerialized ? 0 : initialStock,
           costPrice: +form.costPrice,
           sellingPrice: +form.sellingPrice,
           taxRate: +form.taxRate,
@@ -429,6 +500,17 @@ function AddProductModal({ onClose, onSave }: { onClose: () => void; onSave: () 
 
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Product Info</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="col-span-2">
+              <label className="block text-xs font-medium text-gray-600 mb-1">Type</label>
+              <select
+                value={form.type}
+                onChange={(e) => setForm((p) => ({ ...p, type: e.target.value as 'PHYSICAL' | 'SERVICE' }))}
+                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+              >
+                <option value="PHYSICAL">Physical Product (tracked stock)</option>
+                <option value="SERVICE">Service or Fee (labor, visit charge, installation… no stock)</option>
+              </select>
+            </div>
             <Field label="Product Name *" value={form.name} onChange={f('name')} />
             <Field label="Brand" value={form.brand} onChange={f('brand')} />
             <Field label="SKU / Item Code" value={form.partNumber} onChange={f('partNumber')} placeholder="e.g. SKU-1234" />
@@ -479,6 +561,19 @@ function AddProductModal({ onClose, onSave }: { onClose: () => void; onSave: () 
             <div className="col-span-2">
               <Field label="Notes" value={form.notes} onChange={f('notes')} placeholder="Optional — e.g. size, color, specifications" />
             </div>
+            {account?.serviceModuleEnabled && !isServiceType && (
+              <div className="col-span-2">
+                <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.requiresService}
+                    onChange={(e) => setForm((p) => ({ ...p, requiresService: e.target.checked }))}
+                    className="h-4 w-4 accent-red-700"
+                  />
+                  Requires service tracking
+                </label>
+              </div>
+            )}
           </div>
 
           <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide pt-2">Variant / SKU</p>
@@ -493,20 +588,22 @@ function AddProductModal({ onClose, onSave }: { onClose: () => void; onSave: () 
             <Field label="Cost Price ₹ *" type="number" value={form.costPrice} onChange={f('costPrice')} />
             <Field label="Selling Price ₹ *" type="number" value={form.sellingPrice} onChange={f('sellingPrice')} />
             <Field label="GST Rate %" type="number" value={form.taxRate} onChange={f('taxRate')} />
-            <Field label="Low Stock Alert" type="number" value={form.threshold} onChange={f('threshold')} />
+            {!isServiceType && <Field label="Low Stock Alert" type="number" value={form.threshold} onChange={f('threshold')} />}
             <Field label="Barcode" value={form.barcode} onChange={f('barcode')} />
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Stock Tracking</label>
-              <select
-                value={form.isSerialized ? 'serial' : 'bulk'}
-                onChange={(e) => setForm((p) => ({ ...p, isSerialized: e.target.value === 'serial' }))}
-                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
-              >
-                <option value="bulk">Bulk Qty (most items)</option>
-                <option value="serial">Serial-tracked (high-value)</option>
-              </select>
-            </div>
-            {!form.isSerialized && (
+            {!isServiceType && (
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Stock Tracking</label>
+                <select
+                  value={form.isSerialized ? 'serial' : 'bulk'}
+                  onChange={(e) => setForm((p) => ({ ...p, isSerialized: e.target.value === 'serial' }))}
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+                >
+                  <option value="bulk">Bulk Qty (most items)</option>
+                  <option value="serial">Serial-tracked (high-value)</option>
+                </select>
+              </div>
+            )}
+            {!isServiceType && !form.isSerialized && (
               <Field label="Opening Stock" type="number" value={form.initialStock} onChange={f('initialStock')} placeholder="0" />
             )}
           </div>
@@ -515,6 +612,244 @@ function AddProductModal({ onClose, onSave }: { onClose: () => void; onSave: () 
           <button onClick={onClose} className="flex-1 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
           <button onClick={handleSave} disabled={saving} className="flex-1 py-2 bg-red-700 text-white rounded-lg text-sm font-medium hover:bg-red-800 disabled:opacity-50">
             {saving ? 'Saving…' : 'Save Product'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Edit Product Modal ─────────────────────────────────────────────── */
+function EditProductModal({ product, onClose, onSave, onRefresh }: { product: Product; onClose: () => void; onSave: () => void; onRefresh?: () => void }) {
+  const { account } = useAuthStore();
+  const [form, setForm] = useState({
+    name: product.name,
+    brand: product.brand || '',
+    partNumber: product.partNumber || '',
+    categoryId: '',
+    hsnCode: product.hsnCode || '',
+    notes: product.customFields?.notes || '',
+    requiresService: product.requiresService ?? false,
+    type: product.type,
+  });
+  const isServiceType = form.type === 'SERVICE';
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [skus, setSkus] = useState<SKU[]>(product.skus);
+  const [editingSku, setEditingSku] = useState<SKU | null>(null);
+
+  useEffect(() => {
+    api.get('/inventory/categories').then(({ data }) => {
+      setCategories(data);
+      const current = data.find((c: any) => c.name === product.category.name);
+      if (current) setForm((p) => ({ ...p, categoryId: current.id }));
+    }).catch(() => {});
+  }, [product.category.name]);
+
+  const handleSave = async () => {
+    setError('');
+    if (!form.name || !form.categoryId) { setError('Name and category are required.'); return; }
+    setSaving(true);
+    try {
+      await api.put(`/inventory/products/${product.id}`, {
+        name: form.name,
+        brand: form.brand || undefined,
+        partNumber: form.partNumber || undefined,
+        categoryId: form.categoryId,
+        hsnCode: form.hsnCode || undefined,
+        customFields: form.notes ? { notes: form.notes } : {},
+        requiresService: isServiceType ? false : form.requiresService,
+        type: form.type,
+      });
+      onSave();
+    } catch (e: any) {
+      setError(e.response?.data?.message || 'Failed to update product');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const f = (k: string) =>
+    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+      setForm((p) => ({ ...p, [k]: e.target.value }));
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4 overflow-auto">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg my-8">
+        <div className="flex items-center justify-between p-6 border-b">
+          <h2 className="text-lg font-bold">Edit Product</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-2xl">&times;</button>
+        </div>
+        <div className="p-6 space-y-3">
+          {error && <p className="text-sm text-red-600 bg-red-50 p-2 rounded">{error}</p>}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="col-span-2">
+              <label className="block text-xs font-medium text-gray-600 mb-1">Type</label>
+              <select
+                value={form.type}
+                onChange={(e) => setForm((p) => ({ ...p, type: e.target.value as 'PHYSICAL' | 'SERVICE' }))}
+                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+              >
+                <option value="PHYSICAL">Physical Product (tracked stock)</option>
+                <option value="SERVICE">Service or Fee (labor, visit charge, installation… no stock)</option>
+              </select>
+            </div>
+            <Field label="Product Name *" value={form.name} onChange={f('name')} />
+            <Field label="Brand" value={form.brand} onChange={f('brand')} />
+            <Field label="SKU / Item Code" value={form.partNumber} onChange={f('partNumber')} />
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Category *</label>
+              <select value={form.categoryId} onChange={f('categoryId')} className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500">
+                <option value="">Select…</option>
+                {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+            <Field label="HSN Code" value={form.hsnCode} onChange={f('hsnCode')} />
+            <div className="col-span-2">
+              <Field label="Notes" value={form.notes} onChange={f('notes')} placeholder="Optional — e.g. size, color, specifications" />
+            </div>
+            {account?.serviceModuleEnabled && !isServiceType && (
+              <div className="col-span-2">
+                <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.requiresService}
+                    onChange={(e) => setForm((p) => ({ ...p, requiresService: e.target.checked }))}
+                    className="h-4 w-4 accent-red-700"
+                  />
+                  Requires service tracking
+                </label>
+              </div>
+            )}
+          </div>
+
+          {skus.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Variants</p>
+              <div className="border rounded-lg divide-y">
+                {skus.map((sku) => (
+                  <div key={sku.id} className="flex items-center justify-between px-3 py-2 text-sm">
+                    <div className="min-w-0">
+                      <p className="font-medium text-gray-900 truncate">{sku.variantName}</p>
+                      <p className="text-xs text-gray-500">
+                        ₹{parseFloat(sku.sellingPrice).toLocaleString('en-IN')}/{sku.unit} · GST {sku.taxRate}%
+                        {!isServiceType && ` · ${sku.isSerialized ? sku._count.serialInventory : sku.stockQty} in stock`}
+                        {sku.barcode && ` · ${sku.barcode}`}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setEditingSku(sku)}
+                      className="p-1.5 text-gray-400 hover:text-red-700 hover:bg-red-50 rounded-lg shrink-0"
+                      title="Edit variant"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="flex gap-3 p-6 border-t">
+          <button onClick={onClose} className="flex-1 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
+          <button onClick={handleSave} disabled={saving} className="flex-1 py-2 bg-red-700 text-white rounded-lg text-sm font-medium hover:bg-red-800 disabled:opacity-50">
+            {saving ? 'Saving…' : 'Save Changes'}
+          </button>
+        </div>
+      </div>
+      {editingSku && (
+        <EditSkuModal
+          sku={editingSku}
+          productName={product.name}
+          onClose={() => setEditingSku(null)}
+          onSave={async () => {
+            setEditingSku(null);
+            const { data } = await api.get(`/inventory/products/${product.id}`);
+            setSkus(data.skus);
+            onRefresh?.();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ── Edit SKU / Variant Modal ──────────────────────────────────────────── */
+function EditSkuModal({ sku, productName, onClose, onSave }: { sku: SKU; productName: string; onClose: () => void; onSave: () => void }) {
+  const [form, setForm] = useState({
+    variantName: sku.variantName,
+    unit: sku.unit,
+    costPrice: sku.costPrice,
+    sellingPrice: sku.sellingPrice,
+    taxRate: sku.taxRate,
+    threshold: String(sku.lowStockThreshold),
+    barcode: sku.barcode || '',
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSave = async () => {
+    setError('');
+    if (!form.variantName || !form.sellingPrice || !form.costPrice) {
+      setError('Variant name, cost and selling price are required.'); return;
+    }
+    setSaving(true);
+    try {
+      await api.put(`/inventory/skus/${sku.id}`, {
+        variantName: form.variantName,
+        unit: form.unit,
+        costPrice: +form.costPrice,
+        sellingPrice: +form.sellingPrice,
+        taxRate: +form.taxRate,
+        lowStockThreshold: +form.threshold,
+        barcode: form.barcode || undefined,
+      });
+      onSave();
+    } catch (e: any) {
+      setError(e.response?.data?.message || 'Failed to update variant');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const f = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    setForm((p) => ({ ...p, [k]: e.target.value }));
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4 overflow-auto">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg my-8">
+        <div className="flex items-center justify-between p-6 border-b">
+          <div>
+            <h2 className="text-lg font-bold">Edit Variant</h2>
+            <p className="text-sm text-gray-500">{productName}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-2xl">&times;</button>
+        </div>
+        <div className="p-6 space-y-3">
+          {error && <p className="text-sm text-red-600 bg-red-50 p-2 rounded">{error}</p>}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Field label="Variant Name" value={form.variantName} onChange={f('variantName')} />
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Unit</label>
+              <select value={form.unit} onChange={f('unit')} className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500">
+                {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
+              </select>
+            </div>
+            <Field label="Cost Price ₹" type="number" value={form.costPrice} onChange={f('costPrice')} />
+            <Field label="Selling Price ₹" type="number" value={form.sellingPrice} onChange={f('sellingPrice')} />
+            <Field label="GST Rate %" type="number" value={form.taxRate} onChange={f('taxRate')} />
+            <Field label="Low Stock Alert" type="number" value={form.threshold} onChange={f('threshold')} />
+            <Field label="Barcode" value={form.barcode} onChange={f('barcode')} />
+          </div>
+          {sku.isSerialized && (
+            <p className="text-xs text-gray-400">Stock quantity isn't edited here — use Add Stock / serial units for that.</p>
+          )}
+        </div>
+        <div className="flex gap-3 p-6 border-t">
+          <button onClick={onClose} className="flex-1 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
+          <button onClick={handleSave} disabled={saving} className="flex-1 py-2 bg-red-700 text-white rounded-lg text-sm font-medium hover:bg-red-800 disabled:opacity-50">
+            {saving ? 'Saving…' : 'Save Changes'}
           </button>
         </div>
       </div>

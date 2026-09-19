@@ -31,6 +31,8 @@ model PlatformAccount {
   tenantDbName String        @unique @map("tenant_db_name")
   tenantDbUrl  String        @map("tenant_db_url")
   status       AccountStatus @default(ACTIVE)
+  licenseExpiresAt     DateTime? @map("license_expires_at")
+  serviceModuleEnabled Boolean   @default(false) @map("service_module_enabled")
   createdAt    DateTime      @default(now()) @map("created_at")
   updatedAt    DateTime      @updatedAt @map("updated_at")
 

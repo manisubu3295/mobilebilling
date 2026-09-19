@@ -17,6 +17,7 @@ export class SettingsService {
     phone?: string;
     gstNumber?: string;
     staticQrUrl?: string;
+    nextServiceLookaheadDays?: number;
   }) {
     return this.prisma.store.update({ where: { id: storeId }, data });
   }

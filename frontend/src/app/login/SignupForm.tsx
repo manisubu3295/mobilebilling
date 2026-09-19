@@ -6,6 +6,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useAuthStore } from '@/store/auth.store';
+import { roleLandingPage } from '@/lib/role-landing';
 
 const schema = z
   .object({
@@ -46,7 +47,7 @@ export function SignupForm({ onSuccess }: { onSuccess: () => void }) {
       const { confirmPassword, ...input } = values;
       await signup(input);
       onSuccess();
-      router.push('/billing/checkout');
+      router.push(roleLandingPage(useAuthStore.getState().user?.role));
     } catch (err: any) {
       setServerError(
         err.response?.data?.message ||

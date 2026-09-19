@@ -1,6 +1,7 @@
 import {
   Controller,
   Post,
+  Patch,
   Body,
   Req,
   Res,
@@ -14,7 +15,9 @@ import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { SignupDto } from './dto/signup.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 const REFRESH_COOKIE = 'refresh_token';
 const COOKIE_OPTS = {
@@ -42,9 +45,9 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async login(@Body() dto: LoginDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const ipAddress = req.ip;
-    const { accessToken, refreshToken, user } = await this.authService.login(dto, ipAddress);
+    const { accessToken, refreshToken, user, account } = await this.authService.login(dto, ipAddress);
     res.cookie(REFRESH_COOKIE, refreshToken, COOKIE_OPTS);
-    return { accessToken, user };
+    return { accessToken, user, account };
   }
 
   @Post('forgot-password')
@@ -72,5 +75,21 @@ export class AuthController {
     const token = req.cookies?.[REFRESH_COOKIE];
     await this.authService.logout(token);
     res.clearCookie(REFRESH_COOKIE);
+  }
+
+  @Patch('change-password')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async changePassword(
+    @CurrentUser('id') userId: string,
+    @Body() dto: ChangePasswordDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.authService.changePassword(userId, dto);
+    // The change invalidates every refresh token for this user, including
+    // this session's own — clear the cookie so the client doesn't keep a
+    // now-dead token around.
+    res.clearCookie(REFRESH_COOKIE);
+    return result;
   }
 }

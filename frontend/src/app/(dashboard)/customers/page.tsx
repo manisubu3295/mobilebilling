@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { Search, Users, Plus, Phone, ChevronRight, X } from 'lucide-react';
+import { Search, Users, Plus, Phone, ChevronRight, X, Pencil, UserCheck, UserX } from 'lucide-react';
 import api from '@/lib/api';
 
 interface Customer {
@@ -10,6 +10,8 @@ interface Customer {
   phone: string;
   email: string | null;
   address: string | null;
+  gstin: string | null;
+  isActive: boolean;
   customFields: Record<string, any> | null;
   createdAt: string;
   invoices?: { id: string; invoiceNumber: string; totalAmount: string; status: string; createdAt: string }[];
@@ -30,12 +32,12 @@ export default function CustomersPage() {
   const [selected, setSelected] = useState<Customer | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
+  const [editing, setEditing] = useState<Customer | null>(null);
 
   const load = useCallback(async (q = '') => {
     setLoading(true);
     try {
-      const params = q ? `?search=${encodeURIComponent(q)}` : '';
-      const { data } = await api.get(`/customers${params}`);
+      const { data } = await api.get('/customers', { params: { search: q || undefined, includeInactive: true } });
       setCustomers(data);
     } finally {
       setLoading(false);
@@ -57,6 +59,12 @@ export default function CustomersPage() {
     } finally {
       setLoadingDetail(false);
     }
+  };
+
+  const handleToggle = async (id: string) => {
+    await api.patch(`/customers/${id}/toggle`);
+    load(search);
+    if (selected?.id === id) setSelected((s) => (s ? { ...s, isActive: !s.isActive } : s));
   };
 
   return (
@@ -101,21 +109,32 @@ export default function CustomersPage() {
             {/* Mobile cards */}
             <div className="sm:hidden space-y-3">
               {customers.map((c) => (
-                <button
-                  key={c.id}
-                  onClick={() => handleView(c.id)}
-                  className="w-full bg-white rounded-xl border p-4 text-left hover:border-red-200 transition-colors"
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-semibold text-gray-900">{c.name}</p>
-                      <p className="text-sm text-gray-500 flex items-center gap-1 mt-0.5">
-                        <Phone className="h-3.5 w-3.5" /> {c.phone}
-                      </p>
+                <div key={c.id} className={`bg-white rounded-xl border p-4 ${!c.isActive ? 'opacity-60' : ''}`}>
+                  <button onClick={() => handleView(c.id)} className="w-full text-left">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <p className="font-semibold text-gray-900">{c.name}</p>
+                          {!c.isActive && <span className="text-xs px-1.5 py-0.5 rounded-full bg-red-100 text-red-600 font-medium">Inactive</span>}
+                        </div>
+                        <p className="text-sm text-gray-500 flex items-center gap-1 mt-0.5">
+                          <Phone className="h-3.5 w-3.5" /> {c.phone}
+                        </p>
+                      </div>
+                      <ChevronRight className="h-5 w-5 text-gray-300 shrink-0" />
                     </div>
-                    <ChevronRight className="h-5 w-5 text-gray-300 shrink-0" />
+                  </button>
+                  <div className="flex justify-end mt-2">
+                    <button
+                      onClick={() => handleToggle(c.id)}
+                      className={`px-3 py-1 rounded-lg text-xs font-medium border ${
+                        c.isActive ? 'hover:bg-red-50 text-gray-600 hover:text-red-600' : 'hover:bg-green-50 text-gray-600 hover:text-green-600'
+                      }`}
+                    >
+                      {c.isActive ? 'Deactivate' : 'Activate'}
+                    </button>
                   </div>
-                </button>
+                </div>
               ))}
             </div>
 
@@ -127,17 +146,31 @@ export default function CustomersPage() {
                     <th className="text-left px-4 py-3 font-medium text-gray-600">Name</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-600">Phone</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-600">Email</th>
-                    <th className="px-4 py-3 w-12"></th>
+                    <th className="text-left px-4 py-3 font-medium text-gray-600">Status</th>
+                    <th className="px-4 py-3 w-24"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
                   {customers.map((c) => (
-                    <tr key={c.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => handleView(c.id)}>
-                      <td className="px-4 py-3 font-medium text-gray-900">{c.name}</td>
-                      <td className="px-4 py-3 text-gray-600">{c.phone}</td>
-                      <td className="px-4 py-3 text-gray-500">{c.email || '—'}</td>
+                    <tr key={c.id} className={`hover:bg-gray-50 ${!c.isActive ? 'opacity-50' : ''}`}>
+                      <td className="px-4 py-3 font-medium text-gray-900 cursor-pointer" onClick={() => handleView(c.id)}>{c.name}</td>
+                      <td className="px-4 py-3 text-gray-600 cursor-pointer" onClick={() => handleView(c.id)}>{c.phone}</td>
+                      <td className="px-4 py-3 text-gray-500 cursor-pointer" onClick={() => handleView(c.id)}>{c.email || '—'}</td>
                       <td className="px-4 py-3">
-                        <ChevronRight className="h-4 w-4 text-gray-300" />
+                        <span className={`flex items-center gap-1 text-xs font-medium ${c.isActive ? 'text-green-600' : 'text-red-500'}`}>
+                          {c.isActive ? <><UserCheck className="h-3.5 w-3.5" /> Active</> : <><UserX className="h-3.5 w-3.5" /> Inactive</>}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() => handleToggle(c.id)}
+                          className={`p-1.5 rounded text-xs font-medium transition-colors ${
+                            c.isActive ? 'hover:bg-red-50 text-gray-400 hover:text-red-600' : 'hover:bg-green-50 text-gray-400 hover:text-green-600'
+                          }`}
+                          title={c.isActive ? 'Deactivate' : 'Activate'}
+                        >
+                          {c.isActive ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -154,15 +187,33 @@ export default function CustomersPage() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg my-8">
             <div className="flex items-center justify-between p-6 border-b">
               <div>
-                <h2 className="text-lg font-bold text-gray-900">{selected.name}</h2>
+                <div className="flex items-center gap-1.5">
+                  <h2 className="text-lg font-bold text-gray-900">{selected.name}</h2>
+                  {!selected.isActive && <span className="text-xs px-1.5 py-0.5 rounded-full bg-red-100 text-red-600 font-medium">Inactive</span>}
+                </div>
                 <p className="text-sm text-gray-500">{selected.phone}</p>
               </div>
-              <button onClick={() => setSelected(null)} className="text-gray-400 hover:text-gray-700 text-2xl leading-none">&times;</button>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setEditing(selected)}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg font-medium"
+                >
+                  <Pencil className="h-3.5 w-3.5" /> Edit
+                </button>
+                <button
+                  onClick={() => handleToggle(selected.id)}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg font-medium"
+                >
+                  {selected.isActive ? <><UserX className="h-3.5 w-3.5" /> Deactivate</> : <><UserCheck className="h-3.5 w-3.5" /> Activate</>}
+                </button>
+                <button onClick={() => setSelected(null)} className="text-gray-400 hover:text-gray-700 text-2xl leading-none px-1">&times;</button>
+              </div>
             </div>
             <div className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-3 text-sm">
                 {selected.email && <div><span className="text-gray-500">Email:</span> <span className="font-medium">{selected.email}</span></div>}
                 {selected.address && <div><span className="text-gray-500">Address:</span> <span className="font-medium">{selected.address}</span></div>}
+                {selected.gstin && <div><span className="text-gray-500">GSTIN:</span> <span className="font-medium font-mono">{selected.gstin}</span></div>}
                 {selected.customFields?.vehicle_no && <div><span className="text-gray-500">Vehicle No:</span> <span className="font-medium font-mono">{selected.customFields.vehicle_no}</span></div>}
                 {selected.customFields?.re_model && <div><span className="text-gray-500">Model:</span> <span className="font-medium">{selected.customFields.re_model}</span></div>}
                 <div><span className="text-gray-500">Since:</span> <span className="font-medium">{new Date(selected.createdAt).toLocaleDateString('en-IN', { dateStyle: 'medium' })}</span></div>
@@ -193,13 +244,31 @@ export default function CustomersPage() {
         </div>
       )}
 
-      {showAdd && <AddCustomerModal onClose={() => setShowAdd(false)} onSave={() => { setShowAdd(false); load(search); }} />}
+      {showAdd && <CustomerFormModal onClose={() => setShowAdd(false)} onSave={() => { setShowAdd(false); load(search); }} />}
+      {editing && (
+        <CustomerFormModal
+          customer={editing}
+          onClose={() => setEditing(null)}
+          onSave={() => {
+            setEditing(null);
+            setSelected(null);
+            load(search);
+          }}
+        />
+      )}
     </div>
   );
 }
 
-function AddCustomerModal({ onClose, onSave }: { onClose: () => void; onSave: () => void }) {
-  const [form, setForm] = useState({ name: '', phone: '', email: '', address: ''});
+function CustomerFormModal({ customer, onClose, onSave }: { customer?: Customer; onClose: () => void; onSave: () => void }) {
+  const isEdit = !!customer;
+  const [form, setForm] = useState({
+    name: customer?.name ?? '',
+    phone: customer?.phone ?? '',
+    email: customer?.email ?? '',
+    address: customer?.address ?? '',
+    gstin: customer?.gstin ?? '',
+  });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -208,10 +277,14 @@ function AddCustomerModal({ onClose, onSave }: { onClose: () => void; onSave: ()
     if (!form.name || !form.phone) { setError('Name and phone are required.'); return; }
     setSaving(true);
     try {
-      await api.post('/customers', form);
+      if (isEdit) {
+        await api.put(`/customers/${customer!.id}`, form);
+      } else {
+        await api.post('/customers', form);
+      }
       onSave();
     } catch (e: any) {
-      setError(e.response?.data?.message || 'Failed to create customer');
+      setError(e.response?.data?.message || `Failed to ${isEdit ? 'update' : 'create'} customer`);
     } finally {
       setSaving(false);
     }
@@ -225,7 +298,7 @@ function AddCustomerModal({ onClose, onSave }: { onClose: () => void; onSave: ()
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
         <div className="flex items-center gap-2 p-6 border-b">
           <Users className="h-5 w-5 text-red-700" />
-          <h2 className="text-lg font-bold">Add Customer</h2>
+          <h2 className="text-lg font-bold">{isEdit ? 'Edit Customer' : 'Add Customer'}</h2>
           <button onClick={onClose} className="ml-auto text-gray-400 hover:text-gray-700 text-2xl">&times;</button>
         </div>
         <div className="p-6 space-y-3">
@@ -235,13 +308,14 @@ function AddCustomerModal({ onClose, onSave }: { onClose: () => void; onSave: ()
             { label: 'Phone *', key: 'phone', placeholder: '9876543210' },
             { label: 'Email', key: 'email', placeholder: '' },
             { label: 'Address', key: 'address', placeholder: '' },
+            { label: 'GSTIN', key: 'gstin', placeholder: '33XXXXX1234X1ZX' },
           ].map(({ label, key, placeholder }) => (
             <div key={key}>
               <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
               <input
                 type="text"
                 value={(form as any)[key]}
-                onChange={f(key)}
+                onChange={key === 'gstin' ? (e) => setForm((p) => ({ ...p, gstin: e.target.value.toUpperCase() })) : f(key)}
                 placeholder={placeholder}
                 className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
               />
@@ -251,7 +325,7 @@ function AddCustomerModal({ onClose, onSave }: { onClose: () => void; onSave: ()
         <div className="flex gap-3 p-6 border-t">
           <button onClick={onClose} className="flex-1 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
           <button onClick={handleSave} disabled={saving} className="flex-1 py-2 bg-red-700 text-white rounded-lg text-sm font-medium hover:bg-red-800 disabled:opacity-50">
-            {saving ? 'Saving…' : 'Add Customer'}
+            {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Add Customer'}
           </button>
         </div>
       </div>

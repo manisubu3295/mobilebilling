@@ -2,6 +2,7 @@ import { Injectable, ConflictException, NotFoundException } from '@nestjs/common
 import { PrismaService } from '../prisma/prisma.service';
 import { MasterPrismaService } from '../master-prisma/master-prisma.service';
 import * as argon2 from 'argon2';
+import { randomBytes } from 'crypto';
 import { Role } from '@prisma/client';
 
 @Injectable()
@@ -73,5 +74,40 @@ export class UsersService {
       data: { isActive: !user.isActive },
       select: { id: true, isActive: true },
     });
+  }
+
+  async updateUser(id: string, data: { name?: string; role?: Role; phone?: string }, storeId: string) {
+    const user = await this.prisma.user.findFirst({ where: { id, storeId } });
+    if (!user) throw new NotFoundException('User not found');
+
+    return this.prisma.user.update({
+      where: { id },
+      data: {
+        ...(data.name !== undefined && { name: data.name }),
+        ...(data.role !== undefined && { role: data.role }),
+        ...(data.phone !== undefined && { phone: data.phone || null }),
+      },
+      select: { id: true, email: true, name: true, role: true, isActive: true, phone: true, createdAt: true },
+    });
+  }
+
+  // Admin-triggered reset for a staff member who's locked out — generates a
+  // temporary password and returns it once for the admin to relay directly,
+  // rather than depending on email delivery (SMTP isn't configured for every
+  // tenant). Invalidates existing sessions so the old password stops working
+  // immediately.
+  async resetPassword(id: string, storeId: string) {
+    const user = await this.prisma.user.findFirst({ where: { id, storeId } });
+    if (!user) throw new NotFoundException('User not found');
+
+    const tempPassword = randomBytes(9).toString('base64url');
+    const passwordHash = await argon2.hash(tempPassword);
+
+    await this.prisma.$transaction([
+      this.prisma.user.update({ where: { id }, data: { passwordHash } }),
+      this.prisma.refreshToken.deleteMany({ where: { userId: id } }),
+    ]);
+
+    return { tempPassword };
   }
 }

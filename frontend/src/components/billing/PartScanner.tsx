@@ -7,14 +7,8 @@ import { unitAllowsDecimal } from '@/lib/units';
 import { BarcodeScannerModal } from './BarcodeScannerModal';
 import api from '@/lib/api';
 
-// Camera scanning needs getUserMedia (and a secure context) — feature-detect
-// rather than assume every browser/deployment supports it, so the button
-// simply doesn't appear where it can't work instead of erroring on tap.
-const supportsCameraScan =
-  typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia;
-
 interface PartResult {
-  type: 'bulk' | 'serial';
+  type: 'bulk' | 'serial' | 'service';
   found: boolean;
   skuId: string;
   productName: string;
@@ -25,6 +19,7 @@ interface PartResult {
   taxRate: any;
   hsnCode?: string;
   stockQty: number;
+  requiresService?: boolean;
   serialUnitId?: string;
   serialNumber?: string;
   batchNumber?: string;
@@ -74,6 +69,18 @@ export function PartScanner() {
   const inputRef = useRef<HTMLInputElement>(null);
   const { addItem, items } = useBillingStore();
   const searchIdRef = useRef(0);
+
+  // Camera scanning needs getUserMedia (and a secure context) — feature-detect
+  // rather than assume every browser/deployment supports it, so the button
+  // simply doesn't appear where it can't work instead of erroring on tap.
+  // Deferred to a post-mount effect (not a module-scope constant) so the
+  // server render and the client's first hydration pass agree — `navigator`
+  // doesn't exist during SSR, so evaluating this eagerly on the client
+  // caused a hydration mismatch on this very button.
+  const [supportsCameraScan, setSupportsCameraScan] = useState(false);
+  useEffect(() => {
+    setSupportsCameraScan(!!navigator.mediaDevices?.getUserMedia);
+  }, []);
 
   // `auto` distinguishes a debounced live-typing search from an explicit one
   // (Enter / "Find" click): a live search always shows the picker list for
@@ -182,6 +189,7 @@ export function PartScanner() {
       serialNumber: part.serialNumber ?? undefined,
       hsnCode: part.hsnCode ?? undefined,
       stockQty: part.type === 'bulk' ? part.stockQty : undefined,
+      requiresService: part.requiresService,
     });
 
     setInput('');
@@ -296,7 +304,7 @@ export function PartScanner() {
               <div className="text-right shrink-0 ml-3">
                 <p className="text-sm font-semibold text-red-700">₹{parseFloat(r.sellingPrice).toFixed(0)}</p>
                 <p className={`text-xs ${r.found ? 'text-green-600' : 'text-red-500'}`}>
-                  {r.type === 'bulk' ? `${r.stockQty} ${r.unit}` : r.found ? 'In stock' : 'Out of stock'}
+                  {r.type === 'bulk' ? `${r.stockQty} ${r.unit}` : r.type === 'service' ? 'Service' : r.found ? 'In stock' : 'Out of stock'}
                 </p>
               </div>
               <ChevronRight className="h-4 w-4 text-gray-300 ml-2 shrink-0" />
@@ -323,6 +331,8 @@ export function PartScanner() {
               <p className="text-xs text-gray-500 font-mono mt-0.5">
                 {selected.type === 'serial'
                   ? `S/N: ${selected.serialNumber ?? 'auto-assigned'}`
+                  : selected.type === 'service'
+                  ? 'Service — no stock limit'
                   : `Stock: ${selected.stockQty} ${selected.unit}`}
               </p>
               <p className="text-sm font-bold text-red-700 mt-0.5">
@@ -335,7 +345,7 @@ export function PartScanner() {
           </div>
 
           <div className="flex items-center gap-2">
-            {selected.type === 'bulk' && (
+            {selected.type !== 'serial' && (
               <div className="flex items-center gap-1 border rounded-lg overflow-hidden bg-white">
                 <button
                   onClick={() => setQty((q) => Math.max(unitAllowsDecimal(selected.unit) ? 0.01 : 1, q - 1))}
@@ -364,8 +374,8 @@ export function PartScanner() {
               onClick={() => handleAddToCart(selected)}
               className="flex-1 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 font-medium"
             >
-              Add {selected.type === 'bulk' ? `${qty} ${selected.unit}` : '1'} →
-              ₹{(parseFloat(selected.sellingPrice) * (selected.type === 'bulk' ? qty : 1)).toFixed(2)}
+              Add {selected.type !== 'serial' ? `${qty} ${selected.unit}` : '1'} →
+              ₹{(parseFloat(selected.sellingPrice) * (selected.type !== 'serial' ? qty : 1)).toFixed(2)}
             </button>
           </div>
         </div>

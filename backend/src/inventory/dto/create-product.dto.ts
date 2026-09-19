@@ -1,6 +1,7 @@
 import {
   IsArray,
   IsBoolean,
+  IsEnum,
   IsNotEmpty,
   IsNumber,
   IsObject,
@@ -10,6 +11,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { ProductType } from '@prisma/client';
 
 export class CreateSkuDto {
   @IsString()
@@ -76,6 +78,18 @@ export class CreateProductDto {
   @IsOptional()
   @IsString()
   hsnCode?: string;
+
+  // Service module: opt this product into the warranty/service-job workflow
+  // when it's sold (e.g. water purifiers, not accessories/consumables).
+  @IsOptional()
+  @IsBoolean()
+  requiresService?: boolean;
+
+  // PHYSICAL (default) = a stocked good. SERVICE = a billable line item with
+  // no physical stock (labor, visit fees…) — always sellable, no stock checks.
+  @IsOptional()
+  @IsEnum(ProductType)
+  type?: ProductType;
 
   // Business-defined fields (e.g. compatible models for a bike shop) — see the
   // attributes module for how a store defines which keys are available here.

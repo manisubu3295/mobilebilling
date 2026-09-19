@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   Search, Eye, XCircle, RefreshCw, FileText, Printer,
-  RotateCcw, ChevronLeft, ChevronRight, X, CalendarDays,
+  RotateCcw, ChevronLeft, ChevronRight, X, CalendarDays, Wallet,
 } from 'lucide-react';
 import api from '@/lib/api';
 import { printReceipt } from '@/lib/print-receipt';
@@ -98,6 +98,11 @@ export default function InvoicesPage() {
   const [returnQtys, setReturnQtys]     = useState<Record<string, number>>({});
   const [returning, setReturning]       = useState(false);
   const [actionError, setActionError]   = useState<string | null>(null);
+  const [payModal, setPayModal]         = useState(false);
+  const [payMode, setPayMode]           = useState('CASH');
+  const [payAmount, setPayAmount]       = useState('');
+  const [payReference, setPayReference] = useState('');
+  const [paying, setPaying]             = useState(false);
 
   const [listError, setListError] = useState('');
 
@@ -140,6 +145,7 @@ export default function InvoicesPage() {
       setSelected(data);
       setReturnQtys({});
       setReturnModal(false);
+      setPayModal(false);
     } catch (e: any) {
       setActionError(e?.response?.data?.message || 'Could not load invoice');
     } finally { setML(false); }
@@ -192,6 +198,37 @@ export default function InvoicesPage() {
     } catch (e: any) {
       setActionError(e.response?.data?.message || 'Return failed');
     } finally { setReturning(false); }
+  };
+
+  /* ── Record repayment ─────────────────────────────────────────── */
+  const balanceDue = selected ? parseFloat(selected.totalAmount) - parseFloat(selected.paidAmount) : 0;
+
+  const openPayModal = () => {
+    setPayMode('CASH');
+    setPayAmount(balanceDue > 0 ? balanceDue.toFixed(2) : '');
+    setPayReference('');
+    setPayModal(true);
+    setActionError(null);
+  };
+
+  const handleAddPayment = async () => {
+    if (!selected) return;
+    const amount = parseFloat(payAmount);
+    if (!amount || amount <= 0) { setActionError('Enter a valid amount.'); return; }
+    setPaying(true);
+    setActionError(null);
+    try {
+      await api.post(`/billing/invoices/${selected.id}/payments`, {
+        mode: payMode,
+        amount,
+        reference: payReference || undefined,
+      });
+      setPayModal(false);
+      await handleView(selected.id);
+      load(page);
+    } catch (e: any) {
+      setActionError(e.response?.data?.message || 'Failed to record payment');
+    } finally { setPaying(false); }
   };
 
   const totalPages = Math.ceil(total / 20);
@@ -547,6 +584,69 @@ export default function InvoicesPage() {
                     </div>
                   </div>
 
+                  {/* Record Payment sub-panel */}
+                  {payModal && selected.status !== 'CANCELLED' && selected.status !== 'RETURNED' && (
+                    <div className="border border-green-200 rounded-xl p-4 bg-green-50">
+                      <h3 className="font-semibold text-green-800 text-sm mb-3">Record Payment</h3>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Mode</label>
+                          <select
+                            value={payMode}
+                            onChange={(e) => setPayMode(e.target.value)}
+                            className="w-full border rounded-lg px-2 py-1.5 text-sm bg-white"
+                          >
+                            <option value="CASH">Cash</option>
+                            <option value="UPI">UPI</option>
+                            <option value="CREDIT_CARD">Credit Card</option>
+                            <option value="DEBIT_CARD">Debit Card</option>
+                            <option value="BANK_TRANSFER">Bank Transfer</option>
+                            <option value="EMI">EMI</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Amount (₹)</label>
+                          <input
+                            type="number"
+                            min={0.01}
+                            max={balanceDue}
+                            step="0.01"
+                            value={payAmount}
+                            onChange={(e) => setPayAmount(e.target.value)}
+                            className="w-full border rounded-lg px-2 py-1.5 text-sm bg-white"
+                          />
+                        </div>
+                        <div className="col-span-2">
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Reference (optional)</label>
+                          <input
+                            type="text"
+                            value={payReference}
+                            onChange={(e) => setPayReference(e.target.value)}
+                            placeholder="UTR / transaction ID…"
+                            className="w-full border rounded-lg px-2 py-1.5 text-sm bg-white"
+                          />
+                        </div>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-2">Balance due: {fmt(balanceDue)}</p>
+                      {actionError && <p className="text-red-600 text-xs mt-2">{actionError}</p>}
+                      <div className="flex gap-2 mt-3">
+                        <button
+                          onClick={handleAddPayment}
+                          disabled={paying}
+                          className="flex-1 py-2 bg-green-700 text-white rounded-lg text-sm font-semibold hover:bg-green-800 disabled:opacity-50"
+                        >
+                          {paying ? 'Recording…' : 'Confirm Payment'}
+                        </button>
+                        <button
+                          onClick={() => { setPayModal(false); setActionError(null); }}
+                          className="px-4 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Return Items sub-panel */}
                   {returnModal && selected.status !== 'CANCELLED' && selected.status !== 'RETURNED' && (
                     <div className="border border-purple-200 rounded-xl p-4 bg-purple-50">
@@ -595,7 +695,7 @@ export default function InvoicesPage() {
                     </div>
                   )}
 
-                  {actionError && !returnModal && (
+                  {actionError && !returnModal && !payModal && (
                     <p className="text-red-600 text-sm bg-red-50 p-2.5 rounded-lg">{actionError}</p>
                   )}
                 </div>
@@ -608,6 +708,16 @@ export default function InvoicesPage() {
                   >
                     <Printer className="h-4 w-4" /> Print Receipt
                   </button>
+
+                  {balanceDue > 0.005 && selected.status !== 'CANCELLED' && selected.status !== 'RETURNED' &&
+                    !payModal && !returnModal && !confirmCancel && (
+                    <button
+                      onClick={openPayModal}
+                      className="flex items-center gap-2 px-4 py-2 border border-green-300 text-green-700 rounded-lg text-sm font-medium hover:bg-green-50"
+                    >
+                      <Wallet className="h-4 w-4" /> Record Payment
+                    </button>
+                  )}
 
                   {isManager && selected.status !== 'CANCELLED' && selected.status !== 'RETURNED' && (
                     <>

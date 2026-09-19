@@ -3,6 +3,7 @@ import { Throttle } from '@nestjs/throttler';
 import { PlatformAdminService } from './platform-admin.service';
 import { AdminLoginDto } from './dto/admin-login.dto';
 import { UpdatePlatformSettingsDto } from './dto/update-settings.dto';
+import { UpdateAccountDto } from './dto/update-account.dto';
 import { PlatformAdminJwtGuard } from './platform-admin-jwt.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
@@ -33,6 +34,12 @@ export class PlatformAdminController {
   @UseGuards(PlatformAdminJwtGuard)
   async listAccounts() {
     return this.adminService.listAccounts();
+  }
+
+  @Patch('accounts/:id')
+  @UseGuards(PlatformAdminJwtGuard)
+  async updateAccount(@Param('id') id: string, @Body() dto: UpdateAccountDto) {
+    return this.adminService.updateAccount(id, dto);
   }
 
   @Get('requests')

@@ -34,6 +34,7 @@ interface Invoice {
   paidAmount: string;
   qrPayload?: string;
   createdBy?: { name: string };
+  gstApplied?: boolean; // undefined (older invoices) is treated as true
 }
 
 const fmt = (v: string | number) =>
@@ -52,6 +53,7 @@ export function ThermalReceipt({ invoice }: { invoice: Invoice }) {
   const balance = parseFloat(invoice.totalAmount) - parseFloat(invoice.paidAmount);
   const date = new Date(invoice.createdAt);
   const hasDiscount = parseFloat(invoice.discountAmount) > 0;
+  const gstApplied = invoice.gstApplied !== false;
 
   return (
     <>
@@ -105,7 +107,7 @@ export function ThermalReceipt({ invoice }: { invoice: Invoice }) {
           <span className="receipt-col-item">Item</span>
           <span className="receipt-col-qty">Qty</span>
           <span className="receipt-col-rate">Rate</span>
-          <span className="receipt-col-gst">GST</span>
+          {gstApplied && <span className="receipt-col-gst">GST</span>}
           <span className="receipt-col-total">Total</span>
         </div>
 
@@ -127,7 +129,9 @@ export function ThermalReceipt({ invoice }: { invoice: Invoice }) {
                 </div>
                 <div className="receipt-col-qty">{item.quantity}<br /><span className="receipt-unit">{item.sku.unit}</span></div>
                 <div className="receipt-col-rate">{fmt(item.unitPrice)}</div>
-                <div className="receipt-col-gst">{item.taxRate}%<br /><span className="receipt-tax-amt">{fmt(item.taxAmount)}</span></div>
+                {gstApplied && (
+                  <div className="receipt-col-gst">{item.taxRate}%<br /><span className="receipt-tax-amt">{fmt(item.taxAmount)}</span></div>
+                )}
                 <div className="receipt-col-total receipt-item-total">{fmt(item.lineTotal)}</div>
               </div>
             );
@@ -144,9 +148,15 @@ export function ThermalReceipt({ invoice }: { invoice: Invoice }) {
               <span>Discount</span><span>− {fmt(invoice.discountAmount)}</span>
             </div>
           )}
-          <div className="receipt-total-row">
-            <span>GST (incl.)</span><span>{fmt(invoice.taxAmount)}</span>
-          </div>
+          {gstApplied ? (
+            <div className="receipt-total-row">
+              <span>GST</span><span>{fmt(invoice.taxAmount)}</span>
+            </div>
+          ) : (
+            <div className="receipt-total-row">
+              <span>GST</span><span>Not applicable</span>
+            </div>
+          )}
           <div className="receipt-grand-total-row">
             <span>GRAND TOTAL</span><span>{fmt(invoice.totalAmount)}</span>
           </div>

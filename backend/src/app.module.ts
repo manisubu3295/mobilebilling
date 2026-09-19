@@ -15,6 +15,9 @@ import { CustomersModule } from './customers/customers.module';
 import { SettingsModule } from './settings/settings.module';
 import { AttributesModule } from './attributes/attributes.module';
 import { PlatformAdminModule } from './platform-admin/platform-admin.module';
+import { WarrantyModule } from './warranty/warranty.module';
+import { QuotationsModule } from './quotations/quotations.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -32,6 +35,9 @@ import { PlatformAdminModule } from './platform-admin/platform-admin.module';
     SettingsModule,
     AttributesModule,
     PlatformAdminModule,
+    WarrantyModule,
+    QuotationsModule,
+    NotificationsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

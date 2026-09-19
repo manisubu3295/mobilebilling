@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Put,
+  Patch,
   Body,
   Param,
   Query,
@@ -27,8 +28,8 @@ export class CustomersController {
   }
 
   @Get()
-  findAll(@Query('search') search?: string) {
-    return this.customersService.findAll(search);
+  findAll(@Query('search') search?: string, @Query('includeInactive') includeInactive?: string) {
+    return this.customersService.findAll(search, includeInactive === 'true');
   }
 
   @Get(':id')
@@ -39,5 +40,10 @@ export class CustomersController {
   @Put(':id')
   update(@Param('id') id: string, @Body() dto: Partial<CreateCustomerDto>) {
     return this.customersService.update(id, dto);
+  }
+
+  @Patch(':id/toggle')
+  toggleActive(@Param('id') id: string) {
+    return this.customersService.toggleActive(id);
   }
 }

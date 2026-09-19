@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   TrendingUp, Wallet, AlertCircle, FileX, CreditCard,
   Banknote, Smartphone, ArrowDownCircle, Calendar, RefreshCw,
-  FileDown, FileText,
+  FileDown, FileText, Receipt, FileSpreadsheet,
 } from 'lucide-react';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
@@ -37,6 +37,17 @@ interface CollectionsData {
   byMode: ModeRow[];
   byDay: DayRow[];
   outstandingInvoices: OutstandingInvoice[];
+}
+
+interface GstInvoiceRow {
+  invoiceNumber: string;
+  createdAt: string;
+  customer: { name: string; gstin: string | null } | null;
+  subtotal: string;
+  taxAmount: string;
+  totalAmount: string;
+  gstApplied?: boolean;
+  status: string;
 }
 
 /* ── Helpers ───────────────────────────────────────────────────────────── */
@@ -147,6 +158,118 @@ export default function AccountsPage() {
   }, [range, customFrom, customTo]);
 
   useEffect(() => { load(); }, [load]);
+
+  const [gstRows, setGstRows] = useState<GstInvoiceRow[]>([]);
+  const [gstLoading, setGstLoading] = useState(false);
+  const [gstPdfLoading, setGstPdfLoading] = useState(false);
+
+  const loadGst = useCallback(async () => {
+    setGstLoading(true);
+    try {
+      const { from, to } = getRangeDates(range, customFrom, customTo);
+      const { data: rows } = await api.get<GstInvoiceRow[]>('/billing/invoices/export', {
+        params: { from: from.slice(0, 10), to: to.slice(0, 10) },
+      });
+      setGstRows(rows.filter((r) => r.status !== 'CANCELLED'));
+    } catch {
+      setGstRows([]);
+    } finally {
+      setGstLoading(false);
+    }
+  }, [range, customFrom, customTo]);
+
+  useEffect(() => { loadGst(); }, [loadGst]);
+
+  const gstTotals = gstRows.reduce(
+    (acc, r) => ({
+      taxable: acc.taxable + parseFloat(r.subtotal),
+      tax: acc.tax + parseFloat(r.taxAmount),
+      total: acc.total + parseFloat(r.totalAmount),
+    }),
+    { taxable: 0, tax: 0, total: 0 },
+  );
+
+  const gstCsvRows = () => gstRows.map((r) => [
+    r.invoiceNumber,
+    new Date(r.createdAt).toLocaleDateString('en-IN'),
+    r.customer?.name || 'Walk-in',
+    r.customer?.gstin || '',
+    r.gstApplied === false ? 'No' : 'Yes',
+    r.subtotal,
+    r.taxAmount,
+    r.totalAmount,
+    r.status,
+  ]);
+  const GST_HEADERS = ['Invoice No', 'Date', 'Customer', 'GSTIN', 'GST Applied', 'Taxable Value (INR)', 'Tax Amount (INR)', 'Total (INR)', 'Status'];
+
+  const exportGstCsv = () => {
+    const esc = (v: string | number) => {
+      const str = String(v ?? '');
+      return str.includes(',') || str.includes('"') ? `"${str.replace(/"/g, '""')}"` : str;
+    };
+    const rows = [
+      `# ${storeName} — GST Report`,
+      `# Period: ${rangeLabel}`,
+      '',
+      GST_HEADERS.join(','),
+      ...gstCsvRows().map((r) => r.map(esc).join(',')),
+      '',
+      `Totals,,,,,${gstTotals.taxable.toFixed(2)},${gstTotals.tax.toFixed(2)},${gstTotals.total.toFixed(2)},`,
+    ];
+    const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `gst-report-${range}-${dateTag}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportGstExcel = async () => {
+    const { utils, writeFile } = await import('xlsx');
+    const wsData = [GST_HEADERS, ...gstCsvRows(), [], ['Totals', '', '', '', '', gstTotals.taxable.toFixed(2), gstTotals.tax.toFixed(2), gstTotals.total.toFixed(2), '']];
+    const ws = utils.aoa_to_sheet(wsData);
+    ws['!cols'] = [{ wch: 16 }, { wch: 12 }, { wch: 22 }, { wch: 16 }, { wch: 10 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 12 }];
+    const wb = utils.book_new();
+    utils.book_append_sheet(wb, ws, 'GST Report');
+    writeFile(wb, `gst-report-${range}-${dateTag}.xlsx`);
+  };
+
+  const exportGstPdf = async () => {
+    if (gstPdfLoading) return;
+    setGstPdfLoading(true);
+    try {
+      const { default: jsPDF } = await import('jspdf');
+      const { default: autoTable } = await import('jspdf-autotable');
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+      doc.setFillColor(127, 29, 29);
+      doc.rect(0, 0, 297, 18, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(13);
+      doc.setFont('helvetica', 'bold');
+      doc.text(storeName, 14, 8);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`GST Report · Period: ${rangeLabel}`, 14, 14);
+      doc.text(`Generated: ${new Date().toLocaleString('en-IN')}`, 200, 14);
+      doc.setTextColor(0, 0, 0);
+
+      autoTable(doc, {
+        startY: 22,
+        head: [GST_HEADERS],
+        body: gstCsvRows(),
+        foot: [['Totals', '', '', '', '', gstTotals.taxable.toFixed(2), gstTotals.tax.toFixed(2), gstTotals.total.toFixed(2), '']],
+        headStyles: { fillColor: [31, 41, 55], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
+        footStyles: { fillColor: [243, 244, 246], textColor: [17, 24, 39], fontStyle: 'bold', fontSize: 8 },
+        bodyStyles: { fontSize: 8 },
+        alternateRowStyles: { fillColor: [249, 250, 251] },
+        margin: { left: 10, right: 10 },
+      });
+      doc.save(`gst-report-${range}-${dateTag}.pdf`);
+    } finally {
+      setGstPdfLoading(false);
+    }
+  };
 
   const dateTag = new Date().toISOString().slice(0, 10);
   const storeName = user?.store?.name || 'My Store';
@@ -724,6 +847,93 @@ export default function AccountsPage() {
                           <td colSpan={2} />
                         </tr>
                       </tfoot>
+                    </table>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* ── GST Report ─────────────────────────────────────── */}
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm">
+              <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <Receipt className="h-4 w-4 text-gray-500" />
+                  <h2 className="font-semibold text-gray-800 text-sm">GST Report</h2>
+                  <span className="text-xs text-gray-400">— same period as above, cancelled invoices excluded</span>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={exportGstCsv}
+                    disabled={gstRows.length === 0}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs border border-gray-200 rounded-lg bg-white hover:bg-gray-50 disabled:opacity-50 text-gray-700"
+                  >
+                    <FileDown className="h-3.5 w-3.5 text-green-600" /> CSV
+                  </button>
+                  <button
+                    onClick={exportGstExcel}
+                    disabled={gstRows.length === 0}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs border border-gray-200 rounded-lg bg-white hover:bg-gray-50 disabled:opacity-50 text-gray-700"
+                  >
+                    <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-600" /> Excel
+                  </button>
+                  <button
+                    onClick={exportGstPdf}
+                    disabled={gstRows.length === 0 || gstPdfLoading}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-red-700 text-white rounded-lg hover:bg-red-800 disabled:opacity-50"
+                  >
+                    <FileText className={`h-3.5 w-3.5 ${gstPdfLoading ? 'animate-pulse' : ''}`} /> {gstPdfLoading ? 'Generating…' : 'PDF'}
+                  </button>
+                </div>
+              </div>
+
+              {gstLoading ? (
+                <div className="flex justify-center py-10"><RefreshCw className="h-6 w-6 text-gray-300 animate-spin" /></div>
+              ) : gstRows.length === 0 ? (
+                <p className="text-center text-gray-400 py-8 text-sm">No invoices in this period</p>
+              ) : (
+                <>
+                  <div className="grid grid-cols-3 gap-3 p-4 border-b border-gray-100">
+                    <div>
+                      <p className="text-xs text-gray-500">Taxable Value</p>
+                      <p className="font-bold text-gray-900">{fmt(gstTotals.taxable)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Tax Amount</p>
+                      <p className="font-bold text-gray-900">{fmt(gstTotals.tax)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Total</p>
+                      <p className="font-bold text-gray-900">{fmt(gstTotals.total)}</p>
+                    </div>
+                  </div>
+                  <div className="overflow-auto max-h-80">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50 sticky top-0">
+                        <tr>
+                          <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase">Invoice</th>
+                          <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase">Customer</th>
+                          <th className="px-4 py-2.5 text-left text-xs font-semibold text-gray-500 uppercase">GSTIN</th>
+                          <th className="px-4 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase">Taxable</th>
+                          <th className="px-4 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase">Tax</th>
+                          <th className="px-4 py-2.5 text-right text-xs font-semibold text-gray-500 uppercase">Total</th>
+                          <th className="px-4 py-2.5 text-center text-xs font-semibold text-gray-500 uppercase">Date</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {gstRows.map((r) => (
+                          <tr key={r.invoiceNumber} className="hover:bg-gray-50/60">
+                            <td className="px-4 py-2.5 font-mono text-xs text-red-700 font-bold">{r.invoiceNumber}</td>
+                            <td className="px-4 py-2.5 text-gray-700">{r.customer?.name || 'Walk-in'}</td>
+                            <td className="px-4 py-2.5 text-xs font-mono text-gray-500">{r.customer?.gstin || '—'}</td>
+                            <td className="px-4 py-2.5 text-right text-gray-700">{fmt(r.subtotal)}</td>
+                            <td className="px-4 py-2.5 text-right text-gray-700">{fmt(r.taxAmount)}</td>
+                            <td className="px-4 py-2.5 text-right font-medium text-gray-900">{fmt(r.totalAmount)}</td>
+                            <td className="px-4 py-2.5 text-center text-xs text-gray-500">
+                              {new Date(r.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
                     </table>
                   </div>
                 </>

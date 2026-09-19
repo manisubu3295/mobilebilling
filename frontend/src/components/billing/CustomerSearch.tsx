@@ -23,7 +23,7 @@ export function CustomerSearch({ selectedId, onSelect }: CustomerSearchProps) {
   const [selected, setSelected] = useState<Customer | null>(null);
   const [loading, setLoading] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
-  const [newCustomer, setNewCustomer] = useState({ name: '', phone: '', email: '' });
+  const [newCustomer, setNewCustomer] = useState({ name: '', phone: '', email: '', address: '', gstin: '' });
 
   const selectedRef = useRef<Customer | null>(null);
   useEffect(() => { selectedRef.current = selected; }, [selected]);
@@ -94,10 +94,12 @@ export function CustomerSearch({ selectedId, onSelect }: CustomerSearchProps) {
       const { data } = await api.post('/customers', {
         ...newCustomer,
         email: newCustomer.email.trim() || undefined,
+        address: newCustomer.address.trim() || undefined,
+        gstin: newCustomer.gstin.trim() || undefined,
       });
       handleSelect(data);
       setShowCreate(false);
-      setNewCustomer({ name: '', phone: '', email: '' });
+      setNewCustomer({ name: '', phone: '', email: '', address: '', gstin: '' });
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to create customer');
     }
@@ -180,6 +182,18 @@ export function CustomerSearch({ selectedId, onSelect }: CustomerSearchProps) {
               placeholder="Email (optional)"
               value={newCustomer.email}
               onChange={(e) => setNewCustomer((p) => ({ ...p, email: e.target.value }))}
+              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+            />
+            <input
+              placeholder="Address (optional)"
+              value={newCustomer.address}
+              onChange={(e) => setNewCustomer((p) => ({ ...p, address: e.target.value }))}
+              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+            />
+            <input
+              placeholder="GSTIN (optional)"
+              value={newCustomer.gstin}
+              onChange={(e) => setNewCustomer((p) => ({ ...p, gstin: e.target.value.toUpperCase() }))}
               className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
             />
             <div className="flex gap-2 pt-1">

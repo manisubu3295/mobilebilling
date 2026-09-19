@@ -33,8 +33,14 @@ export default function CheckoutPage() {
     return () => { window.removeEventListener('online', up); window.removeEventListener('offline', dn); };
   }, []);
 
+  const needsCustomerForService = store.items.some((i) => i.requiresService) && !store.customerId;
+
   const handleCheckout = useCallback(async () => {
     if (store.items.length === 0) return;
+    if (store.items.some((i) => i.requiresService) && !store.customerId) {
+      setError('Please assign a customer before completing this sale — the order includes a service-eligible product requiring AMC registration.');
+      return;
+    }
     setError(null);
     setIsSubmitting(true);
 
@@ -49,6 +55,7 @@ export default function CheckoutPage() {
       discountType: store.discountType || undefined,
       discountValue: store.discountValue || undefined,
       notes: store.notes || undefined,
+      gstApplied: store.gstApplied,
     };
 
     if (!isOnline) {
@@ -128,6 +135,11 @@ export default function CheckoutPage() {
               selectedId={store.customerId}
               onSelect={(id) => store.setCustomer(id)}
             />
+            {needsCustomerForService && (
+              <p className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
+                A customer is required to enable AMC registration for the service-eligible product in this order.
+              </p>
+            )}
           </div>
           {/* Scanner */}
           <div className="p-3 border-b shrink-0">
@@ -156,7 +168,7 @@ export default function CheckoutPage() {
           <div className="p-3 border-t bg-white shrink-0 sticky bottom-0 lg:static z-10">
             <button
               onClick={handleCheckout}
-              disabled={isSubmitting || store.items.length === 0}
+              disabled={isSubmitting || store.items.length === 0 || needsCustomerForService}
               className="w-full py-3 bg-red-700 text-white rounded-xl font-bold text-base
                          hover:bg-red-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
@@ -164,7 +176,9 @@ export default function CheckoutPage() {
                 ? 'Processing…'
                 : store.items.length === 0
                   ? 'Add items to cart'
-                  : `Complete Sale — ₹${store.total().toFixed(2)}`}
+                  : needsCustomerForService
+                    ? 'Customer Assignment Required'
+                    : `Complete Sale — ₹${store.total().toFixed(2)}`}
             </button>
           </div>
         </div>

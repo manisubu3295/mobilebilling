@@ -2,12 +2,14 @@
 
 import React, { useState } from 'react';
 import { useBillingStore } from '@/store/billing.store';
+import { useAuthStore } from '@/store/auth.store';
 import { ChevronDown } from 'lucide-react';
 
 const DISCOUNT_CAP = 15;
 
 export function InvoiceSummary() {
   const store = useBillingStore();
+  const { account } = useAuthStore();
   const [showDiscount, setShowDiscount] = useState(false);
   const discPct =
     store.discountType === 'PERCENT'
@@ -23,7 +25,22 @@ export function InvoiceSummary() {
 
       <div className="space-y-1.5 text-sm">
         <Row label="Subtotal" value={`₹${store.subtotal().toFixed(2)}`} />
-        <Row label="Tax (GST)" value={`₹${store.taxTotal().toFixed(2)}`} />
+        {account?.serviceModuleEnabled ? (
+          <div className="flex justify-between items-center">
+            <label className="flex items-center gap-1.5 text-gray-600 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={store.gstApplied}
+                onChange={(e) => store.setGstApplied(e.target.checked)}
+                className="h-3.5 w-3.5 accent-red-700"
+              />
+              Include GST
+            </label>
+            <span className="text-gray-900">₹{store.taxTotal().toFixed(2)}</span>
+          </div>
+        ) : (
+          <Row label="Tax (GST)" value={`₹${store.taxTotal().toFixed(2)}`} />
+        )}
         {store.discountAmount() > 0 && (
           <Row
             label="Discount"

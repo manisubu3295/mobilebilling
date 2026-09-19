@@ -1,5 +1,6 @@
 import {
   IsArray,
+  IsBoolean,
   IsEnum,
   IsNotEmpty,
   IsNumber,
@@ -85,4 +86,10 @@ export class CreateInvoiceDto {
   @IsOptional()
   @IsString()
   managerOtpToken?: string;
+
+  // Per-invoice GST override (service-module feature). Defaults to true so
+  // existing tenants without the toggle in their UI keep today's behavior.
+  @IsOptional()
+  @IsBoolean()
+  gstApplied?: boolean;
 }

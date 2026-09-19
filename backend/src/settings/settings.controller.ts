@@ -5,7 +5,7 @@ import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Role } from '@prisma/client';
-import { IsOptional, IsString } from 'class-validator';
+import { IsInt, IsOptional, IsString, Min } from 'class-validator';
 
 class UpdateStoreDto {
   @IsOptional() @IsString() name?: string;
@@ -13,6 +13,7 @@ class UpdateStoreDto {
   @IsOptional() @IsString() phone?: string;
   @IsOptional() @IsString() gstNumber?: string;
   @IsOptional() @IsString() staticQrUrl?: string;
+  @IsOptional() @IsInt() @Min(1) nextServiceLookaheadDays?: number;
 }
 
 @Controller('settings')

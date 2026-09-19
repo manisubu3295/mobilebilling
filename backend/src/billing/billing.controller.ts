@@ -12,7 +12,7 @@ import {
 import { Request } from 'express';
 import { SkipThrottle } from '@nestjs/throttler';
 import { BillingService } from './billing.service';
-import { CreateInvoiceDto } from './dto/create-invoice.dto';
+import { CreateInvoiceDto, PaymentDto } from './dto/create-invoice.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -49,6 +49,16 @@ export class BillingController {
     return this.billingService.listInvoices(storeId, +page, +limit, search, from, to, status);
   }
 
+  @Get('invoices/export')
+  @Roles(Role.SUPER_ADMIN, Role.STORE_MANAGER)
+  listInvoicesForExport(
+    @CurrentUser('storeId') storeId: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.billingService.listInvoicesForExport(storeId, from, to);
+  }
+
   @Get('invoices/:id')
   @Roles(Role.SUPER_ADMIN, Role.STORE_MANAGER, Role.BILLING_CLERK)
   getInvoice(@Param('id') id: string, @CurrentUser('storeId') storeId: string) {
@@ -59,6 +69,16 @@ export class BillingController {
   @Roles(Role.SUPER_ADMIN, Role.STORE_MANAGER)
   cancelInvoice(@Param('id') id: string, @CurrentUser() user: any) {
     return this.billingService.cancelInvoice(id, user.id, user.storeId);
+  }
+
+  @Post('invoices/:id/payments')
+  @Roles(Role.SUPER_ADMIN, Role.STORE_MANAGER, Role.BILLING_CLERK)
+  addPayment(
+    @Param('id') id: string,
+    @Body() dto: PaymentDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.billingService.addPayment(id, user.storeId, user.id, dto);
   }
 
   @Patch('invoices/:id/return-items')

@@ -31,6 +31,7 @@ export interface PrintInvoice {
   paidAmount: string;
   qrPayload?: string | null;
   createdBy?: { name: string } | null;
+  gstApplied?: boolean; // undefined (older invoices) is treated as true
 }
 
 const PAYMENT_LABELS: Record<string, string> = {
@@ -165,12 +166,24 @@ const RECEIPT_CSS = `
   hr.dash { border: none; border-top: 1px dashed #bbb; margin: 0; }
   @page { margin: 0; size: 80mm auto; }
   @media print { body { width: 72mm; } }
+  .print-bar {
+    position: sticky; top: 0; z-index: 10;
+    display: flex; gap: 8px; padding: 8px; background: #f3f4f6;
+    border-bottom: 1px solid #ddd;
+  }
+  .print-bar button {
+    flex: 1; padding: 8px; border: none; border-radius: 6px;
+    background: #7f1d1d; color: #fff; font-size: 12px; font-weight: 700;
+    font-family: Arial, Helvetica, sans-serif; cursor: pointer;
+  }
+  @media print { .print-bar { display: none; } }
 `;
 
 function buildHtml(invoice: PrintInvoice, qrDataUrl: string): string {
   const date = new Date(invoice.createdAt);
   const balance = parseFloat(invoice.totalAmount) - parseFloat(invoice.paidAmount);
   const hasDiscount = parseFloat(invoice.discountAmount) > 0;
+  const gstApplied = invoice.gstApplied !== false;
 
   const customerHtml = invoice.customer ? `
     <div class="billed-to">
@@ -199,7 +212,7 @@ function buildHtml(invoice: PrintInvoice, qrDataUrl: string): string {
         </div>
         <div class="col-qty">${item.quantity}<br><span class="small-label">${esc(item.sku.unit)}</span></div>
         <div class="col-rate">${fmt(item.unitPrice)}</div>
-        <div class="col-gst">${item.taxRate}%<br><span class="small-label">${fmt(item.taxAmount)}</span></div>
+        ${gstApplied ? `<div class="col-gst">${item.taxRate}%<br><span class="small-label">${fmt(item.taxAmount)}</span></div>` : ''}
         <div class="col-total">${fmt(item.lineTotal)}</div>
       </div>`;
   }).join('');
@@ -232,6 +245,7 @@ function buildHtml(invoice: PrintInvoice, qrDataUrl: string): string {
   <style>${RECEIPT_CSS}</style>
 </head>
 <body>
+  <div class="print-bar"><button onclick="window.print()">Print Receipt</button></div>
   <div class="brand-band">
     <div class="store-name">${esc(invoice.store.name)}</div>
   </div>
@@ -259,7 +273,7 @@ function buildHtml(invoice: PrintInvoice, qrDataUrl: string): string {
     <span class="col-item">Item</span>
     <span class="col-qty">Qty</span>
     <span class="col-rate">Rate</span>
-    <span class="col-gst">GST</span>
+    ${gstApplied ? '<span class="col-gst">GST</span>' : ''}
     <span class="col-total">Total</span>
   </div>
   <div class="items-body">${itemsHtml}</div>
@@ -267,7 +281,7 @@ function buildHtml(invoice: PrintInvoice, qrDataUrl: string): string {
   <div class="totals">
     <div class="total-row"><span>Subtotal</span><span>${fmt(invoice.subtotal)}</span></div>
     ${hasDiscount ? `<div class="total-row discount-row"><span>Discount</span><span>&minus; ${fmt(invoice.discountAmount)}</span></div>` : ''}
-    <div class="total-row"><span>GST (incl.)</span><span>${fmt(invoice.taxAmount)}</span></div>
+    <div class="total-row"><span>GST</span><span>${gstApplied ? fmt(invoice.taxAmount) : 'Not applicable'}</span></div>
     <div class="grand-total"><span>GRAND TOTAL</span><span>${fmt(invoice.totalAmount)}</span></div>
   </div>
 
@@ -287,10 +301,12 @@ function buildHtml(invoice: PrintInvoice, qrDataUrl: string): string {
   </div>
 
   <script>
-    window.onload = function() {
-      window.print();
-      setTimeout(function() { window.close(); }, 1000);
-    };
+    // Printing is a manual click (see .print-bar above) so the user can
+    // scroll and review the receipt first — auto-firing window.print() on
+    // load used to force the print dialog open immediately, which is what
+    // made the page feel unscrollable. Close only after an actual print
+    // attempt (printed or cancelled), never on a timer.
+    window.onafterprint = function() { window.close(); };
   </script>
 </body>
 </html>`;
@@ -322,6 +338,8 @@ export async function printReceipt(invoice: PrintInvoice): Promise<void> {
     iframe.style.top = '-9999px';
     iframe.style.left = '-9999px';
     iframe.style.width = '80mm';
+    // Height set from the rendered content below — a fixed guess here would
+    // clip anything taller (long invoices) before it ever reaches print.
     iframe.style.height = '600px';
     document.body.appendChild(iframe);
     const doc = iframe.contentDocument || iframe.contentWindow?.document;
@@ -330,6 +348,8 @@ export async function printReceipt(invoice: PrintInvoice): Promise<void> {
       doc.write(html);
       doc.close();
       setTimeout(() => {
+        const fullHeight = doc.body?.scrollHeight || 600;
+        iframe.style.height = `${fullHeight}px`;
         iframe.contentWindow?.print();
         setTimeout(() => document.body.removeChild(iframe), 2000);
       }, 500);

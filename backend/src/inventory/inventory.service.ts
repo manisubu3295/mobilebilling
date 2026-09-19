@@ -1,8 +1,9 @@
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { AuditAction } from '@prisma/client';
+import { AuditAction, ProductType } from '@prisma/client';
 import { CreateProductDto } from './dto/create-product.dto';
 import { AddSerialUnitsDto } from './dto/add-serial-units.dto';
+import { UpdateProductDto, UpdateSkuDto } from './dto/update-product.dto';
 import { Decimal } from '@prisma/client/runtime/library';
 import { unitAllowsDecimal } from '../common/units';
 
@@ -11,9 +12,11 @@ export class InventoryService {
   constructor(private prisma: PrismaService) {}
 
   async createProduct(dto: CreateProductDto, userId: string, storeId: string) {
+    const isService = dto.type === ProductType.SERVICE;
+
     for (const sku of dto.skus) {
       const unit = sku.unit || 'PCS';
-      if (!sku.isSerialized && sku.stockQty != null && !unitAllowsDecimal(unit) && !Number.isInteger(sku.stockQty)) {
+      if (!isService && !sku.isSerialized && sku.stockQty != null && !unitAllowsDecimal(unit) && !Number.isInteger(sku.stockQty)) {
         throw new BadRequestException(`"${unit}" is stocked in whole numbers — opening stock must be a whole number`);
       }
     }
@@ -27,13 +30,17 @@ export class InventoryService {
         storeId,
         description: dto.description || null,
         hsnCode: dto.hsnCode || null,
+        requiresService: dto.requiresService ?? false,
+        type: dto.type ?? ProductType.PHYSICAL,
         customFields: dto.customFields ?? undefined,
         skus: {
+          // A service has no physical stock — force these regardless of what
+          // was submitted, rather than trusting the client to leave them out.
           create: dto.skus.map((sku) => ({
             variantName: sku.variantName,
             unit: sku.unit || 'PCS',
-            isSerialized: sku.isSerialized ?? false,
-            stockQty: sku.isSerialized ? 0 : (sku.stockQty ?? 0),
+            isSerialized: isService ? false : (sku.isSerialized ?? false),
+            stockQty: isService ? 0 : (sku.isSerialized ? 0 : (sku.stockQty ?? 0)),
             costPrice: new Decimal(sku.costPrice),
             sellingPrice: new Decimal(sku.sellingPrice),
             taxRate: new Decimal(sku.taxRate ?? 18),
@@ -71,9 +78,10 @@ export class InventoryService {
 
   async listProducts(
     storeId: string,
-    filters: { search?: string; categoryId?: string; lowStock?: boolean },
+    filters: { search?: string; categoryId?: string; lowStock?: boolean; includeInactive?: boolean },
   ) {
     const where: any = { storeId };
+    if (!filters.includeInactive) where.isActive = true;
     if (filters.categoryId) where.categoryId = filters.categoryId;
     if (filters.search) {
       where.OR = [
@@ -124,6 +132,68 @@ export class InventoryService {
 
     if (!product) throw new NotFoundException('Product not found');
     return this._serializeProductStock(product);
+  }
+
+  async updateProduct(id: string, dto: UpdateProductDto, storeId: string) {
+    const product = await this.prisma.product.findFirst({ where: { id, storeId } });
+    if (!product) throw new NotFoundException('Product not found');
+
+    const updated = await this.prisma.product.update({
+      where: { id },
+      data: {
+        ...(dto.name !== undefined && { name: dto.name }),
+        ...(dto.brand !== undefined && { brand: dto.brand || null }),
+        ...(dto.partNumber !== undefined && { partNumber: dto.partNumber || null }),
+        ...(dto.categoryId !== undefined && { categoryId: dto.categoryId }),
+        ...(dto.description !== undefined && { description: dto.description || null }),
+        ...(dto.hsnCode !== undefined && { hsnCode: dto.hsnCode || null }),
+        ...(dto.requiresService !== undefined && { requiresService: dto.requiresService }),
+        ...(dto.type !== undefined && { type: dto.type }),
+        ...(dto.customFields !== undefined && { customFields: dto.customFields }),
+      },
+      include: { skus: true, category: true },
+    });
+
+    // Switching to Service strips any real stock it was carrying — a
+    // service has no physical inventory, regardless of what it had before.
+    if (dto.type === ProductType.SERVICE) {
+      await this.prisma.sKU.updateMany({
+        where: { productId: id },
+        data: { isSerialized: false, stockQty: 0 },
+      });
+      updated.skus = updated.skus.map((s) => ({ ...s, isSerialized: false, stockQty: new Decimal(0) }));
+    }
+
+    return this._serializeProductStock(updated);
+  }
+
+  async toggleProductActive(id: string, storeId: string) {
+    const product = await this.prisma.product.findFirst({ where: { id, storeId } });
+    if (!product) throw new NotFoundException('Product not found');
+    const updated = await this.prisma.product.update({
+      where: { id },
+      data: { isActive: !product.isActive },
+      include: { skus: true, category: true },
+    });
+    return this._serializeProductStock(updated);
+  }
+
+  async updateSku(skuId: string, dto: UpdateSkuDto, storeId: string) {
+    const sku = await this.prisma.sKU.findFirst({ where: { id: skuId, storeId } });
+    if (!sku) throw new NotFoundException('SKU not found');
+
+    return this.prisma.sKU.update({
+      where: { id: skuId },
+      data: {
+        ...(dto.variantName !== undefined && { variantName: dto.variantName }),
+        ...(dto.unit !== undefined && { unit: dto.unit }),
+        ...(dto.costPrice !== undefined && { costPrice: new Decimal(dto.costPrice) }),
+        ...(dto.sellingPrice !== undefined && { sellingPrice: new Decimal(dto.sellingPrice) }),
+        ...(dto.taxRate !== undefined && { taxRate: new Decimal(dto.taxRate) }),
+        ...(dto.lowStockThreshold !== undefined && { lowStockThreshold: dto.lowStockThreshold }),
+        ...(dto.barcode !== undefined && { barcode: dto.barcode || null }),
+      },
+    });
   }
 
   async addSerialUnits(dto: AddSerialUnitsDto, userId: string, storeId: string) {
@@ -208,7 +278,8 @@ export class InventoryService {
 
   async getLowStockAlerts(storeId: string) {
     const skus = await this.prisma.sKU.findMany({
-      where: { storeId },
+      // Service items have no physical stock — nothing to alert on.
+      where: { storeId, product: { type: { not: ProductType.SERVICE } } },
       include: {
         product: true,
         _count: { select: { serialInventory: { where: { status: 'IN_STOCK' } } } },

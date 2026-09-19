@@ -15,6 +15,7 @@ import { TenantProvisioningService } from '../tenancy/tenant-provisioning.servic
 import { LoginDto } from './dto/login.dto';
 import { SignupDto } from './dto/signup.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { MailerService } from '../mailer/mailer.service';
 
 @Injectable()
@@ -111,7 +112,11 @@ export class AuthService {
     const tokens = await this.generateTokens(user.id, user.role, user.storeId, account.id);
     await this.storeRefreshToken(tenantClient, user.id, tokens.refreshToken);
 
-    return { user: { id: user.id, name: user.name, role: user.role, store: user.store }, ...tokens };
+    return {
+      user: { id: user.id, name: user.name, role: user.role, store: user.store },
+      account: { licenseExpiresAt: account.licenseExpiresAt, serviceModuleEnabled: account.serviceModuleEnabled },
+      ...tokens,
+    };
   }
 
   async refresh(refreshToken: string) {
@@ -177,6 +182,26 @@ export class AuthService {
   async logout(refreshToken: string) {
     if (!refreshToken) return;
     await this.prisma.refreshToken.deleteMany({ where: { token: refreshToken } });
+  }
+
+  // Self-service change for the logged-in user — distinct from forgotPassword
+  // (which escalates to the platform admin) and from UsersService.resetPassword
+  // (an admin resetting someone else's). Invalidates other sessions so a
+  // stolen old password stops working immediately.
+  async changePassword(userId: string, dto: ChangePasswordDto) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw new UnauthorizedException('User not found');
+
+    const pwMatch = await argon2.verify(user.passwordHash, dto.currentPassword);
+    if (!pwMatch) throw new UnauthorizedException('Current password is incorrect');
+
+    const passwordHash = await argon2.hash(dto.newPassword);
+    await this.prisma.$transaction([
+      this.prisma.user.update({ where: { id: userId }, data: { passwordHash } }),
+      this.prisma.refreshToken.deleteMany({ where: { userId } }),
+    ]);
+
+    return { message: 'Password changed successfully' };
   }
 
   private async generateTokens(userId: string, role: string, storeId: string, accountId: string) {

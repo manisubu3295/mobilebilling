@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { Plus, UserCheck, UserX, Shield } from 'lucide-react';
+import { Plus, UserCheck, UserX, Shield, Pencil, KeyRound, Copy, Check } from 'lucide-react';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
 
@@ -20,12 +20,15 @@ const ROLE_STYLE: Record<string, string> = {
   STORE_MANAGER: 'bg-blue-100 text-blue-700',
   BILLING_CLERK: 'bg-green-100 text-green-700',
   INVENTORY_MANAGER: 'bg-orange-100 text-orange-700',
+  SERVICE_STAFF: 'bg-teal-100 text-teal-700',
 };
 
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [resettingUser, setResettingUser] = useState<User | null>(null);
   const { user: me } = useAuthStore();
 
   const load = useCallback(async () => {
@@ -92,15 +95,23 @@ export default function UsersPage() {
                     <span className={`flex items-center gap-1 text-xs font-medium ${u.isActive ? 'text-green-600' : 'text-red-500'}`}>
                       {u.isActive ? <><UserCheck className="h-3.5 w-3.5" /> Active</> : <><UserX className="h-3.5 w-3.5" /> Inactive</>}
                     </span>
-                    <button
-                      onClick={() => handleToggle(u.id)}
-                      disabled={u.id === me?.id}
-                      className={`px-3 py-1 rounded-lg text-xs font-medium disabled:opacity-30 border ${
-                        u.isActive ? 'hover:bg-red-50 text-gray-600 hover:text-red-600' : 'hover:bg-green-50 text-gray-600 hover:text-green-600'
-                      }`}
-                    >
-                      {u.isActive ? 'Deactivate' : 'Activate'}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => setEditingUser(u)} className="px-2 py-1 rounded-lg text-xs font-medium border text-gray-600 hover:bg-gray-50" title="Edit">
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                      <button onClick={() => setResettingUser(u)} className="px-2 py-1 rounded-lg text-xs font-medium border text-gray-600 hover:bg-gray-50" title="Reset Password">
+                        <KeyRound className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleToggle(u.id)}
+                        disabled={u.id === me?.id}
+                        className={`px-3 py-1 rounded-lg text-xs font-medium disabled:opacity-30 border ${
+                          u.isActive ? 'hover:bg-red-50 text-gray-600 hover:text-red-600' : 'hover:bg-green-50 text-gray-600 hover:text-green-600'
+                        }`}
+                      >
+                        {u.isActive ? 'Deactivate' : 'Activate'}
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -117,7 +128,7 @@ export default function UsersPage() {
                     <th className="text-left px-4 py-3 font-medium text-gray-600">Role</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-600">Status</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-600">Joined</th>
-                    <th className="px-4 py-3 w-16"></th>
+                    <th className="px-4 py-3 w-28"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
@@ -148,18 +159,34 @@ export default function UsersPage() {
                         {new Date(u.createdAt).toLocaleDateString('en-IN', { dateStyle: 'medium' })}
                       </td>
                       <td className="px-4 py-3">
-                        <button
-                          onClick={() => handleToggle(u.id)}
-                          disabled={u.id === me?.id}
-                          className={`p-1.5 rounded text-xs font-medium transition-colors disabled:opacity-30 ${
-                            u.isActive
-                              ? 'hover:bg-red-50 text-gray-400 hover:text-red-600'
-                              : 'hover:bg-green-50 text-gray-400 hover:text-green-600'
-                          }`}
-                          title={u.isActive ? 'Deactivate' : 'Activate'}
-                        >
-                          {u.isActive ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
-                        </button>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => setEditingUser(u)}
+                            className="p-1.5 rounded text-xs font-medium transition-colors text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                            title="Edit"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => setResettingUser(u)}
+                            className="p-1.5 rounded text-xs font-medium transition-colors text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                            title="Reset Password"
+                          >
+                            <KeyRound className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleToggle(u.id)}
+                            disabled={u.id === me?.id}
+                            className={`p-1.5 rounded text-xs font-medium transition-colors disabled:opacity-30 ${
+                              u.isActive
+                                ? 'hover:bg-red-50 text-gray-400 hover:text-red-600'
+                                : 'hover:bg-green-50 text-gray-400 hover:text-green-600'
+                            }`}
+                            title={u.isActive ? 'Deactivate' : 'Activate'}
+                          >
+                            {u.isActive ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -171,11 +198,18 @@ export default function UsersPage() {
       </div>
 
       {showAdd && <AddUserModal onClose={() => setShowAdd(false)} onSave={load} />}
+      {editingUser && (
+        <EditUserModal user={editingUser} onClose={() => setEditingUser(null)} onSave={load} />
+      )}
+      {resettingUser && (
+        <ResetPasswordModal user={resettingUser} onClose={() => setResettingUser(null)} />
+      )}
     </div>
   );
 }
 
 function AddUserModal({ onClose, onSave }: { onClose: () => void; onSave: () => void }) {
+  const { account } = useAuthStore();
   const [form, setForm] = useState({ name: '', email: '', phone: '', password: '', role: 'BILLING_CLERK' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -229,6 +263,7 @@ function AddUserModal({ onClose, onSave }: { onClose: () => void; onSave: () => 
             <select value={form.role} onChange={f('role')} className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500">
               <option value="BILLING_CLERK">Billing Clerk</option>
               <option value="INVENTORY_MANAGER">Inventory Manager</option>
+              {account?.serviceModuleEnabled && <option value="SERVICE_STAFF">Service Staff</option>}
               <option value="STORE_MANAGER">Store Manager</option>
               <option value="SUPER_ADMIN">Super Admin</option>
             </select>
@@ -238,6 +273,163 @@ function AddUserModal({ onClose, onSave }: { onClose: () => void; onSave: () => 
           <button onClick={onClose} className="flex-1 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
           <button onClick={handleSave} disabled={saving} className="flex-1 py-2 bg-red-700 text-white rounded-lg text-sm font-medium hover:bg-red-800 disabled:opacity-50">
             {saving ? 'Creating…' : 'Create User'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EditUserModal({ user, onClose, onSave }: { user: User; onClose: () => void; onSave: () => void }) {
+  const { account } = useAuthStore();
+  const [form, setForm] = useState({ name: user.name, phone: user.phone || '', role: user.role });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSave = async () => {
+    setError('');
+    if (!form.name) { setError('Name is required.'); return; }
+    setSaving(true);
+    try {
+      await api.patch(`/users/${user.id}`, form);
+      onSave(); onClose();
+    } catch (e: any) {
+      setError(e.response?.data?.message || 'Failed to update user');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const f = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    setForm((p) => ({ ...p, [k]: e.target.value }));
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+        <div className="flex items-center gap-2 p-6 border-b">
+          <Pencil className="h-5 w-5 text-red-700" />
+          <h2 className="text-lg font-bold">Edit User</h2>
+          <button onClick={onClose} className="ml-auto text-gray-400 hover:text-gray-700 text-2xl">&times;</button>
+        </div>
+        <div className="p-6 space-y-3">
+          {error && <p className="text-sm text-red-600 bg-red-50 p-2 rounded">{error}</p>}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Full Name *</label>
+            <input
+              type="text"
+              value={form.name}
+              onChange={f('name')}
+              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Email</label>
+            <input
+              type="email"
+              value={user.email}
+              disabled
+              className="w-full border rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-400"
+            />
+            <p className="text-xs text-gray-400 mt-1">Email can&apos;t be changed here — contact support if it&apos;s wrong.</p>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Phone</label>
+            <input
+              type="tel"
+              value={form.phone}
+              onChange={f('phone')}
+              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Role *</label>
+            <select value={form.role} onChange={f('role')} className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500">
+              <option value="BILLING_CLERK">Billing Clerk</option>
+              <option value="INVENTORY_MANAGER">Inventory Manager</option>
+              {account?.serviceModuleEnabled && <option value="SERVICE_STAFF">Service Staff</option>}
+              <option value="STORE_MANAGER">Store Manager</option>
+              <option value="SUPER_ADMIN">Super Admin</option>
+            </select>
+          </div>
+        </div>
+        <div className="flex gap-3 p-6 border-t">
+          <button onClick={onClose} className="flex-1 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
+          <button onClick={handleSave} disabled={saving} className="flex-1 py-2 bg-red-700 text-white rounded-lg text-sm font-medium hover:bg-red-800 disabled:opacity-50">
+            {saving ? 'Saving…' : 'Save Changes'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ResetPasswordModal({ user, onClose }: { user: User; onClose: () => void }) {
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [tempPassword, setTempPassword] = useState('');
+  const [copied, setCopied] = useState(false);
+
+  const handleReset = async () => {
+    setError('');
+    setSaving(true);
+    try {
+      const { data } = await api.patch(`/users/${user.id}/reset-password`);
+      setTempPassword(data.tempPassword);
+    } catch (e: any) {
+      setError(e.response?.data?.message || 'Failed to reset password');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(tempPassword);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // clipboard unavailable — user can still select the text manually
+    }
+  };
+
+  if (tempPassword) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+          <div className="text-center space-y-1">
+            <p className="font-semibold text-gray-900">Temporary password for {user.name}</p>
+            <p className="text-xs text-gray-500">Share this with them now — it won&apos;t be shown again.</p>
+          </div>
+          <div className="flex items-center gap-2 bg-gray-50 border rounded-lg px-3 py-2">
+            <code className="flex-1 text-sm font-mono text-gray-900 break-all">{tempPassword}</code>
+            <button onClick={handleCopy} className="shrink-0 text-gray-500 hover:text-gray-800" title="Copy">
+              {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+            </button>
+          </div>
+          <button onClick={onClose} className="w-full py-2 bg-red-700 text-white rounded-lg text-sm font-medium hover:bg-red-800">
+            Done
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4">
+        <div className="flex items-center gap-2">
+          <KeyRound className="h-5 w-5 text-red-700" />
+          <h2 className="text-lg font-bold">Reset Password</h2>
+        </div>
+        {error && <p className="text-sm text-red-600 bg-red-50 p-2 rounded">{error}</p>}
+        <p className="text-sm text-gray-600">
+          This generates a new temporary password for <span className="font-medium text-gray-900">{user.name}</span> and signs them out everywhere.
+          They should change it after logging in.
+        </p>
+        <div className="flex gap-3">
+          <button onClick={onClose} className="flex-1 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
+          <button onClick={handleReset} disabled={saving} className="flex-1 py-2 bg-red-700 text-white rounded-lg text-sm font-medium hover:bg-red-800 disabled:opacity-50">
+            {saving ? 'Resetting…' : 'Reset Password'}
           </button>
         </div>
       </div>

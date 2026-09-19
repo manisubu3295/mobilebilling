@@ -1,13 +1,14 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Save, Store, QrCode, Upload, X, CheckCircle } from 'lucide-react';
+import { Save, Store, QrCode, Upload, X, CheckCircle, CalendarClock } from 'lucide-react';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
 
 export default function SettingsPage() {
-  const { user } = useAuthStore();
+  const { user, account } = useAuthStore();
   const [form, setForm] = useState({ name: '', address: '', phone: '', gstNumber: '', staticQrUrl: '' });
+  const [lookaheadDays, setLookaheadDays] = useState('30');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
@@ -22,6 +23,7 @@ export default function SettingsPage() {
         gstNumber: data.gstNumber || '',
         staticQrUrl: data.staticQrUrl || '',
       });
+      setLookaheadDays(String(data.nextServiceLookaheadDays ?? 30));
     }).catch(() => {
       if (user?.store) setForm((f) => ({ ...f, name: user.store.name || '' }));
     });
@@ -39,6 +41,21 @@ export default function SettingsPage() {
         staticQrUrl: payload.staticQrUrl || undefined,
       });
       if (fields) setForm((f) => ({ ...f, ...fields }));
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch (e: any) {
+      setError(e.response?.data?.message || 'Save failed');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveLookahead = async () => {
+    setError(''); setSaving(true);
+    try {
+      const days = Math.max(1, parseInt(lookaheadDays, 10) || 30);
+      await api.patch('/settings/store', { nextServiceLookaheadDays: days });
+      setLookaheadDays(String(days));
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     } catch (e: any) {
@@ -114,6 +131,35 @@ export default function SettingsPage() {
             <Save className="h-4 w-4" /> {saving ? 'Saving…' : 'Save Changes'}
           </button>
         </div>
+
+        {/* Service Settings */}
+        {account?.serviceModuleEnabled && (
+          <div className="bg-white rounded-xl border p-6 space-y-4">
+            <div className="flex items-center gap-2">
+              <CalendarClock className="h-5 w-5 text-red-700" />
+              <h2 className="font-semibold text-gray-900">Service Settings</h2>
+            </div>
+            <div className="max-w-xs">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Show upcoming service visits within (days)
+              </label>
+              <input
+                type="number"
+                min={1}
+                value={lookaheadDays}
+                onChange={(e) => setLookaheadDays(e.target.value)}
+                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+              />
+              <p className="text-xs text-gray-400 mt-1">
+                Controls the default window on the Next Service screen and the bell notification count.
+              </p>
+            </div>
+            <button onClick={handleSaveLookahead} disabled={saving}
+              className="flex items-center gap-2 px-4 py-2 bg-red-700 text-white rounded-lg text-sm font-medium hover:bg-red-800 disabled:opacity-50">
+              <Save className="h-4 w-4" /> {saving ? 'Saving…' : 'Save Changes'}
+            </button>
+          </div>
+        )}
 
         {/* Payment QR Settings */}
         <div className="bg-white rounded-xl border p-6 space-y-5">

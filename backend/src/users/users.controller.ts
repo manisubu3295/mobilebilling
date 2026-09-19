@@ -15,6 +15,15 @@ class CreateUserDto {
   @IsOptional() @IsString() phone?: string;
 }
 
+// Email is deliberately not editable here — it's the key PlatformUserEmail
+// uses to resolve which tenant a login belongs to, so changing it needs a
+// synchronized update on the master DB too. Out of scope for a simple edit.
+class UpdateUserDto {
+  @IsOptional() @IsString() @IsNotEmpty() name?: string;
+  @IsOptional() @IsEnum(Role) role?: Role;
+  @IsOptional() @IsString() phone?: string;
+}
+
 @Controller('users')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class UsersController {
@@ -40,5 +49,21 @@ export class UsersController {
   @Roles(Role.SUPER_ADMIN, Role.STORE_MANAGER)
   toggleUser(@Param('id') id: string, @CurrentUser('storeId') storeId: string) {
     return this.usersService.toggleUser(id, storeId);
+  }
+
+  @Patch(':id')
+  @Roles(Role.SUPER_ADMIN, Role.STORE_MANAGER)
+  updateUser(
+    @Param('id') id: string,
+    @Body() dto: UpdateUserDto,
+    @CurrentUser('storeId') storeId: string,
+  ) {
+    return this.usersService.updateUser(id, dto, storeId);
+  }
+
+  @Patch(':id/reset-password')
+  @Roles(Role.SUPER_ADMIN, Role.STORE_MANAGER)
+  resetPassword(@Param('id') id: string, @CurrentUser('storeId') storeId: string) {
+    return this.usersService.resetPassword(id, storeId);
   }
 }

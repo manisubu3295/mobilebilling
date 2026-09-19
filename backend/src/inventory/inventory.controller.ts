@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Put,
+  Patch,
   Body,
   Param,
   Query,
@@ -17,6 +18,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Role } from '@prisma/client';
 import { CreateProductDto } from './dto/create-product.dto';
 import { AddSerialUnitsDto } from './dto/add-serial-units.dto';
+import { UpdateProductDto, UpdateSkuDto } from './dto/update-product.dto';
 
 @Controller('inventory')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -39,14 +41,46 @@ export class InventoryController {
     @Query('search') search?: string,
     @Query('categoryId') categoryId?: string,
     @Query('lowStock') lowStock?: string,
+    @Query('includeInactive') includeInactive?: string,
   ) {
-    return this.inventoryService.listProducts(storeId, { search, categoryId, lowStock: lowStock === 'true' });
+    return this.inventoryService.listProducts(storeId, {
+      search,
+      categoryId,
+      lowStock: lowStock === 'true',
+      includeInactive: includeInactive === 'true',
+    });
   }
 
   @Get('products/:id')
   @Roles(Role.SUPER_ADMIN, Role.STORE_MANAGER, Role.BILLING_CLERK, Role.INVENTORY_MANAGER)
   getProduct(@Param('id') id: string, @CurrentUser('storeId') storeId: string) {
     return this.inventoryService.getProduct(id, storeId);
+  }
+
+  @Put('products/:id')
+  @Roles(Role.SUPER_ADMIN, Role.STORE_MANAGER, Role.INVENTORY_MANAGER)
+  updateProduct(
+    @Param('id') id: string,
+    @Body() dto: UpdateProductDto,
+    @CurrentUser('storeId') storeId: string,
+  ) {
+    return this.inventoryService.updateProduct(id, dto, storeId);
+  }
+
+  @Patch('products/:id/toggle')
+  @Roles(Role.SUPER_ADMIN, Role.STORE_MANAGER, Role.INVENTORY_MANAGER)
+  toggleProductActive(@Param('id') id: string, @CurrentUser('storeId') storeId: string) {
+    return this.inventoryService.toggleProductActive(id, storeId);
+  }
+
+  @Put('skus/:id')
+  @Roles(Role.SUPER_ADMIN, Role.STORE_MANAGER, Role.INVENTORY_MANAGER)
+  updateSku(
+    @Param('id') id: string,
+    @Body() dto: UpdateSkuDto,
+    @CurrentUser('storeId') storeId: string,
+  ) {
+    return this.inventoryService.updateSku(id, dto, storeId);
   }
 
   @Post('serial-units')

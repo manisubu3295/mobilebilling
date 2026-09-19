@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
-import { Role, StockStatus, AuditAction, InvoiceStatus } from '@prisma/client';
+import { Role, StockStatus, AuditAction, InvoiceStatus, ProductType, PaymentMode } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { unitAllowsDecimal } from '../common/units';
 
@@ -60,7 +60,9 @@ export class BillingService {
         );
       }
 
-      if (!sku.isSerialized) {
+      if (sku.product.type === ProductType.SERVICE) {
+        // Service items have no physical stock — always sellable.
+      } else if (!sku.isSerialized) {
         // Bulk: check stockQty
         if (sku.stockQty.lessThan(item.quantity)) {
           throw new BadRequestException(
@@ -79,6 +81,8 @@ export class BillingService {
         }
       }
     }
+
+    const gstApplied = dto.gstApplied ?? true;
 
     // ── 2. DB Transaction ────────────────────────────────────────────────────
     const invoice = await this.prisma.$transaction(async (tx) => {
@@ -99,47 +103,12 @@ export class BillingService {
 
       for (const item of dto.items) {
         const sku = skus.find((s) => s.id === item.skuId)!;
-        let serialUnitIds: string[] = [];
-
-        if (!sku.isSerialized) {
-          // Bulk: decrement stockQty inside transaction (prevents race conditions)
-          const updated = await tx.sKU.update({
-            where: { id: sku.id },
-            data: { stockQty: { decrement: item.quantity } },
-          });
-          if (updated.stockQty.lessThan(0)) {
-            throw new BadRequestException(
-              `Race condition: "${sku.variantName}" ran out of stock. Please try again.`,
-            );
-          }
-        } else if (item.serialIds && item.serialIds.length > 0) {
-          // Serialized with explicit IDs: re-check inside tx
-          const units = await tx.serialInventory.findMany({
-            where: { id: { in: item.serialIds }, skuId: item.skuId, storeId, status: StockStatus.IN_STOCK },
-          });
-          if (units.length !== item.serialIds.length) {
-            throw new BadRequestException(`Serial units for "${sku.variantName}" were just sold. Retry.`);
-          }
-          serialUnitIds = units.map((u) => u.id);
-        } else {
-          // Serialized, auto-assign FIFO
-          const units = await tx.serialInventory.findMany({
-            where: { skuId: item.skuId, storeId, status: StockStatus.IN_STOCK },
-            orderBy: { createdAt: 'asc' },
-            take: item.quantity,
-          });
-          if (units.length < item.quantity) {
-            throw new BadRequestException(
-              `Insufficient stock for "${sku.variantName}". Available: ${units.length}, requested: ${item.quantity}`,
-            );
-          }
-          serialUnitIds = units.map((u) => u.id);
-        }
+        const { serialUnitIds } = await this.allocateStockForItem(tx, storeId, sku, item.quantity, item.serialIds);
 
         const unitPrice = sku.sellingPrice;
         const taxRate = sku.taxRate;
         const lineSubtotal = unitPrice.mul(item.quantity);
-        const itemTax = lineSubtotal.mul(taxRate).div(100);
+        const itemTax = gstApplied ? lineSubtotal.mul(taxRate).div(100) : new Decimal(0);
 
         subtotal = subtotal.add(lineSubtotal);
         taxTotal = taxTotal.add(itemTax);
@@ -202,6 +171,7 @@ export class BillingService {
           discountType: dto.discountType || null,
           discountValue: dto.discountValue ? new Decimal(dto.discountValue) : new Decimal(0),
           discountAmount,
+          gstApplied,
           taxAmount: taxTotal,
           totalAmount,
           paidAmount: paidDecimal,
@@ -231,6 +201,22 @@ export class BillingService {
           await tx.serialInventory.updateMany({
             where: { id: { in: rec.serialUnitIds } },
             data: { status: StockStatus.SOLD, soldAt: new Date(), invoiceItemId: invoiceItem.id },
+          });
+        }
+
+        // Water-purifier-style service module: products opted in via
+        // `requiresService` get a pending warranty claim per unit sold, for
+        // an admin to later approve with a period + recurring service frequency.
+        const soldSku = skus.find((s) => s.id === rec.skuId)!;
+        if (soldSku.product.requiresService && dto.customerId) {
+          await tx.warranty.create({
+            data: {
+              storeId,
+              customerId: dto.customerId,
+              invoiceItemId: invoiceItem.id,
+              productId: soldSku.productId,
+              startDate: newInvoice.createdAt,
+            },
           });
         }
       }
@@ -279,6 +265,57 @@ export class BillingService {
       },
     });
     return this._serializeInvoiceItemQuantities(created);
+  }
+
+  // Decrements/reserves stock for one sale line inside an active transaction —
+  // shared by createInvoice and QuotationsService.convertQuotation so both paths
+  // can't drift apart on how serialized vs. bulk stock gets allocated.
+  async allocateStockForItem(
+    tx: any,
+    storeId: string,
+    sku: { id: string; isSerialized: boolean; variantName: string; product?: { type: ProductType } },
+    quantity: number,
+    explicitSerialIds?: string[],
+  ): Promise<{ serialUnitIds: string[] }> {
+    if (sku.product?.type === ProductType.SERVICE) {
+      // No physical stock to reserve or decrement — infinitely sellable.
+      return { serialUnitIds: [] };
+    }
+
+    if (!sku.isSerialized) {
+      const updated = await tx.sKU.update({
+        where: { id: sku.id },
+        data: { stockQty: { decrement: quantity } },
+      });
+      if (updated.stockQty.lessThan(0)) {
+        throw new BadRequestException(
+          `Race condition: "${sku.variantName}" ran out of stock. Please try again.`,
+        );
+      }
+      return { serialUnitIds: [] };
+    }
+
+    if (explicitSerialIds && explicitSerialIds.length > 0) {
+      const units = await tx.serialInventory.findMany({
+        where: { id: { in: explicitSerialIds }, skuId: sku.id, storeId, status: StockStatus.IN_STOCK },
+      });
+      if (units.length !== explicitSerialIds.length) {
+        throw new BadRequestException(`Serial units for "${sku.variantName}" were just sold. Retry.`);
+      }
+      return { serialUnitIds: units.map((u) => u.id) };
+    }
+
+    const units = await tx.serialInventory.findMany({
+      where: { skuId: sku.id, storeId, status: StockStatus.IN_STOCK },
+      orderBy: { createdAt: 'asc' },
+      take: quantity,
+    });
+    if (units.length < quantity) {
+      throw new BadRequestException(
+        `Insufficient stock for "${sku.variantName}". Available: ${units.length}, requested: ${quantity}`,
+      );
+    }
+    return { serialUnitIds: units.map((u) => u.id) };
   }
 
   async getInvoice(id: string, storeId: string) {
@@ -362,6 +399,23 @@ export class BillingService {
       this.prisma.invoice.count({ where }),
     ]);
     return { data, total, page, limit };
+  }
+
+  // Unpaginated — every invoice in range, for the GST report export (CSV/
+  // Excel/PDF need every row, not one page). Invoice-level GST fields
+  // (subtotal/taxAmount/gstApplied) are plain columns, so no item join needed.
+  async listInvoicesForExport(storeId: string, from?: string, to?: string) {
+    const where: any = { storeId };
+    if (from || to) {
+      where.createdAt = {};
+      if (from) where.createdAt.gte = new Date(from + 'T00:00:00+05:30');
+      if (to) where.createdAt.lte = new Date(to + 'T23:59:59+05:30');
+    }
+    return this.prisma.invoice.findMany({
+      where,
+      include: { customer: { select: { name: true, phone: true, gstin: true } } },
+      orderBy: { createdAt: 'asc' },
+    });
   }
 
   async returnInvoiceItems(
@@ -494,6 +548,76 @@ export class BillingService {
     });
   }
 
+  // Records a repayment against an existing invoice's outstanding balance —
+  // the gap DRAFT/PARTIALLY_PAID invoices had no way to close out short of
+  // creating a whole new invoice. Flips to PAID once the balance is cleared.
+  async addPayment(invoiceId: string, storeId: string, userId: string, dto: { mode: PaymentMode; amount: number; reference?: string }) {
+    const invoice = await this.prisma.invoice.findFirst({ where: { id: invoiceId, storeId } });
+    if (!invoice) throw new NotFoundException('Invoice not found');
+    if (invoice.status === InvoiceStatus.CANCELLED) {
+      throw new BadRequestException('Cannot record a payment on a cancelled invoice');
+    }
+    if (invoice.status === InvoiceStatus.RETURNED) {
+      throw new BadRequestException('Cannot record a payment on a fully returned invoice');
+    }
+
+    const balance = invoice.totalAmount.sub(invoice.paidAmount);
+    if (balance.lessThanOrEqualTo(0)) {
+      throw new BadRequestException('This invoice is already fully paid');
+    }
+    const amount = new Decimal(dto.amount);
+    if (amount.greaterThan(balance)) {
+      throw new BadRequestException(`Amount exceeds the balance due (${balance.toFixed(2)})`);
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.payment.create({
+        data: {
+          invoiceId,
+          mode: dto.mode,
+          amount,
+          reference: dto.reference || null,
+        },
+      });
+
+      const newPaidAmount = invoice.paidAmount.add(amount);
+      const newStatus = newPaidAmount.gte(invoice.totalAmount) ? InvoiceStatus.PAID : InvoiceStatus.PARTIALLY_PAID;
+
+      await tx.invoice.update({
+        where: { id: invoiceId },
+        data: { paidAmount: newPaidAmount, status: newStatus },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          storeId,
+          userId,
+          action: AuditAction.PAYMENT_RECEIVED,
+          entityType: 'Invoice',
+          entityId: invoiceId,
+          newValues: { amount: amount.toString(), mode: dto.mode, newStatus },
+        },
+      });
+
+      const result = await tx.invoice.findUnique({
+        where: { id: invoiceId },
+        include: {
+          items: {
+            include: {
+              sku: { include: { product: { include: { category: true } } } },
+              serialUnits: true,
+            },
+          },
+          payments: true,
+          customer: true,
+          store: true,
+          createdBy: { select: { name: true, role: true } },
+        },
+      });
+      return this._serializeInvoiceItemQuantities(result);
+    });
+  }
+
   // Unified part search — returns array of matches so frontend can show a picker
   async lookupPart(query: string, storeId: string) {
     const q = query.trim();
@@ -501,7 +625,7 @@ export class BillingService {
 
     // 1. Exact barcode on SKU — highest priority, return immediately as single result
     const skuByBarcode = await this.prisma.sKU.findFirst({
-      where: { barcode: q, storeId },
+      where: { barcode: q, storeId, product: { isActive: true } },
       include: { product: true },
     });
     if (skuByBarcode) {
@@ -511,7 +635,7 @@ export class BillingService {
 
     // 2. Exact serial number — return immediately
     const serialUnit = await this.prisma.serialInventory.findFirst({
-      where: { serialNumber: q, storeId },
+      where: { serialNumber: q, storeId, sku: { product: { isActive: true } } },
       include: { sku: { include: { product: true } } },
     });
     if (serialUnit) {
@@ -526,6 +650,7 @@ export class BillingService {
         sellingPrice: serialUnit.sku.sellingPrice,
         taxRate: serialUnit.sku.taxRate,
         hsnCode: serialUnit.sku.product.hsnCode,
+        requiresService: serialUnit.sku.product.requiresService,
         serialUnitId: serialUnit.id,
         serialNumber: serialUnit.serialNumber,
         batchNumber: serialUnit.batchNumber,
@@ -538,6 +663,7 @@ export class BillingService {
     const products = await this.prisma.product.findMany({
       where: {
         storeId,
+        isActive: true,
         OR: [
           { name: { contains: q, mode: 'insensitive' } },
           { partNumber: { contains: q, mode: 'insensitive' } },
@@ -560,6 +686,22 @@ export class BillingService {
   }
 
   private async _buildSkuResult(sku: any, storeId: string) {
+    if (sku.product.type === ProductType.SERVICE) {
+      return {
+        type: 'service' as const,
+        found: true, // always sellable — no physical stock to run out of
+        skuId: sku.id,
+        productName: sku.product.name,
+        partNumber: sku.product.partNumber,
+        variantName: sku.variantName,
+        unit: sku.unit,
+        sellingPrice: sku.sellingPrice,
+        taxRate: sku.taxRate,
+        hsnCode: sku.product.hsnCode,
+        requiresService: sku.product.requiresService,
+        stockQty: 0,
+      };
+    }
     if (sku.isSerialized) {
       const unit = await this.prisma.serialInventory.findFirst({
         where: { skuId: sku.id, storeId, status: StockStatus.IN_STOCK },
@@ -575,6 +717,7 @@ export class BillingService {
         sellingPrice: sku.sellingPrice,
         taxRate: sku.taxRate,
         hsnCode: sku.product.hsnCode,
+        requiresService: sku.product.requiresService,
         serialUnitId: unit?.id ?? null,
         serialNumber: unit?.serialNumber ?? null,
         batchNumber: unit?.batchNumber ?? null,
@@ -592,6 +735,7 @@ export class BillingService {
         sellingPrice: sku.sellingPrice,
         taxRate: sku.taxRate,
         hsnCode: sku.product.hsnCode,
+        requiresService: sku.product.requiresService,
         // stockQty is a Decimal column now (fractional stock for KG/LITER/METER)
         // but this response's contract has always been a plain JSON number —
         // normalize it here rather than pushing a Decimal-as-string onto every

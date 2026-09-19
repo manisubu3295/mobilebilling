@@ -16,6 +16,7 @@ export interface CartItem {
   serialNumber?: string;      // display only — for serialized parts
   hsnCode?: string;
   stockQty?: number;          // available stock at time of scan (bulk items only) — caps in-cart quantity edits
+  requiresService?: boolean;  // this product creates a pending AMC on sale — but only if a customer is attached
 }
 
 export interface PaymentEntry {
@@ -32,6 +33,7 @@ interface BillingState {
   discountValue: number;
   notes: string;
   storeId: string | null;    // which store this persisted cart belongs to — see resetForStore
+  gstApplied: boolean;       // service-module feature: per-invoice GST override
 
   addItem: (item: CartItem) => void;
   removeItem: (skuId: string) => void;
@@ -41,6 +43,7 @@ interface BillingState {
   setCustomer: (id: string | null) => void;
   setDiscount: (type: 'PERCENT' | 'FLAT' | null, value: number) => void;
   setNotes: (notes: string) => void;
+  setGstApplied: (applied: boolean) => void;
   clearCart: () => void;
   resetForStore: (storeId: string) => void;
 
@@ -63,6 +66,7 @@ export const useBillingStore = create<BillingState>()(
       discountValue: 0,
       notes: '',
       storeId: null,
+      gstApplied: true,
 
       addItem: (item) =>
         set((s) => {
@@ -130,8 +134,9 @@ export const useBillingStore = create<BillingState>()(
       setCustomer: (id) => set({ customerId: id }),
       setDiscount: (type, value) => set({ discountType: type, discountValue: value }),
       setNotes: (notes) => set({ notes }),
+      setGstApplied: (applied) => set({ gstApplied: applied }),
       clearCart: () =>
-        set({ items: [], payments: [], customerId: null, discountType: null, discountValue: 0, notes: '' }),
+        set({ items: [], payments: [], customerId: null, discountType: null, discountValue: 0, notes: '', gstApplied: true }),
 
       // Persisted cart is keyed by a single fixed localStorage entry, so on a
       // shared browser it survives a logout/login as a different store's
@@ -146,7 +151,9 @@ export const useBillingStore = create<BillingState>()(
 
       subtotal: () => get().items.reduce((s, i) => s + i.unitPrice * i.quantity, 0),
       taxTotal: () =>
-        get().items.reduce((s, i) => s + (i.unitPrice * i.quantity * i.taxRate) / 100, 0),
+        get().gstApplied
+          ? get().items.reduce((s, i) => s + (i.unitPrice * i.quantity * i.taxRate) / 100, 0)
+          : 0,
       discountAmount: () => {
         const { discountType, discountValue, subtotal } = get();
         if (discountType === 'PERCENT') return (subtotal() * discountValue) / 100;

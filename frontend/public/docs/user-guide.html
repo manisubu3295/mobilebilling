@@ -49,6 +49,7 @@
     .badge { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; margin-left: 8px; }
     .badge-admin { background: #f0e6ff; color: #7c3aed; }
     .badge-clerk { background: #e6f4ff; color: #1d6fa4; }
+    .badge-service { background: #e6fff4; color: #0d9467; }
 
     /* FAQ */
     .faq-item { border: 1px solid #e8e8e8; border-radius: 8px; margin-bottom: 12px; overflow: hidden; }
@@ -78,22 +79,26 @@
   <div class="header-icon">🔧</div>
   <div>
     <h1>Aadhirai Billing</h1>
-    <p>Billing &amp; Inventory Management — User Guide</p>
+    <p>Billing, Inventory &amp; Service Management — User Guide</p>
   </div>
 </div>
 
 <!-- Table of Contents -->
 <div class="toc">
   <a href="#login">1. Login</a>
-  <a href="#checkout">2. Billing / Checkout</a>
-  <a href="#invoices">3. Invoices</a>
-  <a href="#accounts">4. Accounts</a>
-  <a href="#inventory">5. Inventory</a>
-  <a href="#customers">6. Customers</a>
-  <a href="#users">7. Users</a>
-  <a href="#audit">8. Audit Logs</a>
-  <a href="#settings">9. Settings</a>
-  <a href="#mobile-app">10. Mobile App</a>
+  <a href="#dashboard">2. Dashboard</a>
+  <a href="#checkout">3. Checkout</a>
+  <a href="#quotations">4. Quotations</a>
+  <a href="#invoices">5. Invoices</a>
+  <a href="#accounts">6. Accounts</a>
+  <a href="#inventory">7. Inventory</a>
+  <a href="#customers">8. Customers</a>
+  <a href="#service">9. Service &amp; AMC</a>
+  <a href="#notifications">10. Notifications</a>
+  <a href="#users">11. Users</a>
+  <a href="#audit">12. Audit Logs</a>
+  <a href="#settings">13. Settings</a>
+  <a href="#mobile-app">14. Mobile App</a>
   <a href="#faq">FAQ</a>
 </div>
 
@@ -115,50 +120,98 @@
         <li><span>Open <strong>https://billing.aadhiraiinnovations.com</strong> in any browser.</span></li>
         <li><span>Enter your <strong>Email</strong> address.</span></li>
         <li><span>Enter your <strong>Password</strong>.</span></li>
-        <li><span>Click <strong>Sign In</strong>. You will be taken directly to the Billing screen.</span></li>
+        <li><span>Click <strong>Sign In</strong>. Admins and managers land on the <strong>Dashboard</strong>; billing, inventory, and service staff land directly on the screen for their role.</span></li>
       </ol>
       <div class="tip"><strong>Tip:</strong> After 5 failed attempts your account is temporarily locked for 15 minutes.</div>
-      <div class="note"><strong>Default credentials:</strong><br>
+      <div class="note"><strong>Change your password any time:</strong> click your name in the top-right corner → <strong>Change Password</strong>. This signs you out of all devices, so you'll need to log back in with the new password. If you're locked out entirely, ask a Super Admin or Store Manager to reset it for you from <strong>Users</strong>.</div>
+      <div class="note"><strong>Default demo credentials:</strong><br>
         Admin: admin@aadhirai.com / Admin@1234<br>
         Clerk: clerk@aadhirai.com / Clerk@1234<br>
-        Change these passwords after first login via Settings → Users.
+        Change these after first login.
       </div>
     </div>
   </div>
 
-  <!-- ── 2. CHECKOUT ── -->
-  <div class="section" id="checkout">
+  <!-- ── 2. DASHBOARD ── -->
+  <div class="section" id="dashboard">
     <div class="section-header">
       <div class="section-num">2</div>
       <div>
-        <h2>Billing / Checkout</h2>
+        <h2>Dashboard <span class="badge badge-admin">Admin / Manager</span></h2>
+        <p>Your landing page — a snapshot of what needs attention today</p>
+      </div>
+    </div>
+    <div class="section-body">
+      <p style="font-size: 14px; line-height: 1.7; color: #333;">
+        The Dashboard is the first thing Super Admins and Store Managers see after signing in. It brings
+        together the numbers you'd otherwise have to check across several separate pages, each one linking
+        straight through to its full page.
+      </p>
+      <ol class="steps">
+        <li><span><strong>Quick Actions</strong> at the top — jump straight into New Sale, New Quotation, or Register AMC.</span></li>
+        <li><span><strong>Today's Sales</strong> and <strong>Outstanding</strong> — today's billed and collected totals, and how much is still owed across open invoices.</span></li>
+        <li><span><strong>Low Stock Alerts</strong> — how many products are at or below their reorder threshold right now.</span></li>
+        <li><span><strong>Pending AMC Approvals</strong> and <strong>Overdue Service Visits</strong> — only shown if your account has the Service module enabled.</span></li>
+      </ol>
+      <div class="tip"><strong>Tip:</strong> Each card links straight to its own full page — click "Outstanding" to see the actual list of unpaid invoices, for example.</div>
+      <div class="note">Card totals are deliberately not summed together across cards (e.g. sales + service charges), since a billed service visit already shows up inside "Today's Sales" — adding them again would double-count it.</div>
+    </div>
+  </div>
+
+  <!-- ── 3. CHECKOUT ── -->
+  <div class="section" id="checkout">
+    <div class="section-header">
+      <div class="section-num">3</div>
+      <div>
+        <h2>Checkout</h2>
         <p>Create a new sale and generate an invoice</p>
       </div>
     </div>
     <div class="section-body">
       <img src="screenshots/02_checkout.png" class="screenshot" alt="Checkout page" />
-      <p class="screenshot-caption">Checkout — Parts Billing screen with cart and order summary</p>
+      <p class="screenshot-caption">Checkout — cart and order summary</p>
 
       <h3 style="margin: 16px 0 10px; font-size: 15px;">How to create a bill</h3>
       <ol class="steps">
-        <li><span><strong>Search for a customer</strong> by name or phone number in the top search box. Leave blank for a walk-in customer.</span></li>
-        <li><span><strong>Search for a part</strong> by name, part number (e.g. RE-500-39A01), or barcode in the part search box. Click <strong>Find</strong> or press Enter.</span></li>
-        <li><span>The part appears in the cart. Adjust the <strong>quantity</strong> if needed.</span></li>
-        <li><span>Repeat steps 2–3 to add more parts.</span></li>
-        <li><span>Optionally click <strong>Apply Discount</strong> to add a flat or percentage discount.</span></li>
-        <li><span>Select the <strong>Payment Mode</strong> (Cash, UPI, Card, etc.) and enter the amount received.</span></li>
-        <li><span>Click <strong>Add Payment</strong>, then confirm the invoice to complete the sale.</span></li>
+        <li><span><strong>Search for a customer</strong> by name or phone number in the top search box. Leave blank for a walk-in sale.</span></li>
+        <li><span><strong>Search for a product</strong> by name, item code, or barcode in the search box below it. Click <strong>Find</strong>, press Enter, or scan with a barcode scanner / the in-app camera scanner.</span></li>
+        <li><span>The item appears in the cart. Adjust the <strong>quantity</strong> if needed.</span></li>
+        <li><span>Repeat to add more items. Optionally click <strong>Apply Discount</strong> for a flat or percentage discount.</span></li>
+        <li><span>Select the <strong>Payment Mode</strong> (Cash, UPI, Card, etc.), enter the amount, and add the payment. You can add more than one payment mode to split a payment.</span></li>
+        <li><span>Click <strong>Complete Sale</strong> to generate the invoice and print a receipt.</span></li>
       </ol>
 
-      <div class="tip"><strong>Tip:</strong> You can add multiple payment modes for split payments (e.g. part cash, part UPI).</div>
-      <div class="tip"><strong>Tip:</strong> Scanning a barcode with a USB barcode scanner automatically fills the part search box.</div>
+      <div class="tip"><strong>Tip:</strong> Scanning a barcode with a USB scanner (or the phone app's camera) automatically fills the product search box.</div>
+      <div class="note"><strong>Selling a service-tracked product?</strong> If any item in the cart is flagged as requiring service tracking, you must pick a customer before you can complete the sale — otherwise there's no one to attach the resulting AMC record to, and the sale is blocked with a clear message until you do.</div>
     </div>
   </div>
 
-  <!-- ── 3. INVOICES ── -->
+  <!-- ── 4. QUOTATIONS ── -->
+  <div class="section" id="quotations">
+    <div class="section-header">
+      <div class="section-num">4</div>
+      <div>
+        <h2>Quotations</h2>
+        <p>Draft a price quote a customer can accept later, without committing stock yet</p>
+      </div>
+    </div>
+    <div class="section-body">
+      <ol class="steps">
+        <li><span>Click <strong>Quotations</strong> in the sidebar, then <strong>New Quotation</strong>.</span></li>
+        <li><span>Search for a customer and add items, the same way as Checkout.</span></li>
+        <li><span>Optionally set a discount and a <strong>Valid Until</strong> date, then save.</span></li>
+        <li><span>When the customer is ready to buy, open the quotation and click <strong>Convert to Invoice</strong> — this creates the real invoice, deducts stock, and records the payment, exactly like a normal sale.</span></li>
+        <li><span>Changed your mind, or the customer walked away? Open the quotation and click <strong>Cancel Quotation</strong> — only an open (not yet converted) quotation can be cancelled.</span></li>
+      </ol>
+      <div class="tip"><strong>Tip:</strong> Stock isn't reserved or deducted until a quotation is actually converted to an invoice — a quotation is just a price on paper until then.</div>
+      <div class="note"><strong>Service-tracked products</strong> need a customer on the quotation too, for the same reason as Checkout — its AMC record can't be created without one when it converts.</div>
+    </div>
+  </div>
+
+  <!-- ── 5. INVOICES ── -->
   <div class="section" id="invoices">
     <div class="section-header">
-      <div class="section-num">3</div>
+      <div class="section-num">5</div>
       <div>
         <h2>Invoices</h2>
         <p>View, search and manage past bills</p>
@@ -170,21 +223,32 @@
       <ol class="steps">
         <li><span>Click <strong>Invoices</strong> in the left sidebar.</span></li>
         <li><span>Use the <strong>search box</strong> to find by invoice number, customer name, or phone.</span></li>
-        <li><span>Use the <strong>date pickers</strong> to filter by date range.</span></li>
-        <li><span>Use the <strong>status dropdown</strong> (All / Paid / Partial / Cancelled) to filter by status.</span></li>
-        <li><span>Click the <strong>eye icon</strong> on any row to view full invoice details and print.</span></li>
+        <li><span>Use the <strong>date pickers</strong> and <strong>status dropdown</strong> (All / Paid / Partial / Cancelled) to filter.</span></li>
+        <li><span>Click the <strong>eye icon</strong> on any row to view full invoice details, print a receipt, or act on it.</span></li>
       </ol>
-      <div class="tip"><strong>Status colours:</strong> Green = Paid &nbsp;|&nbsp; Yellow = Partial &nbsp;|&nbsp; Red = Cancelled</div>
+      <div class="tip"><strong>Status colours:</strong> Green = Paid &nbsp;|&nbsp; Yellow = Partial &nbsp;|&nbsp; Purple = Returned &nbsp;|&nbsp; Red = Cancelled</div>
+
+      <h3 style="margin: 20px 0 10px; font-size: 15px;">Closing out a partial / credit sale</h3>
+      <p style="font-size: 14px; line-height: 1.7; color: #333;">
+        Sold something on credit, or the customer only paid part of the bill? Open the invoice and click
+        <strong>Record Payment</strong> — the amount box is pre-filled with the exact balance still due, but
+        you can enter less for another partial top-up. The invoice status updates automatically: it stays
+        <strong>Partial</strong> until the full balance is collected, then flips to <strong>Paid</strong> on
+        its own. Every repayment is listed under Payments on that invoice, so there's a full record of how
+        it was paid off over time.
+      </p>
+
+      <div class="note"><strong>Other actions from the invoice detail:</strong> <strong>Return Items</strong> (restocks the returned quantity and records the return), and <strong>Cancel Invoice</strong> (voids the whole invoice and restores all stock) — both available to Super Admin / Store Manager.</div>
     </div>
   </div>
 
-  <!-- ── 4. ACCOUNTS ── -->
+  <!-- ── 6. ACCOUNTS ── -->
   <div class="section" id="accounts">
     <div class="section-header">
-      <div class="section-num">4</div>
+      <div class="section-num">6</div>
       <div>
-        <h2>Accounts &amp; Collections</h2>
-        <p>Revenue summary, payment breakdown and outstanding amounts</p>
+        <h2>Accounts &amp; Collections <span class="badge badge-admin">Admin / Manager</span></h2>
+        <p>Revenue summary, payment breakdown, outstanding amounts, and GST reporting</p>
       </div>
     </div>
     <div class="section-body">
@@ -196,67 +260,159 @@
         <li><span>The top cards show: Total Billed, Collected, Outstanding, Cancelled, Avg Invoice.</span></li>
         <li><span>The <strong>Payment Mode Breakdown</strong> shows how much was collected via Cash, UPI, Card, etc.</span></li>
         <li><span>The <strong>Outstanding / Credit Invoices</strong> table lists bills that are not fully paid.</span></li>
-        <li><span>Click <strong>CSV</strong> or <strong>PDF</strong> to export the report.</span></li>
+        <li><span>Click <strong>CSV</strong> or <strong>PDF</strong> at the top to export the collections report.</span></li>
       </ol>
+
+      <h3 style="margin: 20px 0 10px; font-size: 15px;">GST Report</h3>
+      <p style="font-size: 14px; line-height: 1.7; color: #333;">
+        Further down the same page is a dedicated <strong>GST Report</strong>, for whenever you need
+        invoice-level GST figures rather than just a revenue total — it lists every invoice in the selected
+        period with its taxable value, tax amount, and total, along with the customer's GSTIN where one is
+        on file. Export it as <strong>CSV</strong>, <strong>Excel</strong>, or <strong>PDF</strong>; it uses
+        the same date range as the rest of the Accounts page, and cancelled invoices are excluded.
+      </p>
       <div class="tip"><strong>Tip:</strong> Check this page at the end of each day to reconcile cash and UPI collections.</div>
     </div>
   </div>
 
-  <!-- ── 5. INVENTORY ── -->
+  <!-- ── 7. INVENTORY ── -->
   <div class="section" id="inventory">
     <div class="section-header">
-      <div class="section-num">5</div>
+      <div class="section-num">7</div>
       <div>
-        <h2>Parts Inventory</h2>
-        <p>Manage stock, add new parts and monitor low-stock alerts</p>
+        <h2>Inventory</h2>
+        <p>Manage stock, add new products and monitor low-stock alerts</p>
       </div>
     </div>
     <div class="section-body">
       <img src="screenshots/05_inventory.png" class="screenshot" alt="Inventory page" />
-      <p class="screenshot-caption">Parts Inventory — 7 parts with categories, part numbers and stock counts</p>
+      <p class="screenshot-caption">Inventory — products with categories, item codes and stock counts</p>
       <ol class="steps">
         <li><span>Click <strong>Inventory</strong> in the sidebar.</span></li>
-        <li><span>Search by part name, part number, or compatible models.</span></li>
-        <li><span>Click the <strong>arrow</strong> on any row to expand and see variants (e.g. 20W50, 10W40).</span></li>
-        <li><span>Click <strong>+ Add Part</strong> to add a new spare part with variants, price and stock.</span></li>
-        <li><span>Click the <strong>Low Stock Alerts</strong> tab to see parts below their threshold.</span></li>
+        <li><span>Search by product name, item code, or brand.</span></li>
+        <li><span>Click the <strong>arrow</strong> on any row to expand and see its variants (e.g. different sizes or pack quantities).</span></li>
+        <li><span>Click <strong>+ Add Product</strong> to add a new product with a variant, price and opening stock.</span></li>
+        <li><span>Click the <strong>pencil icon</strong> on a product to edit it — its Variants list is shown right there too, each with its own edit pencil, so you don't need to hunt for it separately.</span></li>
+        <li><span>Click the <strong>power icon</strong> to deactivate a product you no longer sell — it disappears from Checkout/Quotation search but its past invoices stay intact. Click again to reactivate.</span></li>
+        <li><span>Click the <strong>Low Stock Alerts</strong> tab to see products below their reorder threshold.</span></li>
         <li><span>Use <strong>Export / Import</strong> to bulk-update stock via CSV.</span></li>
       </ol>
-      <div class="tip"><strong>Categories:</strong> Engine · Electrical · Body/Frame · Brakes/Suspension · Filters/Fluids · Chain/Sprocket · Transmission · Accessories</div>
-      <div class="note"><strong>Two stock modes:</strong><br>
-        <strong>Bulk Qty</strong> — for standard parts (filters, oils, plugs). Stock number goes up/down.<br>
-        <strong>Serialized</strong> — for high-value assemblies (gasket kits). Each unit has its own serial number tracked individually.
+      <div class="note"><strong>Two product types:</strong><br>
+        <strong>Physical Product</strong> — normal stocked items; comes in <strong>Bulk Qty</strong> mode (a running total) or <strong>Serial-tracked</strong> mode (each unit tracked by its own serial number).<br>
+        <strong>Service or Fee</strong> — labor, visit charges, installation fees; never has physical stock and is always sellable.
       </div>
+      <div class="tip"><strong>Requires service tracking:</strong> turn this on for a physical product (e.g. a water purifier) that should create an AMC record whenever it's sold to a customer.</div>
     </div>
   </div>
 
-  <!-- ── 6. CUSTOMERS ── -->
+  <!-- ── 8. CUSTOMERS ── -->
   <div class="section" id="customers">
     <div class="section-header">
-      <div class="section-num">6</div>
+      <div class="section-num">8</div>
       <div>
         <h2>Customers</h2>
-        <p>Manage customer records with vehicle details</p>
+        <p>Manage customer records and purchase history</p>
       </div>
     </div>
     <div class="section-body">
       <img src="screenshots/06_customers.png" class="screenshot" alt="Customers page" />
-      <p class="screenshot-caption">Customers — list with name, phone, vehicle registration and RE model</p>
+      <p class="screenshot-caption">Customers — searchable list with contact details and purchase history</p>
       <ol class="steps">
         <li><span>Click <strong>Customers</strong> in the sidebar.</span></li>
         <li><span>Search by name, phone, or email.</span></li>
-        <li><span>Click <strong>+ Add Customer</strong> to register a new customer.</span></li>
-        <li><span>Fill in Name, Phone (required), Email, Address, GSTIN, <strong>Vehicle No</strong>, and <strong>RE Model</strong>.</span></li>
-        <li><span>Click a customer row to view their full profile and invoice history.</span></li>
+        <li><span>Click <strong>+ Add Customer</strong> to register a new customer, or click an existing row to view their profile and invoice history.</span></li>
+        <li><span>Click the <strong>pencil icon</strong> to edit a customer's details, or the <strong>toggle icon</strong> to deactivate one you no longer deal with — their history stays intact, they just drop out of active search.</span></li>
       </ol>
-      <div class="tip"><strong>Tip:</strong> Always fill the Vehicle No and RE Model — it helps identify the right parts for warranty claims and repeat visits.</div>
+      <div class="tip"><strong>Tip:</strong> Fill in GSTIN for business customers who need it on their invoices for their own GST filing.</div>
     </div>
   </div>
 
-  <!-- ── 7. USERS ── -->
+  <!-- ── 9. SERVICE & AMC ── -->
+  <div class="section" id="service">
+    <div class="section-header">
+      <div class="section-num">9</div>
+      <div>
+        <h2>Service &amp; AMC <span class="badge badge-service">Service module</span></h2>
+        <p>Track annual maintenance contracts and the visits scheduled under them</p>
+      </div>
+    </div>
+    <div class="section-body">
+      <p style="font-size: 14px; line-height: 1.7; color: #333;">
+        This section only appears for accounts with the Service module enabled. An <strong>AMC</strong> is
+        the service-coverage record for one product sold to one customer — it's created automatically
+        whenever a service-tracked product is sold or quoted, or you can register one directly for a
+        customer's existing/pre-owned unit.
+      </p>
+
+      <h3 style="margin: 20px 0 10px; font-size: 15px;">Registering an AMC directly</h3>
+      <ol class="steps">
+        <li><span>Click <strong>Register AMC</strong> (top-right of the Service page, or from the Dashboard's Quick Actions).</span></li>
+        <li><span>Pick a customer and a service-tracked product, set the AMC period and service frequency, and save. Use <strong>Add Another Product</strong> to register several products for the same customer in one sitting.</span></li>
+        <li><span>For onboarding an existing customer base in bulk, use the <strong>CSV import</strong> tab instead — download the template, fill it in, and upload it.</span></li>
+      </ol>
+
+      <h3 style="margin: 20px 0 10px; font-size: 15px;">Pending Approval</h3>
+      <p style="font-size: 14px; line-height: 1.7; color: #333;">
+        Every AMC created from an actual sale starts here, waiting for review. <strong>Approve</strong> it
+        (setting the AMC period and service frequency) to activate it and schedule its first visit, or
+        <strong>Reject</strong> it if it shouldn't be tracked.
+      </p>
+
+      <h3 style="margin: 20px 0 10px; font-size: 15px;">Service Jobs</h3>
+      <p style="font-size: 14px; line-height: 1.7; color: #333;">
+        Every scheduled or completed visit lives here. Use the search box, status filter, sort dropdown
+        (Due Date / Customer / Product), and the date-range picker to find what you need — it opens showing
+        visits from 15 days ago to 30 days ahead by default. From a job row you can <strong>Reschedule</strong>,
+        <strong>Assign</strong>/<strong>Reassign</strong> a technician, <strong>Bill Customer</strong> once
+        there's a charge to collect, or <strong>Cancel</strong> the job.
+      </p>
+
+      <h3 style="margin: 20px 0 10px; font-size: 15px;">All AMCs</h3>
+      <p style="font-size: 14px; line-height: 1.7; color: #333;">
+        A dedicated list of every AMC record regardless of status, with the same kind of search, sort, and
+        date-range filtering as Service Jobs (pending or not-yet-scheduled AMCs always show, since they're
+        not date-scoped the same way). For an active AMC you can <strong>Edit</strong> its period/frequency
+        or <strong>Cancel</strong> it; for a cancelled one, <strong>Reactivate</strong> undoes a mistaken
+        cancellation — it goes straight back to Active if it had already been approved, or back to Pending
+        Approval if it was a claim that was rejected before ever being reviewed.
+      </p>
+      <div class="tip"><strong>Tip:</strong> Reassign/Reschedule live only on Service Jobs, and Edit/Cancel/Reactivate live only on All AMCs — each screen sticks to its own actions so the two never overlap.</div>
+    </div>
+  </div>
+
+  <!-- ── 10. NOTIFICATIONS & NEXT SERVICE ── -->
+  <div class="section" id="notifications">
+    <div class="section-header">
+      <div class="section-num">10</div>
+      <div>
+        <h2>Notifications &amp; Next Service <span class="badge badge-service">Service module</span></h2>
+        <p>What needs your attention, and what's coming up</p>
+      </div>
+    </div>
+    <div class="section-body">
+      <h3 style="margin: 0 0 10px; font-size: 15px;">Notifications</h3>
+      <p style="font-size: 14px; line-height: 1.7; color: #333;">
+        Click the bell icon in the top bar. Whenever a technician closes a service visit, an entry appears
+        here with their notes/customer feedback. For each one you can <strong>Mark OK</strong> (nothing more
+        to do), or <strong>Add Action Item</strong> to leave yourself a follow-up note that stays visible
+        until you separately <strong>Resolve</strong> it. The bell's number badge counts unresolved
+        notifications plus AMC visits due soon.
+      </p>
+
+      <h3 style="margin: 20px 0 10px; font-size: 15px;">Next Service</h3>
+      <p style="font-size: 14px; line-height: 1.7; color: #333;">
+        A read-only lookahead of upcoming and overdue service visits — a quick answer to "what's coming up",
+        without any reschedule/assign buttons cluttering it (do that from Service Jobs instead). It defaults
+        to the window configured in <strong>Settings → Service Settings</strong>, with a dropdown to look
+        further or closer ahead for just this view.
+      </p>
+    </div>
+  </div>
+
+  <!-- ── 11. USERS ── -->
   <div class="section" id="users">
     <div class="section-header">
-      <div class="section-num">7</div>
+      <div class="section-num">11</div>
       <div>
         <h2>User Management <span class="badge badge-admin">Admin only</span></h2>
         <p>Add and manage staff accounts</p>
@@ -266,10 +422,11 @@
       <img src="screenshots/07_users.png" class="screenshot" alt="Users page" />
       <p class="screenshot-caption">User Management — staff list with roles and account status</p>
       <ol class="steps">
-        <li><span>Click <strong>Users</strong> in the sidebar (visible to Super Admin only).</span></li>
-        <li><span>Click <strong>+ Add User</strong> to create a new staff account.</span></li>
-        <li><span>Enter Name, Email, Password, Phone, and assign a <strong>Role</strong>.</span></li>
-        <li><span>To deactivate an account, click the toggle icon on the right of the user row.</span></li>
+        <li><span>Click <strong>Users</strong> in the sidebar (Super Admin / Store Manager).</span></li>
+        <li><span>Click <strong>+ Add User</strong> to create a new staff account with a name, email, password, phone, and <strong>Role</strong>.</span></li>
+        <li><span>Click the <strong>pencil icon</strong> on a user to edit their name, phone, or role. Email can't be changed here — it's used to route their login to the right account.</span></li>
+        <li><span>Click the <strong>key icon</strong> to reset a locked-out staff member's password — a temporary password is generated and shown once, so make sure to hand it to them before closing that dialog.</span></li>
+        <li><span>Click the <strong>toggle icon</strong> to deactivate/reactivate an account.</span></li>
       </ol>
 
       <h3 style="margin: 20px 0 12px; font-size: 15px;">Role Permissions</h3>
@@ -278,27 +435,33 @@
           <tr>
             <th>Feature</th>
             <th>Super Admin</th>
+            <th>Store Manager</th>
             <th>Billing Clerk</th>
+            <th>Inventory Manager</th>
+            <th>Service Staff</th>
           </tr>
         </thead>
         <tbody>
-          <tr><td>Create Bills</td><td class="check">✔</td><td class="check">✔</td></tr>
-          <tr><td>View Invoices</td><td class="check">✔</td><td class="check">✔</td></tr>
-          <tr><td>View Accounts</td><td class="check">✔</td><td class="check">✔</td></tr>
-          <tr><td>Manage Inventory</td><td class="check">✔</td><td class="cross">—</td></tr>
-          <tr><td>Manage Customers</td><td class="check">✔</td><td class="check">✔</td></tr>
-          <tr><td>Manage Users</td><td class="check">✔</td><td class="cross">—</td></tr>
-          <tr><td>View Audit Logs</td><td class="check">✔</td><td class="cross">—</td></tr>
-          <tr><td>Change Settings</td><td class="check">✔</td><td class="cross">—</td></tr>
+          <tr><td>Create Bills / Quotations</td><td class="check">✔</td><td class="check">✔</td><td class="check">✔</td><td class="cross">—</td><td class="cross">—</td></tr>
+          <tr><td>Record Invoice Payments</td><td class="check">✔</td><td class="check">✔</td><td class="check">✔</td><td class="cross">—</td><td class="cross">—</td></tr>
+          <tr><td>View Accounts / GST Report</td><td class="check">✔</td><td class="check">✔</td><td class="cross">—</td><td class="cross">—</td><td class="cross">—</td></tr>
+          <tr><td>Manage Inventory</td><td class="check">✔</td><td class="check">✔</td><td class="cross">—</td><td class="check">✔</td><td class="cross">—</td></tr>
+          <tr><td>Manage Customers</td><td class="check">✔</td><td class="check">✔</td><td class="check">✔</td><td class="cross">—</td><td class="cross">—</td></tr>
+          <tr><td>Approve/Manage AMCs &amp; Jobs</td><td class="check">✔</td><td class="check">✔</td><td class="cross">—</td><td class="cross">—</td><td class="cross">—</td></tr>
+          <tr><td>Work Assigned Service Jobs</td><td class="check">✔</td><td class="check">✔</td><td class="cross">—</td><td class="cross">—</td><td class="check">✔</td></tr>
+          <tr><td>Manage Users</td><td class="check">✔</td><td class="check">✔</td><td class="cross">—</td><td class="cross">—</td><td class="cross">—</td></tr>
+          <tr><td>View Audit Logs</td><td class="check">✔</td><td class="check">✔</td><td class="cross">—</td><td class="cross">—</td><td class="cross">—</td></tr>
+          <tr><td>Change Settings</td><td class="check">✔</td><td class="cross">—</td><td class="cross">—</td><td class="cross">—</td><td class="cross">—</td></tr>
         </tbody>
       </table>
+      <div class="tip"><strong>Tip:</strong> Every role can change their own password from the account menu, regardless of what else they can access.</div>
     </div>
   </div>
 
-  <!-- ── 8. AUDIT ── -->
+  <!-- ── 12. AUDIT ── -->
   <div class="section" id="audit">
     <div class="section-header">
-      <div class="section-num">8</div>
+      <div class="section-num">12</div>
       <div>
         <h2>Audit Logs <span class="badge badge-admin">Admin only</span></h2>
         <p>Full trail of every action taken in the system</p>
@@ -309,21 +472,21 @@
       <p class="screenshot-caption">Audit Logs — every invoice, stock and user action with timestamps and IP addresses</p>
       <ol class="steps">
         <li><span>Click <strong>Audit Logs</strong> in the sidebar.</span></li>
-        <li><span>Filter by <strong>Action type</strong> (Invoice Create, Stock In, Return, etc.).</span></li>
+        <li><span>Filter by <strong>Action type</strong> (Invoice Create, Payment Received, Stock In, Return, etc.).</span></li>
         <li><span>Filter by <strong>date range</strong> to narrow results.</span></li>
         <li><span>Click <strong>Details</strong> on any row to see before/after values for that change.</span></li>
       </ol>
-      <div class="note"><strong>Logged actions include:</strong> Invoice Create/Cancel, Return Process, Stock In/Out/Adjust, Price Change, User Create/Update, Discount Override.</div>
+      <div class="note"><strong>Logged actions include:</strong> Invoice Create/Cancel, Payment Received, Return Process, Stock In/Out/Adjust, Price Change, User Create/Update, Discount Override.</div>
     </div>
   </div>
 
-  <!-- ── 9. SETTINGS ── -->
+  <!-- ── 13. SETTINGS ── -->
   <div class="section" id="settings">
     <div class="section-header">
-      <div class="section-num">9</div>
+      <div class="section-num">13</div>
       <div>
         <h2>Settings <span class="badge badge-admin">Admin only</span></h2>
-        <p>Configure store information and payment QR</p>
+        <p>Configure store information, service scheduling, and payment QR</p>
       </div>
     </div>
     <div class="section-body">
@@ -331,18 +494,18 @@
       <p class="screenshot-caption">Settings — store name, address, GSTIN and UPI QR configuration</p>
       <ol class="steps">
         <li><span>Click <strong>Settings</strong> in the sidebar.</span></li>
-        <li><span>Update <strong>Store Name</strong>, <strong>Phone</strong>, <strong>Address</strong>, and <strong>GSTIN</strong>.</span></li>
-        <li><span>Click <strong>Save Changes</strong>.</span></li>
+        <li><span>Update <strong>Store Name</strong>, <strong>Phone</strong>, <strong>Address</strong>, and <strong>GSTIN</strong>, then <strong>Save Changes</strong>.</span></li>
+        <li><span>If the Service module is enabled, use <strong>Service Settings</strong> to set how many days ahead the <strong>Next Service</strong> screen and the bell's due-soon count should look by default.</span></li>
         <li><span>Under <strong>Payment QR Configuration</strong>, upload a static UPI QR image to show on invoices.</span></li>
       </ol>
       <div class="tip"><strong>Dynamic UPI QR:</strong> For automatic per-invoice QR codes (exact amount), set your UPI VPA (e.g. aadhirai@upi) in the server's backend/.env file under STORE_UPI_VPA.</div>
     </div>
   </div>
 
-  <!-- ── 10. MOBILE APP ── -->
+  <!-- ── 14. MOBILE APP ── -->
   <div class="section" id="mobile-app">
     <div class="section-header">
-      <div class="section-num">10</div>
+      <div class="section-num">14</div>
       <div>
         <h2>Mobile App (Android)</h2>
         <p>Install Aadhirai Billing as an app on your phone — same login, same data</p>
@@ -351,8 +514,10 @@
     <div class="section-body">
       <p style="font-size: 14px; line-height: 1.7; color: #333;">
         This is the same website wrapped as an installable Android app — useful mainly for
-        checkout, since it gives the in-app barcode/QR scanner reliable access to your phone's
-        camera. It isn't on the Google Play Store; you install the file directly.
+        checkout and service visits, since it gives the in-app barcode/QR scanner reliable access to your
+        phone's camera. It isn't on the Google Play Store; you install the file directly. Because it always
+        loads the live site, every feature described in this guide is already available in the app the
+        moment it ships on the website — there's nothing to reinstall for a feature update.
       </p>
 
       <div style="text-align: center; margin: 20px 0;">
@@ -389,22 +554,27 @@
 
       <div class="faq-item">
         <div class="faq-q">How do I reprint an invoice?</div>
-        <div class="faq-a">Go to <strong>Invoices</strong> → find the invoice → click the eye icon on the right → click <strong>Print</strong> or use your browser's Ctrl+P.</div>
+        <div class="faq-a">Go to <strong>Invoices</strong> → find the invoice → click the eye icon on the right → click <strong>Print Receipt</strong>. The receipt opens as a normal page you can scroll through before printing — it only prints when you click the Print button on it.</div>
       </div>
 
       <div class="faq-item">
-        <div class="faq-q">A customer returned a part. How do I process it?</div>
-        <div class="faq-a">Go to <strong>Invoices</strong> → open the invoice → click <strong>Return Items</strong> → select the parts being returned and quantity → confirm. Stock is automatically restored.</div>
+        <div class="faq-q">A customer only paid part of the bill. How do I collect the rest later?</div>
+        <div class="faq-a">Go to <strong>Invoices</strong> → open the invoice → click <strong>Record Payment</strong>. The amount is pre-filled to the exact balance due; adjust it if this is another partial top-up. The invoice flips to Paid automatically once the full balance is collected.</div>
       </div>
 
       <div class="faq-item">
-        <div class="faq-q">How do I add stock when new parts arrive?</div>
-        <div class="faq-a">Go to <strong>Inventory</strong> → find the part → expand it → click the variant → update the <strong>Stock Qty</strong> field. The system logs a Stock In entry in Audit Logs automatically.</div>
+        <div class="faq-q">A customer returned a product. How do I process it?</div>
+        <div class="faq-a">Go to <strong>Invoices</strong> → open the invoice → click <strong>Return Items</strong> → select the items being returned and quantity → confirm. Stock is automatically restored.</div>
       </div>
 
       <div class="faq-item">
-        <div class="faq-q">How do I cancel an invoice?</div>
-        <div class="faq-a">Go to <strong>Invoices</strong> → open the invoice → click <strong>Cancel Invoice</strong>. Cancelled invoices are recorded in Audit Logs and stock is restored for serialized parts.</div>
+        <div class="faq-q">How do I add stock when new products arrive?</div>
+        <div class="faq-a">Go to <strong>Inventory</strong> → find the product → expand it → click <strong>+ Stock</strong> on the variant. The system logs a Stock In entry in Audit Logs automatically.</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">How do I cancel an invoice, quotation, or service job?</div>
+        <div class="faq-a"><strong>Invoice:</strong> open it → <strong>Cancel Invoice</strong> (restocks everything). <strong>Quotation:</strong> open it → <strong>Cancel Quotation</strong> (only while still open). <strong>Service Job:</strong> Service Jobs tab → <strong>Cancel</strong> on the job row (only while not yet billed).</div>
       </div>
 
       <div class="faq-item">
@@ -413,28 +583,33 @@
       </div>
 
       <div class="faq-item">
-        <div class="faq-q">How do I export the accounts report?</div>
-        <div class="faq-a">Go to <strong>Accounts</strong> → select the period → click <strong>CSV</strong> for a spreadsheet or <strong>PDF</strong> for a printable report.</div>
+        <div class="faq-q">How do I export the accounts or GST report?</div>
+        <div class="faq-a">Go to <strong>Accounts</strong> → select the period → click <strong>CSV</strong> or <strong>PDF</strong> for the collections report, or use the <strong>CSV / Excel / PDF</strong> buttons on the <strong>GST Report</strong> section further down the same page.</div>
       </div>
 
       <div class="faq-item">
         <div class="faq-q">I forgot my password. What do I do?</div>
-        <div class="faq-a">Ask your Super Admin to create a new account or reset your password from the <strong>Users</strong> page.</div>
+        <div class="faq-a">Ask a Super Admin or Store Manager to reset it for you from <strong>Users</strong> — they'll get a one-time temporary password to give you, and you can change it yourself afterwards from the account menu.</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">What's the difference between "Register AMC" and a new sale creating an AMC automatically?</div>
+        <div class="faq-a">Selling a service-tracked product through Checkout or a converted Quotation creates an AMC claim automatically, starting in <strong>Pending Approval</strong> for review. <strong>Register AMC</strong> is for the opposite case — a customer's existing or pre-owned unit that was never sold through this system — and goes straight to Active since there's no sale to review.</div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-q">A service visit's due date has already passed. What happens?</div>
+        <div class="faq-a">It shows as <strong>Overdue</strong> on Service Jobs and on the <strong>Next Service</strong> screen until it's rescheduled, billed, or closed — it isn't hidden or auto-cancelled.</div>
       </div>
 
       <div class="faq-item">
         <div class="faq-q">The page says "Cannot reach server". What do I do?</div>
-        <div class="faq-a">Check your internet connection. If the connection is fine, the server may have restarted. Contact your administrator to check that the backend service (PM2) is running on the server.</div>
+        <div class="faq-a">Check your internet connection. If the connection is fine, the server may have restarted. Contact your administrator to check that the backend service is running on the server.</div>
       </div>
 
       <div class="faq-item">
-        <div class="faq-q">How do I add a new spare part to the system?</div>
-        <div class="faq-a">Go to <strong>Inventory</strong> → click <strong>+ Add Part</strong> → fill in the part name, brand, OEM part number, compatible models, category, and add at least one variant with cost price, selling price, and opening stock.</div>
-      </div>
-
-      <div class="faq-item">
-        <div class="faq-q">What is the difference between "Bulk" and "Serialized" stock?</div>
-        <div class="faq-a"><strong>Bulk</strong> tracks a total count (e.g. 24 Oil Filters). <strong>Serialized</strong> tracks each individual unit by serial number (e.g. each Engine Gasket Kit has a unique ID). Use serialized for high-value, warranty-tracked assemblies.</div>
+        <div class="faq-q">What is the difference between "Bulk" and "Serial-tracked" stock?</div>
+        <div class="faq-a"><strong>Bulk</strong> tracks a total count (e.g. 24 Oil Filters). <strong>Serial-tracked</strong> tracks each individual unit by serial number (e.g. each RO purifier unit has a unique ID). Use serial-tracked for high-value, individually identifiable units.</div>
       </div>
 
     </div>
@@ -443,7 +618,7 @@
 </div>
 
 <div class="footer">
-  Aadhirai Billing · Billing &amp; Inventory Management · For support contact your system administrator
+  Aadhirai Billing · Billing, Inventory &amp; Service Management · For support contact your system administrator
 </div>
 
 </body>

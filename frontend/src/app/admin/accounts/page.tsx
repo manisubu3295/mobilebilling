@@ -14,6 +14,8 @@ interface PlatformAccount {
   phone: string;
   tenantDbName: string;
   status: 'ACTIVE' | 'SUSPENDED';
+  licenseExpiresAt: string | null;
+  serviceModuleEnabled: boolean;
   createdAt: string;
 }
 
@@ -40,6 +42,12 @@ export default function AdminAccountsPage() {
     }
     load();
   }, [load, router]);
+
+  const updateAccount = async (id: string, patch: Partial<Pick<PlatformAccount, 'licenseExpiresAt' | 'serviceModuleEnabled'>>) => {
+    // Optimistic update — this is an internal admin tool, a failed PATCH is rare and the next load() will resync.
+    setAccounts((prev) => prev.map((a) => (a.id === id ? { ...a, ...patch } : a)));
+    await adminApi.patch(`/platform-admin/accounts/${id}`, patch).catch(() => load());
+  };
 
   const filtered = accounts.filter((a) => {
     const q = search.toLowerCase();
@@ -85,6 +93,8 @@ export default function AdminAccountsPage() {
                   <th className="px-4 py-3 font-medium">Phone</th>
                   <th className="px-4 py-3 font-medium">Database</th>
                   <th className="px-4 py-3 font-medium">Status</th>
+                  <th className="px-4 py-3 font-medium">License Expiry</th>
+                  <th className="px-4 py-3 font-medium">Service Module</th>
                   <th className="px-4 py-3 font-medium">Signed Up</th>
                 </tr>
               </thead>
@@ -107,6 +117,26 @@ export default function AdminAccountsPage() {
                       >
                         {a.status}
                       </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <input
+                        type="date"
+                        value={a.licenseExpiresAt ? a.licenseExpiresAt.slice(0, 10) : ''}
+                        onChange={(e) =>
+                          updateAccount(a.id, { licenseExpiresAt: e.target.value ? new Date(e.target.value).toISOString() : null })
+                        }
+                        className="border rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-red-500"
+                      />
+                    </td>
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={() => updateAccount(a.id, { serviceModuleEnabled: !a.serviceModuleEnabled })}
+                        className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                          a.serviceModuleEnabled ? 'bg-teal-100 text-teal-700' : 'bg-gray-100 text-gray-500'
+                        }`}
+                      >
+                        {a.serviceModuleEnabled ? 'Enabled' : 'Disabled'}
+                      </button>
                     </td>
                     <td className="px-4 py-3 text-gray-500">{new Date(a.createdAt).toLocaleString()}</td>
                   </tr>

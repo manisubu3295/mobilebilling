@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useAuthStore } from '@/store/auth.store';
 import { Store } from 'lucide-react';
 import { SignupForm } from './SignupForm';
+import { roleLandingPage } from '@/lib/role-landing';
 
 type Tab = 'login' | 'signup';
 
@@ -24,7 +25,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await login(email, password);
-      router.push('/billing/checkout');
+      router.push(roleLandingPage(useAuthStore.getState().user?.role));
     } catch (err: any) {
       setError(
         err.response?.data?.message ||

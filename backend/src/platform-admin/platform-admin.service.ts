@@ -7,6 +7,7 @@ import { TenantConnectionManager } from '../prisma/tenant-connection.manager';
 import { MailerService } from '../mailer/mailer.service';
 import { AdminLoginDto } from './dto/admin-login.dto';
 import { UpdatePlatformSettingsDto } from './dto/update-settings.dto';
+import { UpdateAccountDto } from './dto/update-account.dto';
 
 @Injectable()
 export class PlatformAdminService {
@@ -69,9 +70,32 @@ export class PlatformAdminService {
         phone: true,
         tenantDbName: true,
         status: true,
+        licenseExpiresAt: true,
+        serviceModuleEnabled: true,
         createdAt: true,
       },
       orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async updateAccount(id: string, dto: UpdateAccountDto) {
+    const account = await this.master.platformAccount.findUnique({ where: { id } });
+    if (!account) throw new NotFoundException('Account not found');
+
+    return this.master.platformAccount.update({
+      where: { id },
+      data: {
+        ...(dto.licenseExpiresAt !== undefined ? { licenseExpiresAt: dto.licenseExpiresAt ? new Date(dto.licenseExpiresAt) : null } : {}),
+        ...(dto.serviceModuleEnabled !== undefined ? { serviceModuleEnabled: dto.serviceModuleEnabled } : {}),
+        ...(dto.status !== undefined ? { status: dto.status } : {}),
+      },
+      select: {
+        id: true,
+        businessName: true,
+        status: true,
+        licenseExpiresAt: true,
+        serviceModuleEnabled: true,
+      },
     });
   }
 

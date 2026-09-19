@@ -14,6 +14,54 @@ enum Role {
   STORE_MANAGER
   BILLING_CLERK
   INVENTORY_MANAGER
+  SERVICE_STAFF
+}
+
+enum ServiceFrequency {
+  MONTHLY
+  QUARTERLY
+  HALF_YEARLY
+  YEARLY
+}
+
+// PHYSICAL = a stocked good (tracked quantity, sellable only while in stock).
+// SERVICE = a billable line item with no physical stock (labor, visit fees,
+// installation charges…) — always sellable, stock fields are inert.
+enum ProductType {
+  PHYSICAL
+  SERVICE
+}
+
+enum WarrantyStatus {
+  PENDING_APPROVAL
+  ACTIVE
+  CANCELLED
+}
+
+enum ServiceJobStatus {
+  SCHEDULED
+  ASSIGNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum NotificationType {
+  SERVICE_JOB_COMPLETED
+}
+
+enum NotificationStatus {
+  UNREAD
+  ACKNOWLEDGED
+  ACTION_NOTED
+  RESOLVED
+}
+
+enum QuotationStatus {
+  OPEN
+  CONVERTED
+  EXPIRED
+  CANCELLED
 }
 
 enum AttributeFieldType {
@@ -57,6 +105,7 @@ enum AuditAction {
   INVOICE_CREATE
   INVOICE_CANCEL
   RETURN_PROCESS
+  PAYMENT_RECEIVED
   USER_CREATE
   USER_UPDATE
   DISCOUNT_OVERRIDE
@@ -72,6 +121,9 @@ model Store {
   gstNumber   String?  @map("gst_number")
   logoUrl     String?  @map("logo_url")
   staticQrUrl String?  @map("static_qr_url")
+  // Default lookahead window (in days) for the "Next Service" screen — how
+  // far ahead an upcoming service visit shows up before its due date.
+  nextServiceLookaheadDays Int @default(30) @map("next_service_lookahead_days")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
@@ -82,6 +134,11 @@ model Store {
   skus                 SKU[]
   auditLogs            AuditLog[]
   attributeDefinitions AttributeDefinition[]
+  warranties           Warranty[]
+  serviceJobs          ServiceJob[]
+  serviceJobParts      ServiceJobPart[]
+  quotations           Quotation[]
+  notifications        Notification[]
 
   @@map("stores")
 }
@@ -102,6 +159,9 @@ model User {
   refreshTokens RefreshToken[]
   invoices      Invoice[]
   auditLogs     AuditLog[]
+  approvedWarranties  Warranty[]
+  assignedServiceJobs ServiceJob[]
+  quotations          Quotation[]
 
   @@index([email])
   @@index([storeId])
@@ -175,11 +235,15 @@ model Product {
   store            Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
   description      String?
   hsnCode          String?     @map("hsn_code")
+  requiresService  Boolean     @default(false) @map("requires_service")
+  type             ProductType @default(PHYSICAL)
+  isActive         Boolean     @default(true) @map("is_active")
   customFields     Json?       @map("custom_fields")
   createdAt        DateTime    @default(now()) @map("created_at")
   updatedAt        DateTime    @updatedAt @map("updated_at")
 
-  skus SKU[]
+  skus       SKU[]
+  warranties Warranty[]
 
   @@index([storeId])
   @@index([partNumber])
@@ -207,6 +271,8 @@ model SKU {
   serialInventory    SerialInventory[]
   invoiceItems       InvoiceItem[]
   purchaseOrderItems PurchaseOrderItem[]
+  quotationItems     QuotationItem[]
+  serviceJobParts    ServiceJobPart[]
 
   @@index([productId])
   @@index([storeId])
@@ -276,11 +342,14 @@ model Customer {
   email     String?
   address   String?
   gstin     String?
+  isActive  Boolean  @default(true) @map("is_active")
   customFields Json? @map("custom_fields")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  invoices Invoice[]
+  invoices   Invoice[]
+  warranties Warranty[]
+  quotations Quotation[]
 
   @@index([phone])
   @@map("customers")
@@ -302,6 +371,7 @@ model Invoice {
   discountType   String?       @map("discount_type")
   discountValue  Decimal       @default(0) @map("discount_value") @db.Decimal(10, 2)
   discountAmount Decimal       @default(0) @map("discount_amount") @db.Decimal(10, 2)
+  gstApplied     Boolean       @default(true) @map("gst_applied")
   taxAmount      Decimal       @map("tax_amount") @db.Decimal(10, 2)
   totalAmount    Decimal       @map("total_amount") @db.Decimal(10, 2)
   paidAmount     Decimal       @default(0) @map("paid_amount") @db.Decimal(10, 2)
@@ -312,8 +382,10 @@ model Invoice {
   createdAt      DateTime      @default(now()) @map("created_at")
   updatedAt      DateTime      @updatedAt @map("updated_at")
 
-  items    InvoiceItem[]
-  payments Payment[]
+  items          InvoiceItem[]
+  payments       Payment[]
+  quotationOrigin Quotation?
+  serviceJobOrigin ServiceJob?
 
   @@index([invoiceNumber])
   @@index([storeId])
@@ -337,6 +409,7 @@ model InvoiceItem {
   hsnCode      String? @map("hsn_code")
 
   serialUnits SerialInventory[]
+  warranty    Warranty?
 
   @@map("invoice_items")
 }
@@ -375,4 +448,162 @@ model AuditLog {
   @@index([entityId])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+// ─── Service / Warranty ───────────────────────────────────────────────────────
+
+model Warranty {
+  id                   String            @id @default(cuid())
+  storeId              String            @map("store_id")
+  store                Store             @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  customerId           String            @map("customer_id")
+  customer             Customer          @relation(fields: [customerId], references: [id])
+  // Null for a standalone AMC registered directly (no sale in this system —
+  // e.g. a pre-existing customer onboarded via bulk import, or a unit sold
+  // elsewhere). Set when the warranty originated from a checkout/quotation
+  // sale of a requiresService product.
+  invoiceItemId        String?           @unique @map("invoice_item_id")
+  invoiceItem          InvoiceItem?      @relation(fields: [invoiceItemId], references: [id])
+  productId            String            @map("product_id")
+  product              Product           @relation(fields: [productId], references: [id])
+  status               WarrantyStatus    @default(PENDING_APPROVAL)
+  warrantyPeriodMonths Int?              @map("warranty_period_months")
+  serviceFrequency     ServiceFrequency? @map("service_frequency")
+  approvedById         String?           @map("approved_by_id")
+  approvedBy           User?             @relation(fields: [approvedById], references: [id])
+  approvedAt           DateTime?         @map("approved_at")
+  startDate            DateTime          @map("start_date") // = sale date
+  nextServiceDueAt     DateTime?         @map("next_service_due_at")
+  createdAt            DateTime          @default(now()) @map("created_at")
+  updatedAt            DateTime          @updatedAt @map("updated_at")
+
+  serviceJobs ServiceJob[]
+
+  @@index([storeId, status])
+  @@index([customerId])
+  @@map("warranties")
+}
+
+model ServiceJob {
+  id                   String           @id @default(cuid())
+  warrantyId           String           @map("warranty_id")
+  warranty             Warranty         @relation(fields: [warrantyId], references: [id], onDelete: Cascade)
+  storeId              String           @map("store_id") // denormalized for indexing
+  store                Store            @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  dueDate              DateTime         @map("due_date")
+  assignedToId         String?          @map("assigned_to_id")
+  assignedTo           User?            @relation(fields: [assignedToId], references: [id])
+  assignedAt           DateTime?        @map("assigned_at")
+  status               ServiceJobStatus @default(SCHEDULED)
+  visitDate            DateTime?        @map("visit_date")
+  customerFeedback     String?          @map("customer_feedback")
+  staffExpenseAmount   Decimal?         @db.Decimal(10, 2) @map("staff_expense_amount")
+  staffExpenseNotes    String?          @map("staff_expense_notes")
+  customerChargeAmount Decimal?         @db.Decimal(10, 2) @map("customer_charge_amount")
+  customerChargeNotes  String?          @map("customer_charge_notes")
+  // Once the recorded customerChargeAmount is actually billed, this points at
+  // the real GST invoice/payment record — before that, the charge amount is
+  // just a field the technician noted in the field.
+  invoiceId            String?          @unique @map("invoice_id")
+  invoice              Invoice?         @relation(fields: [invoiceId], references: [id])
+  closedAt             DateTime?        @map("closed_at")
+  createdAt            DateTime         @default(now()) @map("created_at")
+  updatedAt            DateTime         @updatedAt @map("updated_at")
+
+  parts         ServiceJobPart[]
+  notifications Notification[]
+
+  @@index([storeId, status, dueDate])
+  @@index([assignedToId, status])
+  @@map("service_jobs")
+}
+
+// A spare part/consumable (filter, membrane, o-ring…) a technician used
+// during a visit — decrements real inventory stock the moment it's logged,
+// and its price/tax are snapshotted here so a later invoice always reflects
+// what was actually charged, even if the SKU's price changes afterward.
+model ServiceJobPart {
+  id           String     @id @default(cuid())
+  serviceJobId String     @map("service_job_id")
+  serviceJob   ServiceJob @relation(fields: [serviceJobId], references: [id], onDelete: Cascade)
+  storeId      String     @map("store_id")
+  store        Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  skuId        String     @map("sku_id")
+  sku          SKU        @relation(fields: [skuId], references: [id])
+  quantity     Decimal    @db.Decimal(10, 3)
+  unitPrice    Decimal    @db.Decimal(10, 2) @map("unit_price")
+  taxRate      Decimal    @db.Decimal(5, 2) @map("tax_rate")
+  createdAt    DateTime   @default(now()) @map("created_at")
+
+  @@index([serviceJobId])
+  @@map("service_job_parts")
+}
+
+// In-app alert for something an admin should look at — currently only
+// raised when a technician closes a service job. Kept simple on purpose:
+// an admin either acknowledges it (nothing more to do) or leaves an
+// action note on it (a reminder for themself, not a reassignment — the
+// job itself is already reassignable from Service Jobs) until resolved.
+model Notification {
+  id           String              @id @default(cuid())
+  storeId      String              @map("store_id")
+  store        Store               @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  type         NotificationType
+  serviceJobId String?             @map("service_job_id")
+  serviceJob   ServiceJob?         @relation(fields: [serviceJobId], references: [id], onDelete: SetNull)
+  title        String
+  body         String
+  status       NotificationStatus  @default(UNREAD)
+  actionNote   String?             @map("action_note")
+  createdAt    DateTime            @default(now()) @map("created_at")
+  resolvedAt   DateTime?           @map("resolved_at")
+  resolvedById String?             @map("resolved_by_id")
+
+  @@index([storeId, status])
+  @@map("notifications")
+}
+
+model Quotation {
+  id                 String          @id @default(cuid())
+  quotationNumber    String          @unique @map("quotation_number")
+  storeId            String          @map("store_id")
+  store              Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  customerId         String?         @map("customer_id")
+  customer           Customer?       @relation(fields: [customerId], references: [id])
+  createdById        String          @map("created_by_id")
+  createdBy          User            @relation(fields: [createdById], references: [id])
+  status             QuotationStatus @default(OPEN)
+  subtotal           Decimal         @db.Decimal(10, 2)
+  discountType       String?         @map("discount_type")
+  discountValue      Decimal         @default(0) @db.Decimal(10, 2) @map("discount_value")
+  discountAmount     Decimal         @default(0) @db.Decimal(10, 2) @map("discount_amount")
+  gstApplied         Boolean         @default(true) @map("gst_applied")
+  taxAmount          Decimal         @db.Decimal(10, 2) @map("tax_amount")
+  totalAmount        Decimal         @db.Decimal(10, 2) @map("total_amount")
+  notes              String?
+  validUntil         DateTime?       @map("valid_until")
+  convertedInvoiceId String?         @unique @map("converted_invoice_id")
+  convertedInvoice   Invoice?        @relation(fields: [convertedInvoiceId], references: [id])
+  createdAt          DateTime        @default(now()) @map("created_at")
+  updatedAt          DateTime        @updatedAt @map("updated_at")
+
+  items QuotationItem[]
+
+  @@index([storeId, status])
+  @@map("quotations")
+}
+
+model QuotationItem {
+  id          String    @id @default(cuid())
+  quotationId String    @map("quotation_id")
+  quotation   Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  skuId       String    @map("sku_id")
+  sku         SKU       @relation(fields: [skuId], references: [id])
+  quantity    Decimal   @db.Decimal(10, 3)
+  unitPrice   Decimal   @map("unit_price") @db.Decimal(10, 2)
+  taxRate     Decimal   @map("tax_rate") @db.Decimal(5, 2)
+  taxAmount   Decimal   @map("tax_amount") @db.Decimal(10, 2)
+  lineTotal   Decimal   @map("line_total") @db.Decimal(10, 2)
+
+  @@map("quotation_items")
 }

@@ -13,8 +13,9 @@ export class CustomersService {
     return this.prisma.customer.create({ data: dto });
   }
 
-  async findAll(search?: string) {
+  async findAll(search?: string, includeInactive?: boolean) {
     const where: any = {};
+    if (!includeInactive) where.isActive = true;
     if (search) {
       where.OR = [
         { name: { contains: search, mode: 'insensitive' } },
@@ -44,5 +45,11 @@ export class CustomersService {
     const customer = await this.prisma.customer.findUnique({ where: { id } });
     if (!customer) throw new NotFoundException('Customer not found');
     return this.prisma.customer.update({ where: { id }, data: dto });
+  }
+
+  async toggleActive(id: string) {
+    const customer = await this.prisma.customer.findUnique({ where: { id } });
+    if (!customer) throw new NotFoundException('Customer not found');
+    return this.prisma.customer.update({ where: { id }, data: { isActive: !customer.isActive } });
   }
 }
