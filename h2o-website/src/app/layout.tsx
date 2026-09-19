@@ -26,7 +26,10 @@ const plexMono = IBM_Plex_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://h2owaterpurifier.com/'),
-  title: 'H2O Water Care',
+  title: {
+    default: 'H2O Water Care — RO Water Purifier Sales & Service in Kumbakonam',
+    template: '%s | H2O Water Care',
+  },
   description:
     'H2O is Kumbakonam\'s water expert — water filter supplier and RO service near you for every type of water purifier, including Aquaguard, Kent and other brands. Iron removal, DM/zero-TDS plants, softeners, AMC and repair. Free on-site water test, doorstep installation. Call +91 87548 16289.',
   keywords: [
@@ -37,6 +40,7 @@ export const metadata: Metadata = {
     'water filter for home',
     'RO service Kumbakonam',
     'RO service near me',
+    'RO service near by me',
     'RO water purifier service',
     'RO water purifier',
     'water purifier repair',
@@ -50,14 +54,26 @@ export const metadata: Metadata = {
     'Kent RO service',
     'iron removal filter',
     'iron removal filter Kumbakonam',
+    'yellow water',
     'yellow water borewell Tamil Nadu',
     'DM plant service',
     'DM water plant Kumbakonam',
+    'DM zero TDS water service',
     'zero TDS water service',
-    'zero TDS water service near me',
+    'zero TDS water service nearby',
     'distilled water machine service',
     'water purification company Kumbakonam',
     'the water expert Kumbakonam',
+    'water filter supplier',
+    'water purifier for home Kumbakonam',
+    'commercial RO plant Kumbakonam',
+    'RO plant price Kumbakonam',
+    '100 LPH RO plant',
+    '500 LPH RO plant',
+    '1000 LPH RO plant Kumbakonam',
+    'RO water purifier shop Kumbakonam',
+    'RO service Thanjavur',
+    'water purifier Thanjavur',
     'Thanjavur Main Road water purifier',
     'Bakkiyanathan Street Kumbakonam',
   ],
@@ -66,7 +82,7 @@ export const metadata: Metadata = {
   },
   openGraph: {
     type: 'website',
-    title: 'H2O Water Care — Kumbakonam',
+    title: 'H2O Water Care — RO Water Purifier Sales & Service in Kumbakonam',
     description:
       'Water filter supplier and RO service near you in Kumbakonam — sales, installation, repair and AMC for RO, UV, UF, softeners, iron removal filters and DM/zero-TDS plants, any brand.',
     locale: 'en_IN',
@@ -75,7 +91,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary',
-    title: 'H2O Water Care — Kumbakonam',
+    title: 'H2O Water Care — RO Water Purifier Sales & Service in Kumbakonam',
     description: 'Water filter supplier and RO service near you in Kumbakonam — sales and service for every type of water purifier, any brand.',
   },
   other: {

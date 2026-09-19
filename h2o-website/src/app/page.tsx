@@ -194,12 +194,6 @@ const pageHtml = `
 <section id="about">
   <div class="wrap about-grid">
     <div class="about-copy">
-      <div class="photo-placeholder">
-        <div class="photo-placeholder-slot" aria-hidden="true">
-          <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4" stroke="currentColor" stroke-width="1.6"/><path d="M4 20c0-3.9 3.6-7 8-7s8 3.1 8 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
-        </div>
-        <span>Photo placeholder — send a real photo of you, your technician or the shop and this gets replaced</span>
-      </div>
       <h2 style="font-size:clamp(26px,3.6vw,36px); font-weight:700;">A local water filter supplier, built around one job.</h2>
       <p>H2O is a Kumbakonam-based water filter supplier, serving the city for 4+ years — sales and service for all types of water filters and purifiers. We install, service and maintain RO, UV, UF and softener systems, using genuine filters and cartridges, and we stay on call long after installation for annual maintenance, filter changes and repairs.</p>
       <p>Whether you're setting up a filter for the first time or your existing one needs a service, we test your water on-site, explain what it actually needs, and fit the right system for your household — not the most expensive one.</p>
@@ -283,31 +277,34 @@ const pageHtml = `
 <section id="pricing">
   <div class="wrap">
     <div class="section-head">
-      <h2>Simple, transparent pricing.</h2>
-      <p>Exact cost depends on your household and source water — here's the shape of it. Call for a firm quote after the free water test.</p>
+      <h2>What decides your price.</h2>
+      <p>No single number fits every home — here's what we actually weigh before quoting, and where to see real starting prices.</p>
     </div>
-    <div class="pricing-grid">
-      <div class="pricing-card">
-        <span class="pricing-flag">Placeholder — real pricing pending</span>
-        <h3>RO Installation</h3>
-        <div class="price-placeholder">Starting from <strong>₹ —,———</strong></div>
-        <p>New RO system, sized for your household, fitted and tested.</p>
-        <a class="btn btn-outline" href="tel:+918754816289">Ask for a quote</a>
+    <div class="why-grid">
+      <div class="why-item">
+        <div class="icon-orb" style="--orb-a: var(--fresh-glow); --orb-b: var(--brand); --orb-shadow: var(--fresh-glow);"><svg viewBox="0 0 24 24" fill="none"><path d="M3 21V10l9-6 9 6v11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 21v-7h6v7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <h3>Household or business size</h3>
+        <p>A single kitchen unit costs less to install than a multi-floor or commercial supply.</p>
       </div>
-      <div class="pricing-card">
-        <span class="pricing-flag">Placeholder — real pricing pending</span>
-        <h3>AMC Plan</h3>
-        <div class="price-placeholder"><strong>₹ ———</strong> / year</div>
-        <p>Scheduled filter changes and check-ups for one year.</p>
-        <a class="btn btn-outline" href="tel:+918754816289">Ask for a quote</a>
+      <div class="why-item">
+        <div class="icon-orb" style="--orb-a: var(--fresh-glow); --orb-b: var(--brand); --orb-shadow: var(--fresh-glow);"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3s6 7 6 11a6 6 0 1 1-12 0c0-4 6-11 6-11Z" stroke="currentColor" stroke-width="1.8"/></svg></div>
+        <h3>Your source water's TDS &amp; hardness</h3>
+        <p>Measured free on-site — harder or higher-TDS water needs a different stage count.</p>
       </div>
-      <div class="pricing-card">
-        <span class="pricing-flag">Placeholder — real pricing pending</span>
-        <h3>UV / UF Installation</h3>
-        <div class="price-placeholder">Starting from <strong>₹ —,———</strong></div>
-        <p>New UV or UF system for municipal or low-TDS supply.</p>
-        <a class="btn btn-outline" href="tel:+918754816289">Ask for a quote</a>
+      <div class="why-item">
+        <div class="icon-orb" style="--orb-a: var(--fresh-glow); --orb-b: var(--brand); --orb-shadow: var(--fresh-glow);"><svg viewBox="0 0 24 24" fill="none"><path d="M4 12a8 8 0 0 1 16 0" stroke="currentColor" stroke-width="1.7"/><path d="M4 12a8 8 0 0 0 16 0" stroke="currentColor" stroke-width="1.7" stroke-dasharray="1.5 3"/></svg></div>
+        <h3>System &amp; capacity you pick</h3>
+        <p>RO, UV, UF or softener, and the LPH capacity for a commercial plant, set the base cost.</p>
       </div>
+      <div class="why-item">
+        <div class="icon-orb" style="--orb-a: var(--fresh-glow); --orb-b: var(--brand); --orb-shadow: var(--fresh-glow);"><svg viewBox="0 0 24 24" fill="none"><path d="M12 21a8 8 0 0 0 0-16 8 8 0 0 0 0 16Z" stroke="currentColor" stroke-width="1.8"/><path d="M12 8v4l2.5 1.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div>
+        <h3>Whether you want an AMC</h3>
+        <p>Scheduled filter changes and check-ups add a small yearly cost, quoted upfront.</p>
+      </div>
+    </div>
+    <div class="pricing-cta">
+      <a class="btn btn-primary" href="/products">See systems &amp; real prices</a>
+      <a class="btn btn-outline" href="tel:+918754816289">Ask for a quote</a>
     </div>
   </div>
 </section>

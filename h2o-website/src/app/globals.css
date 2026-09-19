@@ -357,33 +357,6 @@ img { max-width: 100%; }
   .about-photo { position: relative; border-radius: var(--radius-card); overflow: hidden; margin-bottom: 4px; }
   .about-photo img { width: 100%; height: 160px; object-fit: cover; display: block; }
 
-  /* Shared "not the real thing" tag for the generic stock photos dropped in
-     as layout filler — same intent as the dashed photo-placeholder box, just
-     for spots that need a filled image rather than an empty slot. */
-  .photo-tag {
-    position: absolute; left: 10px; bottom: 10px; z-index: 1;
-    font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;
-    color: #fff; background: rgba(11,31,110,0.75); backdrop-filter: blur(4px);
-    border-radius: var(--radius-pill); padding: 4px 10px;
-  }
-  .photo-tag--light { position: static; display: inline-block; margin: 0 auto; }
-
-  /* Dashed, muted treatment — deliberately reads as "not finished" rather
-     than trying to pass as a real photo. */
-  .photo-placeholder {
-    display: flex; align-items: center; gap: 14px;
-    border: 1.5px dashed var(--border); border-radius: var(--radius-card);
-    padding: 14px 18px; margin-bottom: 4px;
-    background: color-mix(in srgb, var(--bg-soft) 60%, transparent);
-  }
-  .photo-placeholder-slot {
-    width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0;
-    display: flex; align-items: center; justify-content: center;
-    background: var(--bg-soft); color: var(--ink-faint); border: 1px solid var(--border);
-  }
-  .photo-placeholder-slot svg { width: 22px; height: 22px; }
-  .photo-placeholder span { font-size: 12.5px; color: var(--ink-muted); line-height: 1.4; }
-
   /* ── Services ───────────────────────────────────────────────────── */
   /* Soft colour blobs behind the section give the glass cards ahead of them
      something to actually diffuse, instead of blurring flat, empty colour. */
@@ -422,27 +395,8 @@ img { max-width: 100%; }
   .service-card h3 { font-size: 16.5px; font-weight: 700; }
   .service-card p { font-size: 14px; }
 
-  /* ── Pricing (placeholder) ─────────────────────────────────────── */
-  /* Dashed borders and a visible flag label — this must never be mistaken
-     for real numbers if it ships before the client sends actual pricing. */
-  .pricing-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
-  @media (max-width: 900px) { .pricing-grid { grid-template-columns: 1fr; } }
-  .pricing-card {
-    position: relative;
-    background: color-mix(in srgb, var(--bg-soft) 55%, transparent);
-    border: 1.5px dashed var(--border); border-radius: var(--radius-card);
-    padding: 24px; display: grid; gap: 10px; align-content: start;
-  }
-  .pricing-flag {
-    display: inline-block; width: fit-content;
-    font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
-    color: var(--turbid); background: color-mix(in srgb, var(--turbid) 14%, transparent);
-    border-radius: var(--radius-pill); padding: 4px 10px; margin-bottom: 4px;
-  }
-  .pricing-card h3 { font-size: 16.5px; font-weight: 700; }
-  .price-placeholder { font-size: 15px; color: var(--ink-muted); }
-  .price-placeholder strong { font-family: var(--font-sora), sans-serif; font-size: 22px; color: var(--ink-faint); letter-spacing: 0.02em; }
-  .pricing-card p { font-size: 13.5px; margin: 2px 0 8px; }
+  /* ── Pricing (what decides it, not fake numbers) ──────────────────── */
+  .pricing-cta { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-top: 28px; }
 
   /* ── Why us ─────────────────────────────────────────────────────── */
   /* Light section, in the sky-blue wash — navy is reserved for the
