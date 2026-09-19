@@ -2,7 +2,7 @@
   "name": "aadhirai-billing-android",
   "version": "1.0.0",
   "private": true,
-  "description": "Capacitor Android shell wrapping the deployed Aadhirai Billing web app (https://billing.aadhiraiinnovations.com/) for direct-APK distribution.",
+  "description": "Capacitor Android shell wrapping the deployed Aadhirai Billing web app (https://billing.h2owaterpurifier.com/) for direct-APK distribution.",
   "scripts": {
     "sync": "cap sync android",
     "open:android": "cap open android"
