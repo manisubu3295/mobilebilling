@@ -5,12 +5,13 @@ import { Plus, ClipboardList, Search, Trash2, ChevronRight } from 'lucide-react'
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
 import { CustomerSearch } from '@/components/billing/CustomerSearch';
-import { printReceipt } from '@/lib/print-receipt';
+import { printReceipt, printQuotation } from '@/lib/print-receipt';
 
 interface Quotation {
   id: string;
   quotationNumber: string;
   status: 'OPEN' | 'CONVERTED' | 'EXPIRED' | 'CANCELLED';
+  store: { name: string; address?: string | null; phone?: string | null; gstNumber?: string | null };
   customer: { id: string; name: string; phone: string } | null;
   subtotal: string;
   taxAmount: string;
@@ -436,6 +437,13 @@ function QuotationDetailModal({ quotation, onClose, onConverted }: { quotation: 
             )}
             <div className="flex justify-between font-bold text-base"><span>Total</span><span className="text-red-700">₹{parseFloat(quotation.totalAmount).toFixed(2)}</span></div>
           </div>
+
+          <button
+            onClick={() => printQuotation(quotation)}
+            className="w-full py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50"
+          >
+            Print / Save as PDF
+          </button>
 
           {quotation.status === 'OPEN' ? (
             <div className="border-t pt-4 space-y-3">

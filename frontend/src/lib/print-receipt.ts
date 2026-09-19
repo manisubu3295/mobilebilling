@@ -1,5 +1,3 @@
-import QRCode from 'qrcode';
-
 export interface PrintInvoice {
   invoiceNumber: string;
   createdAt: string;
@@ -153,9 +151,6 @@ const RECEIPT_CSS = `
   .pay-row  { display: flex; justify-content: space-between; font-size: 9px; padding: 1.5px 0; }
   .balance-due { color: #dc2626; font-weight: 700; }
   .change      { color: #16a34a; font-weight: 700; }
-  .qr-section  { text-align: center; padding: 8px 0 4px; border-bottom: 1px dashed #bbb; }
-  .qr-section img { width: 90px; height: 90px; }
-  .qr-label    { font-size: 8px; color: #666; margin-top: 3px; }
   .footer {
     text-align: center; padding: 8px 10px 10px;
     font-size: 9px; color: #555; line-height: 1.7;
@@ -179,7 +174,7 @@ const RECEIPT_CSS = `
   @media print { .print-bar { display: none; } }
 `;
 
-function buildHtml(invoice: PrintInvoice, qrDataUrl: string): string {
+function buildHtml(invoice: PrintInvoice): string {
   const date = new Date(invoice.createdAt);
   const balance = parseFloat(invoice.totalAmount) - parseFloat(invoice.paidAmount);
   const hasDiscount = parseFloat(invoice.discountAmount) > 0;
@@ -227,13 +222,6 @@ function buildHtml(invoice: PrintInvoice, qrDataUrl: string): string {
     ? `<div class="pay-row balance-due"><span>Balance Due</span><span>${fmt(balance)}</span></div>`
     : balance < -0.005
     ? `<div class="pay-row change"><span>Change</span><span>${fmt(Math.abs(balance))}</span></div>`
-    : '';
-
-  const qrHtml = qrDataUrl
-    ? `<div class="qr-section">
-        <img src="${qrDataUrl}" alt="UPI QR" />
-        <div class="qr-label">Scan to Pay via UPI</div>
-       </div>`
     : '';
 
   return `<!DOCTYPE html>
@@ -291,8 +279,6 @@ function buildHtml(invoice: PrintInvoice, qrDataUrl: string): string {
     ${balanceHtml}
   </div>
 
-  ${qrHtml}
-
   <div class="footer">
     <div class="footer-line">&#10022; Thank you for your business &#10022;</div>
     <div class="footer-note">Parts sold are non-returnable.</div>
@@ -312,34 +298,18 @@ function buildHtml(invoice: PrintInvoice, qrDataUrl: string): string {
 </html>`;
 }
 
-export async function printReceipt(invoice: PrintInvoice): Promise<void> {
-  // Open the window synchronously within the user gesture so iOS Safari allows it.
-  // Do async work (QR generation) only after the window is already open.
-  const win = window.open('', '_blank', 'width=420,height=700,scrollbars=yes,resizable=yes');
-
-  let qrDataUrl = '';
-  if (invoice.qrPayload) {
-    try {
-      qrDataUrl = await QRCode.toDataURL(invoice.qrPayload, {
-        width: 180, margin: 1, errorCorrectionLevel: 'H',
-        color: { dark: '#000000', light: '#ffffff' },
-      });
-    } catch {
-      // QR generation failed — continue without it
-    }
-  }
-
-  const html = buildHtml(invoice, qrDataUrl);
-
+// Shared by printReceipt and printQuotation — opens a scrollable popup with
+// the given document and a manual Print button; falls back to a hidden
+// iframe (sized to its actual content) if the popup is blocked.
+function renderInNewWindow(win: Window | null, html: string): void {
   if (!win) {
-    // Pop-up blocked — fall back to hidden iframe
     const iframe = document.createElement('iframe');
     iframe.style.position = 'fixed';
     iframe.style.top = '-9999px';
     iframe.style.left = '-9999px';
     iframe.style.width = '80mm';
     // Height set from the rendered content below — a fixed guess here would
-    // clip anything taller (long invoices) before it ever reaches print.
+    // clip anything taller (long documents) before it ever reaches print.
     iframe.style.height = '600px';
     document.body.appendChild(iframe);
     const doc = iframe.contentDocument || iframe.contentWindow?.document;
@@ -361,4 +331,134 @@ export async function printReceipt(invoice: PrintInvoice): Promise<void> {
   win.document.write(html);
   win.document.close();
   win.focus();
+}
+
+export function printReceipt(invoice: PrintInvoice): void {
+  // Open the window synchronously within the user gesture so iOS Safari allows it.
+  const win = window.open('', '_blank', 'width=420,height=700,scrollbars=yes,resizable=yes');
+  renderInNewWindow(win, buildHtml(invoice));
+}
+
+export interface PrintQuotation {
+  quotationNumber: string;
+  status: 'OPEN' | 'CONVERTED' | 'EXPIRED' | 'CANCELLED';
+  createdAt: string;
+  validUntil?: string | null;
+  notes?: string | null;
+  store: { name: string; address?: string | null; phone?: string | null; gstNumber?: string | null };
+  customer?: { name?: string | null; phone?: string | null; email?: string | null } | null;
+  items: Array<{
+    sku: {
+      product: { name: string; partNumber?: string | null; hsnCode?: string | null };
+      variantName: string;
+      unit: string;
+    };
+    quantity: string | number;
+    unitPrice: string;
+    taxRate: string;
+    taxAmount: string;
+    lineTotal: string;
+  }>;
+  subtotal: string;
+  discountAmount: string;
+  taxAmount: string;
+  totalAmount: string;
+  gstApplied?: boolean;
+  createdBy?: { name: string } | null;
+}
+
+function buildQuotationHtml(quotation: PrintQuotation): string {
+  const date = new Date(quotation.createdAt);
+  const hasDiscount = parseFloat(quotation.discountAmount) > 0;
+  const gstApplied = quotation.gstApplied !== false;
+
+  const customerHtml = quotation.customer ? `
+    <div class="billed-to">
+      <div class="section-title">Quoted To</div>
+      <div class="customer-name">${esc(quotation.customer.name || 'Walk-in Customer')}</div>
+      ${quotation.customer.phone ? `<div class="customer-detail">${esc(quotation.customer.phone)}</div>` : ''}
+      ${quotation.customer.email ? `<div class="customer-detail">${esc(quotation.customer.email)}</div>` : ''}
+    </div>` : '';
+
+  const itemsHtml = quotation.items.map((item, i) => `
+      <div class="item-row ${i % 2 === 1 ? 'alt' : ''}">
+        <div class="col-item">
+          <div class="item-name">${esc(item.sku.product.name)}</div>
+          <div class="item-variant">${esc(item.sku.variantName)}</div>
+          ${item.sku.product.partNumber ? `<div class="item-part">Part# ${esc(item.sku.product.partNumber)}</div>` : ''}
+          ${item.sku.product.hsnCode ? `<div class="item-hsn">HSN: ${esc(item.sku.product.hsnCode)}</div>` : ''}
+        </div>
+        <div class="col-qty">${item.quantity}<br><span class="small-label">${esc(item.sku.unit)}</span></div>
+        <div class="col-rate">${fmt(item.unitPrice)}</div>
+        ${gstApplied ? `<div class="col-gst">${item.taxRate}%<br><span class="small-label">${fmt(item.taxAmount)}</span></div>` : ''}
+        <div class="col-total">${fmt(item.lineTotal)}</div>
+      </div>`).join('');
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Quotation ${esc(quotation.quotationNumber)}</title>
+  <style>${RECEIPT_CSS}</style>
+</head>
+<body>
+  <div class="print-bar"><button onclick="window.print()">Print / Save as PDF</button></div>
+  <div class="brand-band">
+    <div class="store-name">${esc(quotation.store.name)}</div>
+  </div>
+
+  <div class="store-details">
+    ${quotation.store.address ? `<div>${esc(quotation.store.address)}</div>` : ''}
+    ${quotation.store.phone ? `<div>&#128222; ${esc(quotation.store.phone)}</div>` : ''}
+    ${quotation.store.gstNumber ? `<div>GSTIN: ${esc(quotation.store.gstNumber)}</div>` : ''}
+  </div>
+
+  <div class="meta-box">
+    <div>
+      <div class="meta-label">Quotation</div>
+      <div class="meta-inv">${esc(quotation.quotationNumber)}</div>
+    </div>
+    <div class="meta-right">
+      <div class="meta-date">${date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+      ${quotation.validUntil ? `<div class="meta-time">Valid till ${new Date(quotation.validUntil).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</div>` : ''}
+    </div>
+  </div>
+
+  ${customerHtml}
+
+  <div class="items-header">
+    <span class="col-item">Item</span>
+    <span class="col-qty">Qty</span>
+    <span class="col-rate">Rate</span>
+    ${gstApplied ? '<span class="col-gst">GST</span>' : ''}
+    <span class="col-total">Total</span>
+  </div>
+  <div class="items-body">${itemsHtml}</div>
+
+  <div class="totals">
+    <div class="total-row"><span>Subtotal</span><span>${fmt(quotation.subtotal)}</span></div>
+    ${hasDiscount ? `<div class="total-row discount-row"><span>Discount</span><span>&minus; ${fmt(quotation.discountAmount)}</span></div>` : ''}
+    <div class="total-row"><span>GST</span><span>${gstApplied ? fmt(quotation.taxAmount) : 'Not applicable'}</span></div>
+    <div class="grand-total"><span>ESTIMATED TOTAL</span><span>${fmt(quotation.totalAmount)}</span></div>
+  </div>
+
+  ${quotation.notes ? `<div class="payments"><div class="section-title">Notes</div><div class="customer-detail">${esc(quotation.notes)}</div></div>` : ''}
+
+  <div class="footer">
+    <div class="footer-line">This is a quotation, not a tax invoice</div>
+    <div class="footer-note">Prices are estimates and subject to change until converted to an invoice.</div>
+    ${quotation.createdBy ? `<div class="served-by">Prepared by: <strong>${esc(quotation.createdBy.name)}</strong></div>` : ''}
+  </div>
+
+  <script>
+    window.onafterprint = function() { window.close(); };
+  </script>
+</body>
+</html>`;
+}
+
+export function printQuotation(quotation: PrintQuotation): void {
+  const win = window.open('', '_blank', 'width=420,height=700,scrollbars=yes,resizable=yes');
+  renderInNewWindow(win, buildQuotationHtml(quotation));
 }

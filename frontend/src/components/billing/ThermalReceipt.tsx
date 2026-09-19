@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import { QRCodeSVG } from 'qrcode.react';
 
 interface Invoice {
   invoiceNumber: string;
@@ -182,14 +181,6 @@ export function ThermalReceipt({ invoice }: { invoice: Invoice }) {
             </div>
           )}
         </div>
-
-        {/* QR Code */}
-        {invoice.qrPayload && (
-          <div className="receipt-qr-section">
-            <QRCodeSVG value={invoice.qrPayload} size={110} level="H" includeMargin />
-            <div className="receipt-qr-label">Scan to Pay via UPI</div>
-          </div>
-        )}
 
         {/* Footer */}
         <div className="receipt-footer">
@@ -403,17 +394,6 @@ export function ThermalReceipt({ invoice }: { invoice: Invoice }) {
         }
         .receipt-balance-due { color: #dc2626; font-weight: 700; }
         .receipt-change      { color: #16a34a; font-weight: 700; }
-        /* QR */
-        .receipt-qr-section {
-          text-align: center;
-          padding: 14px 0 6px;
-          border-bottom: 1px dashed #ccc;
-        }
-        .receipt-qr-label {
-          font-size: 10px;
-          color: #666;
-          margin-top: 4px;
-        }
         /* Footer */
         .receipt-footer {
           text-align: center;
@@ -465,7 +445,6 @@ export function ThermalReceipt({ invoice }: { invoice: Invoice }) {
           .receipt-totals-section { padding: 2mm 3mm; }
           .receipt-grand-total-row { font-size: 13pt; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           .receipt-payment-section { padding: 2mm 3mm; background: #fff !important; }
-          .receipt-qr-section { padding: 3mm 0; }
           .receipt-footer     { padding: 3mm 3mm 4mm; font-size: 7.5pt; }
           .receipt-footer-line { font-size: 8pt; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           .receipt-vehicle-badge { -webkit-print-color-adjust: exact; print-color-adjust: exact; }

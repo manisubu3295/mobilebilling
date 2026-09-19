@@ -67,14 +67,16 @@ const AMC_STATUS_STYLE: Record<string, string> = {
 const waHref = (phone: string) => `https://wa.me/91${phone.replace(/\D/g, '').replace(/^91/, '')}`;
 
 // Default visibility window for Service Jobs / All AMCs — 15 days back,
-// 30 days ahead — so both screens open on "what's relevant right now"
-// instead of every job/AMC ever created. Custom range overrides it.
+// 400 days ahead — so both screens open on "what's relevant right now"
+// instead of every job/AMC ever created, while still covering a freshly
+// approved/registered AMC's first due date, which can be up to a year out
+// (YEARLY service frequency). Custom range overrides it.
 const toDateInput = (d: Date) => d.toLocaleDateString('en-CA'); // YYYY-MM-DD, local time
 function defaultDateRange() {
   const from = new Date();
   from.setDate(from.getDate() - 15);
   const to = new Date();
-  to.setDate(to.getDate() + 30);
+  to.setDate(to.getDate() + 400);
   return { from: toDateInput(from), to: toDateInput(to) };
 }
 

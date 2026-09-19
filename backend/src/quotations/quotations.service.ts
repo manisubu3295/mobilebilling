@@ -10,6 +10,7 @@ const QUOTATION_PREFIX = 'QUO';
 const INVOICE_PREFIX = 'INV';
 
 const quotationInclude = {
+  store: true,
   customer: true,
   createdBy: { select: { name: true, role: true } },
   items: { include: { sku: { include: { product: { include: { category: true } } } } } },
