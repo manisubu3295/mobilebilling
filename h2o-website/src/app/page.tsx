@@ -32,11 +32,7 @@ const pageHtml = `
   <input type="checkbox" id="menu-toggle" class="menu-toggle-input" />
   <div class="wrap site-nav">
     <a href="#home" class="logo">
-      <svg class="logo-mark" viewBox="0 0 32 32" fill="none">
-        <circle cx="16" cy="16" r="15" fill="var(--fresh)" opacity="0.16"/>
-        <path d="M16 5C16 5 8 15.5 8 20.5C8 25.2 11.6 28 16 28C20.4 28 24 25.2 24 20.5C24 15.5 16 5 16 5Z" fill="var(--brand)"/>
-        <path d="M12.5 21.5C12.5 23.5 14 24.8 16 24.8" stroke="var(--fresh-glow)" stroke-width="1.6" stroke-linecap="round"/>
-      </svg>
+      <img class="logo-mark" src="/images/logo-mark.png" alt="" width="32" height="32" />
       <span class="logo-word">H2O</span>
     </a>
     <nav>
@@ -54,7 +50,7 @@ const pageHtml = `
     <div class="nav-cta">
       <a class="staff-login" href="https://billing.h2owaterpurifier.com/login" target="_blank" rel="noopener noreferrer">Staff Login</a>
       <a class="nav-phone" href="tel:+918754816289">+91 87548 16289</a>
-      <a class="btn btn-outline" href="tel:+918754816289">Call Now</a>
+      <a class="btn btn-primary" href="https://wa.me/918754816289?text=Hi%2C%20I%27d%20like%20to%20book%20a%20free%20water%20test" target="_blank" rel="noopener noreferrer">WhatsApp Us</a>
       <label for="menu-toggle" class="menu-toggle" aria-label="Toggle menu">
         <span></span>
       </label>
@@ -70,8 +66,8 @@ const pageHtml = `
     <a href="#faq">FAQ</a>
     <a href="#contact">Contact</a>
     <a href="https://billing.h2owaterpurifier.com/login" target="_blank" rel="noopener noreferrer">Staff Login</a>
-    <a class="btn btn-primary" href="tel:+918754816289">Call +91 87548 16289</a>
-    <a class="btn btn-outline" href="https://wa.me/918754816289?text=Hi%2C%20I%27d%20like%20to%20book%20a%20free%20water%20test" target="_blank" rel="noopener noreferrer">WhatsApp Us</a>
+    <a class="btn btn-primary" href="https://wa.me/918754816289?text=Hi%2C%20I%27d%20like%20to%20book%20a%20free%20water%20test" target="_blank" rel="noopener noreferrer">WhatsApp Us</a>
+    <a class="btn btn-outline" href="tel:+918754816289">Call +91 87548 16289</a>
   </nav>
 </header>
 
@@ -86,13 +82,13 @@ const pageHtml = `
       <h1>Kumbakonam's water,<br>engineered pure.</h1>
       <p class="lede">H2O is Kumbakonam's water filter supplier and RO service near you — sales, repair and AMC for every type of water purifier, any brand: RO, UV, UF, softeners and iron removal filters, for homes and businesses across the city, from raw water at the tap to a glass you don't have to think twice about.</p>
       <div class="hero-actions">
-        <a class="btn btn-primary" href="tel:+918754816289">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C10.6 21 3 13.4 3 4c0-.6.4-1 1-1h3.4c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.4 0 .8-.2 1L6.6 10.8Z" fill="currentColor"/></svg>
-          Call Now
-        </a>
-        <a class="btn btn-ghost" href="https://wa.me/918754816289?text=Hi%2C%20I%27d%20like%20to%20book%20a%20free%20water%20test" target="_blank" rel="noopener noreferrer">
+        <a class="btn btn-primary" href="https://wa.me/918754816289?text=Hi%2C%20I%27d%20like%20to%20book%20a%20free%20water%20test" target="_blank" rel="noopener noreferrer">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M17.5 14.4c-.3-.1-1.6-.8-1.9-.9-.2-.1-.4-.1-.6.1-.2.3-.7.9-.8 1-.1.2-.3.2-.5.1-.3-.1-1.2-.4-2.2-1.4-.8-.7-1.4-1.6-1.6-1.9-.1-.2 0-.4.1-.5.1-.1.3-.3.4-.5.1-.1.2-.3.2-.4.1-.2 0-.3 0-.5-.1-.1-.6-1.4-.8-1.9-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.5.1-.7.3-.2.3-.9.9-.9 2.1 0 1.2.9 2.4 1 2.6.1.2 1.8 2.8 4.4 3.9.6.3 1.1.4 1.5.6.6.2 1.2.2 1.6.1.5-.1 1.6-.6 1.8-1.3.2-.6.2-1.2.2-1.3-.1-.1-.2-.2-.5-.3Z" fill="currentColor"/><path d="M12 2a10 10 0 0 0-8.6 15L2 22l5.2-1.4A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.1l-.3-.2-3.1.8.8-3-.2-.3A8.2 8.2 0 1 1 12 20.2Z" fill="currentColor"/></svg>
           WhatsApp Us
+        </a>
+        <a class="btn btn-ghost" href="tel:+918754816289">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C10.6 21 3 13.4 3 4c0-.6.4-1 1-1h3.4c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.4 0 .8-.2 1L6.6 10.8Z" fill="currentColor"/></svg>
+          Call Now
         </a>
       </div>
       <div class="hero-meta">
@@ -197,7 +193,7 @@ const pageHtml = `
       <h2 style="font-size:clamp(26px,3.6vw,36px); font-weight:700;">A local water filter supplier, built around one job.</h2>
       <p>H2O is a Kumbakonam-based water filter supplier, serving the city for 4+ years — sales and service for all types of water filters and purifiers. We install, service and maintain RO, UV, UF and softener systems, using genuine filters and cartridges, and we stay on call long after installation for annual maintenance, filter changes and repairs.</p>
       <p>Whether you're setting up a filter for the first time or your existing one needs a service, we test your water on-site, explain what it actually needs, and fit the right system for your household — not the most expensive one.</p>
-      <a class="btn btn-primary" href="tel:+918754816289" style="margin-top:4px; width:fit-content;">Get a Free Water Test</a>
+      <a class="btn btn-primary" href="https://wa.me/918754816289?text=Hi%2C%20I%27d%20like%20to%20book%20a%20free%20water%20test" target="_blank" rel="noopener noreferrer" style="margin-top:4px; width:fit-content;">Get a Free Water Test</a>
     </div>
     <div class="about-panel">
       <div class="about-photo">
@@ -304,7 +300,7 @@ const pageHtml = `
     </div>
     <div class="pricing-cta">
       <a class="btn btn-primary" href="/products">See systems &amp; real prices</a>
-      <a class="btn btn-outline" href="tel:+918754816289">Ask for a quote</a>
+      <a class="btn btn-outline" href="https://wa.me/918754816289?text=Hi%2C%20I%27d%20like%20a%20quote" target="_blank" rel="noopener noreferrer">Ask for a quote</a>
     </div>
   </div>
 </section>
@@ -316,7 +312,7 @@ const pageHtml = `
   <div class="wrap media-block-inner">
     <h2>Every installation, done properly.</h2>
     <p class="media-caption">Site survey, fitting, and a full walkthrough of your new system at your home — nothing rushed, nothing left unexplained.</p>
-    <a class="btn btn-primary" href="tel:+918754816289">Call +91 87548 16289</a>
+    <a class="btn btn-primary" href="https://wa.me/918754816289?text=Hi%2C%20I%27d%20like%20to%20book%20an%20installation" target="_blank" rel="noopener noreferrer">WhatsApp Us</a>
   </div>
 </section>
 
@@ -429,10 +425,10 @@ const pageHtml = `
     <div id="contact" class="contact">
       <div>
         <h2>Ready for water you don't have to think about?</h2>
-        <p class="lede">Call for a free site visit and water test — most installations in Kumbakonam are scheduled within a few days.</p>
+        <p class="lede">Message us for a free site visit and water test — most installations in Kumbakonam are scheduled within a few days.</p>
         <div class="hero-actions" style="margin-top:22px;">
-          <a class="btn btn-primary" href="tel:+918754816289">Call +91 87548 16289</a>
-          <a class="btn btn-outline" href="https://wa.me/918754816289?text=Hi%2C%20I%27d%20like%20to%20book%20a%20free%20water%20test" target="_blank" rel="noopener noreferrer">WhatsApp Us</a>
+          <a class="btn btn-primary" href="https://wa.me/918754816289?text=Hi%2C%20I%27d%20like%20to%20book%20a%20free%20water%20test" target="_blank" rel="noopener noreferrer">WhatsApp Us</a>
+          <a class="btn btn-outline" href="tel:+918754816289">Call +91 87548 16289</a>
         </div>
         <p style="margin-top:24px; font-size:13px; color:var(--ink-faint);">Also serving Thanjavur, Papanasam, Thiruvidaimarudur, Swamimalai and Darasuram.</p>
       </div>
@@ -470,14 +466,17 @@ const pageHtml = `
 <section class="callout">
   <div class="wrap callout-inner">
     <h2>Book your free water test today.</h2>
-    <a class="btn btn-primary" href="tel:+918754816289">Call +91 87548 16289</a>
+    <a class="btn btn-primary" href="https://wa.me/918754816289?text=Hi%2C%20I%27d%20like%20to%20book%20a%20free%20water%20test" target="_blank" rel="noopener noreferrer">WhatsApp Us</a>
   </div>
 </section>
 
 <footer class="site">
   <div class="wrap footer-row">
     <div class="footer-brand">
-      <span class="logo-word" style="font-family:'Sora',sans-serif; font-weight:800;">H2O Water Care</span>
+      <span style="display:flex; align-items:center; gap:8px;">
+        <img src="/images/logo-mark.png" alt="" width="22" height="22" style="display:block;" />
+        <span class="logo-word" style="font-family:'Sora',sans-serif; font-weight:800;">H2O Water Care</span>
+      </span>
       <span>&copy; 2026 H2O Water Care</span>
       <a href="https://billing.h2owaterpurifier.com/login" target="_blank" rel="noopener noreferrer" style="font-size:12px; text-decoration:none;">Staff Login</a>
     </div>

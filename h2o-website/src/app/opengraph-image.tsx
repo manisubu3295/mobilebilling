@@ -1,11 +1,15 @@
 import { ImageResponse } from 'next/og';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 
-export const runtime = 'edge';
 export const alt = 'H2O Water Care — Kumbakonam';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
 
-export default function OpengraphImage() {
+export default async function OpengraphImage() {
+  const logoMark = await readFile(path.join(process.cwd(), 'public/images/logo-mark.png'));
+  const logoMarkSrc = `data:image/png;base64,${logoMark.toString('base64')}`;
+
   return new ImageResponse(
     (
       <div
@@ -37,10 +41,10 @@ export default function OpengraphImage() {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: 34,
             }}
           >
-            💧
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={logoMarkSrc} width={44} height={44} alt="" />
           </div>
           <div style={{ fontSize: 36, fontWeight: 800, color: '#fff', letterSpacing: -1 }}>
             H2O Water Care

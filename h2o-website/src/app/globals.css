@@ -139,15 +139,12 @@ img { max-width: 100%; }
   }
   .logo { display: flex; align-items: center; gap: 9px; text-decoration: none; }
   .logo-word { font-family: var(--font-sora), sans-serif; font-weight: 800; font-size: 20px; letter-spacing: -0.02em; color: var(--on-brand); }
-  /* The real logo file is a vertical lockup (icon, then "WATER CARE" text
-     stacked below) — cropped to just the icon here so it sits in a
-     horizontal nav lockup next to coded (recolourable) text instead of the
-     baked-in navy wordmark, which would vanish on the navy header/footer. */
-  .logo-mark-img {
-    display: block; width: 32px; aspect-ratio: 1856 / 1756; overflow: hidden; flex-shrink: 0;
-  }
-  .logo-mark-img img { width: 100%; height: 130%; object-fit: cover; object-position: top; display: block; }
-  .footer-logo { display: flex; align-items: center; gap: 8px; }
+  /* The real logo file (public/images/logo.png) is a vertical lockup — icon,
+     then "WATER CARE" text stacked below in a fixed navy that would vanish
+     on the navy header/footer. logo-mark.png is a pre-cropped, icon-only
+     version of the same file, sized here to sit next to the coded
+     (recolourable) "H2O" text instead. */
+  .logo-mark { display: block; width: 32px; height: 32px; flex-shrink: 0; }
   .nav-links { display: flex; gap: 28px; list-style: none; margin: 0; padding: 0; }
   .nav-links a {
     text-decoration: none; color: color-mix(in srgb, var(--on-brand) 72%, transparent); font-size: 14.5px; font-weight: 500;
