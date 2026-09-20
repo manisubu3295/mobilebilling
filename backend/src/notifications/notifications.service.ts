@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { NotificationStatus } from '@prisma/client';
+import { NotificationStatus, NotificationType } from '@prisma/client';
 
 @Injectable()
 export class NotificationsService {
@@ -13,10 +13,25 @@ export class NotificationsService {
     });
   }
 
-  unreadCount(storeId: string) {
+  unreadCount(storeId: string, type?: NotificationType) {
     return this.prisma.notification.count({
-      where: { storeId, status: { in: [NotificationStatus.UNREAD, NotificationStatus.ACTION_NOTED] } },
+      where: {
+        storeId,
+        ...(type ? { type } : {}),
+        status: { in: [NotificationStatus.UNREAD, NotificationStatus.ACTION_NOTED] },
+      },
     });
+  }
+
+  // Bulk mark-as-read for a whole notification type — used by list pages
+  // (e.g. Website Leads) where simply viewing the list counts as "read",
+  // rather than requiring the admin to acknowledge each entry one by one.
+  async markTypeRead(storeId: string, type: NotificationType) {
+    await this.prisma.notification.updateMany({
+      where: { storeId, type, status: { in: [NotificationStatus.UNREAD, NotificationStatus.ACTION_NOTED] } },
+      data: { status: NotificationStatus.ACKNOWLEDGED },
+    });
+    return { marked: true };
   }
 
   private async _findOpen(id: string, storeId: string) {

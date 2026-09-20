@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { MasterPrismaService } from '../master-prisma/master-prisma.service';
 import { TenantConnectionManager } from '../prisma/tenant-connection.manager';
-import { LeadStatus } from '@prisma/client';
+import { LeadStatus, NotificationType } from '@prisma/client';
 import { CreateLeadDto } from './dto/create-lead.dto';
 import { UpdateLeadDto } from './dto/update-lead.dto';
 import { CreateWebsiteProductDto } from './dto/create-website-product.dto';
@@ -68,7 +68,7 @@ export class WebsiteService {
     );
     if (duplicate) return duplicate;
 
-    return tenant.lead.create({
+    const lead = await tenant.lead.create({
       data: {
         storeId: store.id,
         customerName: dto.customerName,
@@ -80,6 +80,19 @@ export class WebsiteService {
         source: dto.source,
       },
     });
+
+    const itemsSummary = (dto.items || []).map((i) => `${i.name} x${i.qty}`).join(', ');
+    await tenant.notification.create({
+      data: {
+        storeId: store.id,
+        type: NotificationType.NEW_LEAD,
+        leadId: lead.id,
+        title: `New enquiry — ${dto.customerName}`,
+        body: itemsSummary ? `${dto.phone} — ${itemsSummary}` : `${dto.phone} — ${dto.message || 'No message'}`,
+      },
+    });
+
+    return lead;
   }
 
   // ─── Admin (authenticated, tenant-scoped) management ──────────────────────

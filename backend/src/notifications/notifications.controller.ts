@@ -4,7 +4,7 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { Role, NotificationStatus } from '@prisma/client';
+import { Role, NotificationStatus, NotificationType } from '@prisma/client';
 
 const ADMIN_ROLES = [Role.SUPER_ADMIN, Role.STORE_MANAGER];
 
@@ -21,8 +21,13 @@ export class NotificationsController {
   }
 
   @Get('unread-count')
-  unreadCount(@CurrentUser('storeId') storeId: string) {
-    return this.notificationsService.unreadCount(storeId);
+  unreadCount(@CurrentUser('storeId') storeId: string, @Query('type') type?: NotificationType) {
+    return this.notificationsService.unreadCount(storeId, type);
+  }
+
+  @Patch('mark-read')
+  markTypeRead(@CurrentUser('storeId') storeId: string, @Body() body: { type: NotificationType }) {
+    return this.notificationsService.markTypeRead(storeId, body.type);
   }
 
   @Patch(':id/acknowledge')

@@ -49,7 +49,12 @@ export default function WebsiteLeadsPage() {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+    // Viewing the list is what "reads" a new-lead notification — clears the
+    // sidebar badge without requiring a separate per-lead acknowledge action.
+    api.patch('/notifications/mark-read', { type: 'NEW_LEAD' }).catch(() => {});
+  }, [load]);
 
   const visible = statusFilter === 'ALL' ? leads : leads.filter((l) => l.status === statusFilter);
 

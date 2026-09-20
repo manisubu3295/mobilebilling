@@ -48,6 +48,7 @@ enum ServiceJobStatus {
 
 enum NotificationType {
   SERVICE_JOB_COMPLETED
+  NEW_LEAD
 }
 
 enum NotificationStatus {
@@ -566,6 +567,8 @@ model Notification {
   type         NotificationType
   serviceJobId String?             @map("service_job_id")
   serviceJob   ServiceJob?         @relation(fields: [serviceJobId], references: [id], onDelete: SetNull)
+  leadId       String?             @map("lead_id")
+  lead         Lead?               @relation(fields: [leadId], references: [id], onDelete: SetNull)
   title        String
   body         String
   status       NotificationStatus  @default(UNREAD)
@@ -667,6 +670,7 @@ model Lead {
   notes        String?
   createdAt    DateTime   @default(now()) @map("created_at")
   updatedAt    DateTime   @updatedAt @map("updated_at")
+  notifications Notification[]
 
   @@index([storeId, status])
   @@map("leads")

@@ -74,6 +74,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const { user, account, logout, isAuthenticated, hasHydrated } = useAuthStore();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [dueCount, setDueCount] = useState(0);
+  const [newLeadsCount, setNewLeadsCount] = useState(0);
   const [bannerDismissed, setBannerDismissed] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
 
@@ -104,6 +105,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const interval = setInterval(load, 60000);
     return () => clearInterval(interval);
   }, [account?.serviceModuleEnabled, isAdminRole]);
+
+  // Website Leads badge: unread NEW_LEAD notifications, polled separately
+  // from the service due-count since it's gated by websiteModule, not
+  // serviceModule. Cleared by the Leads page itself marking them read.
+  useEffect(() => {
+    if (!account?.websiteEnabled || !isAdminRole) return;
+    const load = () => {
+      api.get('/notifications/unread-count', { params: { type: 'NEW_LEAD' } })
+        .then((res) => setNewLeadsCount(res.data ?? 0))
+        .catch(() => {});
+    };
+    load();
+    const interval = setInterval(load, 60000);
+    return () => clearInterval(interval);
+  }, [account?.websiteEnabled, isAdminRole]);
 
   const licenseDaysLeft = account?.licenseExpiresAt
     ? Math.ceil((new Date(account.licenseExpiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
@@ -170,6 +186,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 >
                   <item.icon className="h-4 w-4 shrink-0" />
                   {item.label}
+                  {item.href === '/website/leads' && newLeadsCount > 0 && (
+                    <span className="ml-auto bg-red-600 text-white text-[10px] leading-none rounded-full h-4 min-w-[16px] px-1 flex items-center justify-center">
+                      {newLeadsCount > 99 ? '99+' : newLeadsCount}
+                    </span>
+                  )}
                 </Link>
               );
             })}
