@@ -1,9 +1,22 @@
 import { IsArray, IsBoolean, IsInt, IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator';
 
 export class CreateWebsiteProductDto {
+  // Free-text category — optional when categoryId is given (its name is used).
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  category: string;
+  category?: string;
+
+  @IsOptional()
+  @IsString()
+  categoryId?: string | null;
+
+  @IsOptional()
+  @IsString()
+  subCategoryId?: string | null;
+
+  @IsOptional()
+  @IsString()
+  brand?: string | null;
 
   @IsString()
   @IsNotEmpty()

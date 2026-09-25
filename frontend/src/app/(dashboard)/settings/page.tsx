@@ -4,11 +4,13 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Save, Store, QrCode, Upload, X, CheckCircle, CalendarClock, Globe } from 'lucide-react';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
+import { BillNumberSettings, WarrantyCardSettings } from '@/components/settings/BillNumberSettings';
 
 export default function SettingsPage() {
   const { user, account, setAccount } = useAuthStore();
-  const [form, setForm] = useState({ name: '', address: '', phone: '', gstNumber: '', staticQrUrl: '' });
+  const [form, setForm] = useState({ name: '', address: '', phone: '', gstNumber: '', staticQrUrl: '', logoUrl: '' });
   const [lookaheadDays, setLookaheadDays] = useState('30');
+  const [warrantyTerms, setWarrantyTerms] = useState('');
   const [siteKey, setSiteKey] = useState('');
   const [savingWebsite, setSavingWebsite] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -28,8 +30,10 @@ export default function SettingsPage() {
         phone: data.phone || '',
         gstNumber: data.gstNumber || '',
         staticQrUrl: data.staticQrUrl || '',
+        logoUrl: data.logoUrl || '',
       });
       setLookaheadDays(String(data.nextServiceLookaheadDays ?? 30));
+      setWarrantyTerms(data.warrantyCardTerms || '');
     }).catch(() => {
       if (user?.store) setForm((f) => ({ ...f, name: user.store.name || '' }));
     });
@@ -45,6 +49,7 @@ export default function SettingsPage() {
         phone: payload.phone,
         gstNumber: payload.gstNumber,
         staticQrUrl: payload.staticQrUrl || undefined,
+        logoUrl: payload.logoUrl || null,
       });
       if (fields) setForm((f) => ({ ...f, ...fields }));
       setSaved(true);
@@ -80,6 +85,31 @@ export default function SettingsPage() {
     reader.onload = () => {
       const base64 = reader.result as string;
       setForm((f) => ({ ...f, staticQrUrl: base64 }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Logo is downscaled in the browser (max 400px, PNG keeps transparency) so
+  // the base64 stored on the store row stays small — it's embedded in every
+  // printed bill and warranty card.
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { setError('Please select an image file.'); return; }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new window.Image();
+      img.onload = () => {
+        const scale = Math.min(1, 400 / Math.max(img.width, img.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        canvas.getContext('2d')?.drawImage(img, 0, 0, canvas.width, canvas.height);
+        setForm((f) => ({ ...f, logoUrl: canvas.toDataURL('image/png') }));
+      };
+      img.onerror = () => setError('Could not read that image.');
+      img.src = reader.result as string;
     };
     reader.readAsDataURL(file);
   };
@@ -159,6 +189,25 @@ export default function SettingsPage() {
               />
             </div>
             <Field label="GSTIN" value={form.gstNumber} onChange={f('gstNumber')} placeholder="33XXXXX1234X1ZX" />
+            <div className="sm:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Logo (printed on bills and warranty cards)</label>
+              <div className="flex items-center gap-3">
+                {form.logoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={form.logoUrl} alt="Store logo" className="h-16 w-16 object-contain border rounded-lg bg-white" />
+                ) : (
+                  <div className="h-16 w-16 border border-dashed rounded-lg flex items-center justify-center text-xs text-gray-400">No logo</div>
+                )}
+                <label className="flex items-center gap-2 px-3 py-2 border rounded-lg text-sm text-gray-700 cursor-pointer hover:bg-gray-50">
+                  <Upload className="h-4 w-4" /> Upload
+                  <input type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
+                </label>
+                {form.logoUrl && (
+                  <button onClick={() => setForm((p) => ({ ...p, logoUrl: '' }))} className="text-sm text-red-600 hover:text-red-800">Remove</button>
+                )}
+              </div>
+              <p className="text-xs text-gray-400 mt-1">Click Save Changes after uploading.</p>
+            </div>
           </div>
 
           <button onClick={() => handleSave()} disabled={saving}
@@ -166,6 +215,12 @@ export default function SettingsPage() {
             <Save className="h-4 w-4" /> {saving ? 'Saving…' : 'Save Changes'}
           </button>
         </div>
+
+        <BillNumberSettings canEdit={user?.role === 'SUPER_ADMIN'} showService={!!account?.serviceModuleEnabled} />
+
+        {account?.serviceModuleEnabled && (
+          <WarrantyCardSettings initial={warrantyTerms} canEdit={user?.role === 'SUPER_ADMIN'} />
+        )}
 
         {/* Service Settings */}
         {account?.serviceModuleEnabled && (

@@ -15,6 +15,11 @@ export class WebsitePublicController {
     return this.websiteService.listPublicProducts(siteKey);
   }
 
+  @Get('categories')
+  listCategories(@Param('siteKey') siteKey: string) {
+    return this.websiteService.listPublicCategories(siteKey);
+  }
+
   @Post('leads')
   @Throttle({ default: { ttl: 60000, limit: 5 } })
   @HttpCode(HttpStatus.CREATED)

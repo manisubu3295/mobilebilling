@@ -6,6 +6,9 @@ const BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:4000/api/v1/p
 export interface WebsiteProduct {
   id: string;
   category: string;
+  categoryId?: string | null;
+  subCategoryId?: string | null;
+  brand?: string | null;
   name: string;
   shortDescription: string | null;
   description: string | null;
@@ -21,6 +24,24 @@ export async function fetchProducts(): Promise<WebsiteProduct[]> {
   const res = await fetch(`${BASE}/products`, { cache: 'no-store' });
   if (!res.ok) return [];
   return res.json();
+}
+
+export interface CatalogCategory {
+  id: string;
+  name: string;
+  children: { id: string; name: string }[];
+}
+
+// Category → sub-category menu. Empty when the store hasn't set one up; the
+// shop then falls back to grouping by each product's category name.
+export async function fetchCategories(): Promise<CatalogCategory[]> {
+  try {
+    const res = await fetch(`${BASE}/categories`, { cache: 'no-store' });
+    if (!res.ok) return [];
+    return res.json();
+  } catch {
+    return [];
+  }
 }
 
 export interface LeadInput {

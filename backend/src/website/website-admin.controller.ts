@@ -9,6 +9,7 @@ import { WebsiteService } from './website.service';
 import { CreateWebsiteProductDto } from './dto/create-website-product.dto';
 import { UpdateWebsiteProductDto } from './dto/update-website-product.dto';
 import { UpdateLeadDto } from './dto/update-lead.dto';
+import { CreateWebsiteCategoryDto, UpdateWebsiteCategoryDto } from './dto/website-category.dto';
 
 const ADMIN_ROLES = [Role.SUPER_ADMIN, Role.STORE_MANAGER];
 
@@ -40,6 +41,35 @@ export class WebsiteAdminController {
   @Delete('website-products/:id')
   deleteProduct(@Param('id') id: string, @CurrentUser('storeId') storeId: string) {
     return this.websiteService.deleteProduct(id, storeId);
+  }
+
+  @Get('website-categories')
+  listCategories(@CurrentUser('storeId') storeId: string) {
+    return this.websiteService.listCategories(storeId);
+  }
+
+  @Post('website-categories')
+  createCategory(@Body() dto: CreateWebsiteCategoryDto, @CurrentUser('storeId') storeId: string) {
+    return this.websiteService.createCategory(storeId, dto);
+  }
+
+  @Post('website-categories/load-defaults')
+  loadDefaultCategories(@CurrentUser('storeId') storeId: string) {
+    return this.websiteService.loadDefaultCategories(storeId);
+  }
+
+  @Patch('website-categories/:id')
+  updateCategory(
+    @Param('id') id: string,
+    @Body() dto: UpdateWebsiteCategoryDto,
+    @CurrentUser('storeId') storeId: string,
+  ) {
+    return this.websiteService.updateCategory(id, storeId, dto);
+  }
+
+  @Delete('website-categories/:id')
+  deleteCategory(@Param('id') id: string, @CurrentUser('storeId') storeId: string) {
+    return this.websiteService.deleteCategory(id, storeId);
   }
 
   @Get('leads')

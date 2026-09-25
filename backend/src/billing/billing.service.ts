@@ -6,12 +6,14 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
-import { Role, StockStatus, AuditAction, InvoiceStatus, ProductType, PaymentMode } from '@prisma/client';
+import { Role, StockStatus, AuditAction, InvoiceStatus, ProductType, PaymentMode, BillType, BillSeries } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { unitAllowsDecimal } from '../common/units';
+import { assignBillNo, assertBillNoFree, nextInvoiceNumber, seriesFor } from './bill-numbers';
 
-const INVOICE_PREFIX = 'INV';
 const DISCOUNT_HARD_CAP = 15;
+export const SERVICE_CHARGE_PRODUCT_NAME = 'Service Visit Charge';
+const SERVICE_CHARGE_CATEGORY_NAME = 'Services';
 
 @Injectable()
 export class BillingService {
@@ -38,8 +40,25 @@ export class BillingService {
       );
     }
 
+    const billType = dto.billType ?? BillType.SALES;
+    const isServiceBill = billType === BillType.SERVICE;
+
+    if (dto.technicianId) {
+      const tech = await this.prisma.user.findFirst({ where: { id: dto.technicianId, storeId }, select: { id: true } });
+      if (!tech) throw new BadRequestException('Technician not found');
+    }
+
+    // Free-typed lines (no skuId) bill against the non-stock service-charge SKU.
+    const freeLines = dto.items.filter((i) => !i.skuId);
+    for (const line of freeLines) {
+      if (!line.description?.trim() || line.unitPrice === undefined) {
+        throw new BadRequestException('A typed-in line needs a description and a price');
+      }
+    }
+    const chargeSku = freeLines.length > 0 ? await this.getOrCreateServiceChargeSku(storeId) : null;
+
     // Pre-validate all SKUs exist BEFORE the transaction
-    const skuIds = dto.items.map((i) => i.skuId);
+    const skuIds = Array.from(new Set(dto.items.filter((i) => i.skuId).map((i) => i.skuId!)));
     const skus = await this.prisma.sKU.findMany({
       where: { id: { in: skuIds }, storeId },
       include: { product: true },
@@ -48,9 +67,12 @@ export class BillingService {
       throw new NotFoundException('One or more SKUs not found in this store');
     }
 
+    const skuFor = (item: { skuId?: string }) =>
+      item.skuId ? skus.find((s) => s.id === item.skuId)! : { ...chargeSku!, product: chargeSku!.product };
+
     // Pre-validate stock availability
     for (const item of dto.items) {
-      const sku = skus.find((s) => s.id === item.skuId)!;
+      const sku = skuFor(item);
 
       // Serial units are always sold one at a time; anything else stays whole
       // unless its unit is measured by weight/volume/length (KG, LITER, METER).
@@ -97,31 +119,44 @@ export class BillingService {
         taxAmount: Decimal;
         lineTotal: Decimal;
         hsnCode: string | null;
+        description: string | null;
         serialUnitIds: string[];
         isSerialized: boolean;
+        requiresService: boolean;
+        productId: string;
       }> = [];
 
       for (const item of dto.items) {
-        const sku = skus.find((s) => s.id === item.skuId)!;
-        const { serialUnitIds } = await this.allocateStockForItem(tx, storeId, sku, item.quantity, item.serialIds);
+        const sku = skuFor(item);
+        const isFree = !item.skuId;
+        const { serialUnitIds } = isFree
+          ? { serialUnitIds: [] as string[] }
+          : await this.allocateStockForItem(tx, storeId, sku, item.quantity, item.serialIds);
 
-        const unitPrice = sku.sellingPrice;
-        const taxRate = sku.taxRate;
+        // Service bills (and typed-in lines) take the price the technician
+        // actually charged; counter sales always use the SKU's selling price.
+        const unitPrice = (isFree || isServiceBill) && item.unitPrice !== undefined
+          ? new Decimal(item.unitPrice)
+          : sku.sellingPrice;
+        const taxRate = isFree && item.taxRate !== undefined ? new Decimal(item.taxRate) : sku.taxRate;
         const lineSubtotal = unitPrice.mul(item.quantity);
         const itemTax = gstApplied ? lineSubtotal.mul(taxRate).div(100) : new Decimal(0);
 
         subtotal = subtotal.add(lineSubtotal);
         taxTotal = taxTotal.add(itemTax);
         itemRecords.push({
-          skuId: item.skuId,
+          skuId: sku.id,
           quantity: item.quantity,
           unitPrice,
           taxRate,
           taxAmount: itemTax,
           lineTotal: lineSubtotal.add(itemTax),
           hsnCode: sku.product.hsnCode ?? null,
+          description: item.description?.trim() || null,
           serialUnitIds,
           isSerialized: sku.isSerialized,
+          requiresService: sku.product.requiresService,
+          productId: sku.productId,
         });
       }
 
@@ -132,6 +167,21 @@ export class BillingService {
       } else if (dto.discountType === 'FLAT' && dto.discountValue) {
         discountAmount = new Decimal(dto.discountValue);
       }
+      if (discountAmount.greaterThan(subtotal)) discountAmount = subtotal;
+
+      // A discount given at sale reduces the taxable value (GST law), so tax
+      // is charged on each line's share of the discounted amount — the lines
+      // keep their full price and the invoice-level discount is shown once.
+      if (discountAmount.greaterThan(0) && gstApplied && subtotal.greaterThan(0)) {
+        const ratio = subtotal.sub(discountAmount).div(subtotal);
+        taxTotal = new Decimal(0);
+        for (const rec of itemRecords) {
+          const lineSubtotal = rec.unitPrice.mul(rec.quantity);
+          rec.taxAmount = lineSubtotal.mul(ratio).mul(rec.taxRate).div(100).toDecimalPlaces(2);
+          rec.lineTotal = lineSubtotal.add(rec.taxAmount);
+          taxTotal = taxTotal.add(rec.taxAmount);
+        }
+      }
 
       const totalAmount = subtotal.add(taxTotal).sub(discountAmount);
       const paidDecimal = new Decimal(dto.payments.reduce((s, p) => s + p.amount, 0));
@@ -139,9 +189,9 @@ export class BillingService {
         ? InvoiceStatus.PAID
         : InvoiceStatus.PARTIALLY_PAID;
 
-      // ── 4. Invoice number ─────────────────────────────────────────────────
-      const count = await tx.invoice.count({ where: { storeId } });
-      const invoiceNumber = `${INVOICE_PREFIX}-${storeId.slice(-4).toUpperCase()}-${String(count + 1).padStart(6, '0')}`;
+      // ── 4. Invoice number + printed bill number ───────────────────────────
+      const invoiceNumber = await nextInvoiceNumber(tx, storeId);
+      const bill = await assignBillNo(tx, storeId, seriesFor(billType, gstApplied), new Date(), dto.billNo);
 
       // ── 5. UPI QR payload ─────────────────────────────────────────────────
       const upiVpa = process.env.STORE_UPI_VPA || '';
@@ -179,6 +229,12 @@ export class BillingService {
           managerOverride: requiresOverride,
           overriddenById: requiresOverride ? userId : null,
           qrPayload,
+          billType,
+          ...bill,
+          serviceCategory: dto.serviceCategory ?? null,
+          technicianId: dto.technicianId || null,
+          tdsRaw: dto.tdsRaw?.trim() || null,
+          tdsTreated: dto.tdsTreated?.trim() || null,
         },
       });
 
@@ -194,6 +250,7 @@ export class BillingService {
             taxAmount: rec.taxAmount,
             lineTotal: rec.lineTotal,
             hsnCode: rec.hsnCode,
+            description: rec.description,
           },
         });
 
@@ -207,14 +264,13 @@ export class BillingService {
         // Water-purifier-style service module: products opted in via
         // `requiresService` get a pending warranty claim per unit sold, for
         // an admin to later approve with a period + recurring service frequency.
-        const soldSku = skus.find((s) => s.id === rec.skuId)!;
-        if (soldSku.product.requiresService && dto.customerId) {
+        if (rec.requiresService && dto.customerId) {
           await tx.warranty.create({
             data: {
               storeId,
               customerId: dto.customerId,
               invoiceItemId: invoiceItem.id,
-              productId: soldSku.productId,
+              productId: rec.productId,
               startDate: newInvoice.createdAt,
             },
           });
@@ -241,7 +297,7 @@ export class BillingService {
           action: AuditAction.INVOICE_CREATE,
           entityType: 'Invoice',
           entityId: newInvoice.id,
-          newValues: { invoiceNumber, totalAmount: totalAmount.toString() },
+          newValues: { invoiceNumber, billNo: bill.billNo, billSeries: bill.billSeries, totalAmount: totalAmount.toString() },
           ipAddress: ipAddress || null,
         },
       });
@@ -262,6 +318,7 @@ export class BillingService {
         customer: true,
         store: true,
         createdBy: { select: { name: true, role: true } },
+        technician: { select: { id: true, name: true } },
       },
     });
     return this._serializeInvoiceItemQuantities(created);
@@ -332,6 +389,7 @@ export class BillingService {
         customer: true,
         store: true,
         createdBy: { select: { name: true, role: true } },
+        technician: { select: { id: true, name: true } },
       },
     });
     if (!invoice) throw new NotFoundException('Invoice not found');
@@ -363,16 +421,20 @@ export class BillingService {
     from?: string,
     to?: string,
     status?: string,
+    type?: string,
   ) {
     const skip = (page - 1) * limit;
 
-    const where: any = { storeId };
+    const where: any = { storeId, ...this._typeFilter(type) };
 
     if (search?.trim()) {
       const q = search.trim();
       where.OR = [
         { invoiceNumber: { contains: q, mode: 'insensitive' } },
+        { billNo: { equals: q.replace(/^0+/, '').padStart(3, '0') } },
+        { billNo: { equals: q } },
         { customer: { name: { contains: q, mode: 'insensitive' } } },
+        { customer: { cardNo: { equals: q } } },
         { customer: { phone: { contains: q, mode: 'insensitive' } } },
       ];
     }
@@ -391,7 +453,7 @@ export class BillingService {
     const [data, total] = await Promise.all([
       this.prisma.invoice.findMany({
         where,
-        include: { customer: true, createdBy: { select: { name: true } } },
+        include: { customer: true, createdBy: { select: { name: true } }, technician: { select: { name: true } } },
         orderBy: { createdAt: 'desc' },
         skip,
         take: limit,
@@ -401,11 +463,20 @@ export class BillingService {
     return { data, total, page, limit };
   }
 
+  // SALES / SERVICE = bill type; GST = the GST tax invoices only (the
+  // auditor's register — non-GST sales and service bills stay out of it).
+  private _typeFilter(type?: string): Record<string, unknown> {
+    if (type === 'SALES') return { billType: BillType.SALES };
+    if (type === 'SERVICE') return { billType: BillType.SERVICE };
+    if (type === 'GST') return { gstApplied: true, billType: BillType.SALES };
+    return {};
+  }
+
   // Unpaginated — every invoice in range, for the GST report export (CSV/
   // Excel/PDF need every row, not one page). Invoice-level GST fields
   // (subtotal/taxAmount/gstApplied) are plain columns, so no item join needed.
-  async listInvoicesForExport(storeId: string, from?: string, to?: string) {
-    const where: any = { storeId };
+  async listInvoicesForExport(storeId: string, from?: string, to?: string, type?: string) {
+    const where: any = { storeId, ...this._typeFilter(type) };
     if (from || to) {
       where.createdAt = {};
       if (from) where.createdAt.gte = new Date(from + 'T00:00:00+05:30');
@@ -413,7 +484,10 @@ export class BillingService {
     }
     return this.prisma.invoice.findMany({
       where,
-      include: { customer: { select: { name: true, phone: true, gstin: true } } },
+      include: {
+        customer: { select: { name: true, phone: true, gstin: true } },
+        store: { select: { gstNumber: true } },
+      },
       orderBy: { createdAt: 'asc' },
     });
   }
@@ -612,6 +686,7 @@ export class BillingService {
           customer: true,
           store: true,
           createdBy: { select: { name: true, role: true } },
+          technician: { select: { id: true, name: true } },
         },
       });
       return this._serializeInvoiceItemQuantities(result);
@@ -813,5 +888,76 @@ export class BillingService {
           status: inv.status,
         })),
     };
+  }
+
+  // Lazily provisions a non-stock "Service Visit Charge" SKU the first time a
+  // store bills a service charge or a typed-in line — keeps this out of the
+  // normal Add Product flow (it isn't a physical good) while still reusing the
+  // real Invoice/Payment machinery (GST, receipts, Accounts reporting).
+  async getOrCreateServiceChargeSku(storeId: string) {
+    const existing = await this.prisma.sKU.findFirst({
+      where: { storeId, product: { name: SERVICE_CHARGE_PRODUCT_NAME } },
+      include: { product: true },
+    });
+    if (existing) return existing;
+
+    let category = await this.prisma.category.findUnique({ where: { name: SERVICE_CHARGE_CATEGORY_NAME } });
+    if (!category) category = await this.prisma.category.create({ data: { name: SERVICE_CHARGE_CATEGORY_NAME } });
+
+    const product = await this.prisma.product.create({
+      data: {
+        name: SERVICE_CHARGE_PRODUCT_NAME,
+        categoryId: category.id,
+        storeId,
+        requiresService: false,
+        type: ProductType.SERVICE,
+        skus: {
+          create: [{
+            variantName: 'Standard',
+            unit: 'PCS',
+            isSerialized: false,
+            stockQty: 0,
+            // No GST by default — edit this SKU from Inventory (it appears
+            // under "Services") if the store wants to charge GST on visits.
+            costPrice: new Decimal(0),
+            sellingPrice: new Decimal(0),
+            taxRate: new Decimal(0),
+            lowStockThreshold: 0,
+            storeId,
+          }],
+        },
+      },
+      include: { skus: { include: { product: true } } },
+    });
+    return product.skus[0];
+  }
+
+  // Service bill numbers can be corrected after saving (the paper book number
+  // is sometimes entered wrong); sales/GST numbers stay fixed once issued.
+  async updateBillNo(invoiceId: string, storeId: string, userId: string, billNo: string) {
+    const invoice = await this.prisma.invoice.findFirst({ where: { id: invoiceId, storeId } });
+    if (!invoice) throw new NotFoundException('Invoice not found');
+    if (invoice.billType !== BillType.SERVICE) {
+      throw new BadRequestException('Only service bill numbers can be changed');
+    }
+    const typed = billNo.trim();
+    const series = invoice.billSeries ?? BillSeries.SERVICE;
+    const billFy = invoice.billFy ?? 'ALL';
+    await this.prisma.$transaction(async (tx) => {
+      await assertBillNoFree(tx, storeId, series, billFy, typed, invoiceId);
+      await tx.invoice.update({ where: { id: invoiceId }, data: { billSeries: series, billFy, billNo: typed } });
+      await tx.auditLog.create({
+        data: {
+          storeId,
+          userId,
+          action: AuditAction.INVOICE_CREATE,
+          entityType: 'Invoice',
+          entityId: invoiceId,
+          oldValues: { billNo: invoice.billNo },
+          newValues: { billNo: typed },
+        },
+      });
+    });
+    return this.getInvoice(invoiceId, storeId);
   }
 }

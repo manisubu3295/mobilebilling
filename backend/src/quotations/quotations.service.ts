@@ -3,11 +3,11 @@ import { PrismaService } from '../prisma/prisma.service';
 import { BillingService } from '../billing/billing.service';
 import { CreateQuotationDto } from './dto/create-quotation.dto';
 import { ConvertQuotationDto } from './dto/convert-quotation.dto';
-import { AuditAction, InvoiceStatus, QuotationStatus, StockStatus } from '@prisma/client';
+import { AuditAction, BillType, InvoiceStatus, QuotationStatus, StockStatus } from '@prisma/client';
+import { assignBillNo, nextInvoiceNumber, seriesFor } from '../billing/bill-numbers';
 import { Decimal } from '@prisma/client/runtime/library';
 
 const QUOTATION_PREFIX = 'QUO';
-const INVOICE_PREFIX = 'INV';
 
 const quotationInclude = {
   store: true,
@@ -121,8 +121,8 @@ export class QuotationsService {
     }
 
     const invoice = await this.prisma.$transaction(async (tx) => {
-      const count = await tx.invoice.count({ where: { storeId } });
-      const invoiceNumber = `${INVOICE_PREFIX}-${storeId.slice(-4).toUpperCase()}-${String(count + 1).padStart(6, '0')}`;
+      const invoiceNumber = await nextInvoiceNumber(tx, storeId);
+      const bill = await assignBillNo(tx, storeId, seriesFor(BillType.SALES, quotation.gstApplied), new Date());
 
       const paidDecimal = new Decimal(dto.payments.reduce((s, p) => s + p.amount, 0));
       const invoiceStatus = paidDecimal.gte(quotation.totalAmount) ? InvoiceStatus.PAID : InvoiceStatus.PARTIALLY_PAID;
@@ -145,6 +145,8 @@ export class QuotationsService {
       const newInvoice = await tx.invoice.create({
         data: {
           invoiceNumber,
+          billType: BillType.SALES,
+          ...bill,
           storeId,
           customerId: quotation.customerId,
           createdById: userId,

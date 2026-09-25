@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, IsObject, IsOptional, IsString, Matches, ValidateIf } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsObject, IsOptional, IsString, Matches, MaxLength, ValidateIf } from 'class-validator';
 
 export class CreateCustomerDto {
   @IsString()
@@ -23,7 +23,21 @@ export class CreateCustomerDto {
 
   @IsOptional()
   @IsString()
+  city?: string;
+
+  @IsOptional()
+  @IsString()
+  landmark?: string;
+
+  @IsOptional()
+  @IsString()
   gstin?: string;
+
+  // "Customer ID" printed on the warranty card / service record.
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  cardNo?: string;
 
   // Business-defined fields (e.g. vehicle no, RE model for a bike shop) — see the
   // attributes module for how a store defines which keys are available here.

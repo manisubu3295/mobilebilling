@@ -7,12 +7,13 @@ import {
   ShoppingCart, Package, Users, FileText,
   BarChart2, Settings, LogOut, Store, Menu, X, UserCircle, Landmark, BookOpen, Smartphone,
   ClipboardList, Wrench, Bell, AlertTriangle, TrendingUp, ClipboardCheck, LayoutDashboard, KeyRound, CalendarClock,
-  Globe, UserPlus,
+  Globe, UserPlus, ReceiptText,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
 import { useBillingStore } from '@/store/billing.store';
 import api from '@/lib/api';
 import { ChangePasswordModal } from '@/components/account/ChangePasswordModal';
+import { PrintPreviewHost } from '@/components/common/PrintPreview';
 
 interface NavItem {
   href: string;
@@ -31,7 +32,8 @@ const NAV_SECTIONS: { label: string | null; items: NavItem[] }[] = [
     label: null,
     items: [
       { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['SUPER_ADMIN', 'STORE_MANAGER'] },
-      { href: '/billing/checkout', label: 'Checkout', icon: ShoppingCart, roles: ['SUPER_ADMIN', 'STORE_MANAGER', 'BILLING_CLERK'] },
+      { href: '/billing/checkout', label: 'Sales Bill', icon: ShoppingCart, roles: ['SUPER_ADMIN', 'STORE_MANAGER', 'BILLING_CLERK'] },
+      { href: '/billing/service-bill', label: 'Service Bill', icon: ReceiptText, roles: ['SUPER_ADMIN', 'STORE_MANAGER', 'BILLING_CLERK'], serviceModule: true },
       { href: '/billing/invoices', label: 'Invoices', icon: FileText, roles: ['SUPER_ADMIN', 'STORE_MANAGER', 'BILLING_CLERK'] },
       { href: '/billing/quotations', label: 'Quotations', icon: ClipboardList, roles: ['SUPER_ADMIN', 'STORE_MANAGER', 'BILLING_CLERK'], serviceModule: true },
       { href: '/accounts', label: 'Accounts', icon: Landmark, roles: ['SUPER_ADMIN', 'STORE_MANAGER'] },
@@ -348,6 +350,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </div>
 
       {showChangePassword && <ChangePasswordModal onClose={() => setShowChangePassword(false)} />}
+      <PrintPreviewHost />
     </div>
   );
 }

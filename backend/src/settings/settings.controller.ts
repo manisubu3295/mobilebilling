@@ -5,7 +5,7 @@ import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Role } from '@prisma/client';
-import { IsBoolean, IsInt, IsOptional, IsString, Matches, Min } from 'class-validator';
+import { IsBoolean, IsInt, IsOptional, IsString, Matches, MaxLength, Min } from 'class-validator';
 
 class UpdateStoreDto {
   @IsOptional() @IsString() name?: string;
@@ -13,7 +13,17 @@ class UpdateStoreDto {
   @IsOptional() @IsString() phone?: string;
   @IsOptional() @IsString() gstNumber?: string;
   @IsOptional() @IsString() staticQrUrl?: string;
+  // Printed on A4 bills and the warranty card. Base64 data URL; null clears it.
+  @IsOptional() @IsString() @MaxLength(700_000) logoUrl?: string | null;
   @IsOptional() @IsInt() @Min(1) nextServiceLookaheadDays?: number;
+  @IsOptional() @IsString() warrantyCardTerms?: string;
+}
+
+class UpdateSequencesDto {
+  @IsOptional() @IsInt() @Min(1) GST_SALES?: number;
+  @IsOptional() @IsInt() @Min(1) SALES?: number;
+  @IsOptional() @IsInt() @Min(1) SERVICE?: number;
+  @IsOptional() @IsInt() @Min(1) CARD?: number;
 }
 
 class UpdateWebsiteDto {
@@ -51,5 +61,17 @@ export class SettingsController {
   @Roles(Role.SUPER_ADMIN)
   updateWebsite(@CurrentUser('accountId') accountId: string, @Body() dto: UpdateWebsiteDto) {
     return this.settingsService.updateWebsite(accountId, dto);
+  }
+
+  @Get('sequences')
+  @Roles(Role.SUPER_ADMIN, Role.STORE_MANAGER)
+  getSequences(@CurrentUser('storeId') storeId: string) {
+    return this.settingsService.getSequences(storeId);
+  }
+
+  @Patch('sequences')
+  @Roles(Role.SUPER_ADMIN)
+  updateSequences(@CurrentUser('storeId') storeId: string, @Body() dto: UpdateSequencesDto) {
+    return this.settingsService.updateSequences(storeId, dto);
   }
 }

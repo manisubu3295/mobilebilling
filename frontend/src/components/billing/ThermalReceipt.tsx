@@ -4,15 +4,20 @@ import React from 'react';
 
 interface Invoice {
   invoiceNumber: string;
+  billNo?: string | null;
+  billType?: 'SALES' | 'SERVICE';
   createdAt: string;
   store: { name: string; address?: string; phone?: string; gstNumber?: string };
   customer?: {
     name?: string;
     phone?: string;
     email?: string;
+    address?: string | null;
+    gstin?: string | null;
     customFields?: Record<string, any>;
   } | null;
   items: Array<{
+    description?: string | null;
     sku: {
       product: { name: string; partNumber?: string; hsnCode?: string };
       variantName: string;
@@ -64,20 +69,32 @@ export function ThermalReceipt({ invoice }: { invoice: Invoice }) {
           <div className="receipt-store-name">{invoice.store.name}</div>
         </div>
 
-        {/* Store details */}
-        <div className="receipt-store-details">
-          {invoice.store.address && <div>{invoice.store.address}</div>}
-          <div className="receipt-store-meta">
-            {invoice.store.phone && <span>📞 {invoice.store.phone}</span>}
-            {invoice.store.gstNumber && <span>GSTIN: {invoice.store.gstNumber}</span>}
+        {/* Shop + customer — both addresses in the header */}
+        <div className="receipt-parties">
+          <div className="receipt-party">
+            <div className="receipt-section-title">FROM</div>
+            <div className="receipt-customer-name">{invoice.store.name}</div>
+            {invoice.store.address && <div className="receipt-customer-detail">{invoice.store.address}</div>}
+            {invoice.store.phone && <div className="receipt-customer-detail">Ph: {invoice.store.phone}</div>}
+            {invoice.store.gstNumber && <div className="receipt-customer-detail">GSTIN: {invoice.store.gstNumber}</div>}
           </div>
+          {invoice.customer && (
+            <div className="receipt-party">
+              <div className="receipt-section-title">BILLED TO</div>
+              <div className="receipt-customer-name">{invoice.customer.name || 'Walk-in Customer'}</div>
+              {invoice.customer.address && <div className="receipt-customer-detail">{invoice.customer.address}</div>}
+              {invoice.customer.phone && <div className="receipt-customer-detail">Ph: {invoice.customer.phone}</div>}
+              {invoice.customer.email && <div className="receipt-customer-detail">{invoice.customer.email}</div>}
+              {invoice.customer.gstin && <div className="receipt-customer-detail">GSTIN: {invoice.customer.gstin}</div>}
+            </div>
+          )}
         </div>
 
         {/* Invoice meta row */}
         <div className="receipt-meta-box">
           <div className="receipt-meta-left">
-            <div className="receipt-label">TAX INVOICE</div>
-            <div className="receipt-inv-number">{invoice.invoiceNumber}</div>
+            <div className="receipt-label">{invoice.billType === 'SERVICE' ? 'SERVICE BILL' : gstApplied ? 'TAX INVOICE' : 'BILL'}</div>
+            <div className="receipt-inv-number">{invoice.billNo ? `No. ${invoice.billNo}` : invoice.invoiceNumber}</div>
           </div>
           <div className="receipt-meta-right">
             <div className="receipt-date">{date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
@@ -85,19 +102,12 @@ export function ThermalReceipt({ invoice }: { invoice: Invoice }) {
           </div>
         </div>
 
-        {/* Billed To */}
-        {invoice.customer && (
+        {(invoice.customer?.customFields?.vehicle_no || invoice.customer?.customFields?.re_model) && (
           <div className="receipt-billed-to">
-            <div className="receipt-section-title">BILLED TO</div>
-            <div className="receipt-customer-name">{invoice.customer.name || 'Walk-in Customer'}</div>
-            {invoice.customer.phone && <div className="receipt-customer-detail">{invoice.customer.phone}</div>}
-            {invoice.customer.email && <div className="receipt-customer-detail">{invoice.customer.email}</div>}
-            {(invoice.customer.customFields?.vehicle_no || invoice.customer.customFields?.re_model) && (
-              <div className="receipt-vehicle-row">
-                {invoice.customer.customFields?.vehicle_no && <span className="receipt-vehicle-badge">{invoice.customer.customFields.vehicle_no}</span>}
-                {invoice.customer.customFields?.re_model && <span className="receipt-model-badge">{invoice.customer.customFields.re_model}</span>}
-              </div>
-            )}
+            <div className="receipt-vehicle-row">
+              {invoice.customer.customFields?.vehicle_no && <span className="receipt-vehicle-badge">{invoice.customer.customFields.vehicle_no}</span>}
+              {invoice.customer.customFields?.re_model && <span className="receipt-model-badge">{invoice.customer.customFields.re_model}</span>}
+            </div>
           </div>
         )}
 
@@ -117,9 +127,9 @@ export function ThermalReceipt({ invoice }: { invoice: Invoice }) {
             return (
               <div key={i} className={`receipt-item-row ${i % 2 === 1 ? 'receipt-item-alt' : ''}`}>
                 <div className="receipt-col-item">
-                  <div className="receipt-item-name">{item.sku.product.name}</div>
-                  <div className="receipt-item-variant">{item.sku.variantName}</div>
-                  {item.sku.product.partNumber && (
+                  <div className="receipt-item-name">{item.description || item.sku.product.name}</div>
+                  {!item.description && <div className="receipt-item-variant">{item.sku.variantName}</div>}
+                  {!item.description && item.sku.product.partNumber && (
                     <div className="receipt-item-part">Part# {item.sku.product.partNumber}</div>
                   )}
                   {serial?.serialNumber && <div className="receipt-item-serial">S/N: {serial.serialNumber}</div>}
@@ -240,6 +250,15 @@ export function ThermalReceipt({ invoice }: { invoice: Invoice }) {
           margin-top: 3px;
           flex-wrap: wrap;
         }
+        .receipt-parties {
+          display: flex;
+          gap: 10px;
+          padding: 10px 14px;
+          border-bottom: 1px solid #eee;
+          line-height: 1.45;
+        }
+        .receipt-party { flex: 1 1 50%; min-width: 0; overflow-wrap: anywhere; }
+        .receipt-party + .receipt-party { border-left: 1px dashed #ccc; padding-left: 10px; }
         .receipt-meta-box {
           display: flex;
           justify-content: space-between;
@@ -429,6 +448,7 @@ export function ThermalReceipt({ invoice }: { invoice: Invoice }) {
           .receipt-store-sub  { font-size: 7pt; }
           .receipt-store-details { font-size: 7pt; padding: 2mm 3mm; }
           .receipt-meta-box   { padding: 2mm 3mm; }
+          .receipt-parties    { padding: 2mm 3mm; font-size: 7pt; }
           .receipt-inv-number { font-size: 10pt; }
           .receipt-billed-to  { padding: 2mm 3mm; background: #fff !important; }
           .receipt-items-header {

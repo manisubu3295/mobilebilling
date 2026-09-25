@@ -1,14 +1,30 @@
+import { openPrintPreview } from '@/store/print.store';
+import { buildA4InvoiceHtml } from './print-a4';
+
 export interface PrintInvoice {
   invoiceNumber: string;
   createdAt: string;
-  store: { name: string; address?: string | null; phone?: string | null; gstNumber?: string | null };
+  // Printed bill number + type (absent on invoices created before bill series existed).
+  billNo?: string | null;
+  billType?: 'SALES' | 'SERVICE';
+  serviceCategory?: string | null;
+  technician?: { name: string } | null;
+  tdsRaw?: string | null;
+  tdsTreated?: string | null;
+  store: { name: string; address?: string | null; phone?: string | null; gstNumber?: string | null; logoUrl?: string | null };
   customer?: {
     name?: string | null;
     phone?: string | null;
     email?: string | null;
+    address?: string | null;
+    city?: string | null;
+    landmark?: string | null;
+    gstin?: string | null;
+    cardNo?: string | null;
     customFields?: Record<string, any> | null;
   } | null;
   items: Array<{
+    description?: string | null;
     sku: {
       product: { name: string; partNumber?: string | null; hsnCode?: string | null };
       variantName: string;
@@ -46,6 +62,32 @@ function fmt(v: string | number): string {
 function esc(s?: string | null): string {
   if (!s) return '';
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+interface PartyStore { name: string; address?: string | null; phone?: string | null; gstNumber?: string | null }
+interface PartyCustomer { name?: string | null; phone?: string | null; email?: string | null; address?: string | null; gstin?: string | null }
+
+// Shop and customer side by side at the top of every printout — the client
+// needs both addresses in the header (their GST bills are filed with it).
+function partiesHtml(store: PartyStore, customer: PartyCustomer | null | undefined, customerTitle: string): string {
+  const shop = `
+    <div class="party">
+      <div class="section-title">From</div>
+      <div class="party-name">${esc(store.name)}</div>
+      ${store.address ? `<div>${esc(store.address)}</div>` : ''}
+      ${store.phone ? `<div>Ph: ${esc(store.phone)}</div>` : ''}
+      ${store.gstNumber ? `<div>GSTIN: ${esc(store.gstNumber)}</div>` : ''}
+    </div>`;
+  const cust = customer ? `
+    <div class="party">
+      <div class="section-title">${customerTitle}</div>
+      <div class="party-name">${esc(customer.name || 'Walk-in Customer')}</div>
+      ${customer.address ? `<div>${esc(customer.address)}</div>` : ''}
+      ${customer.phone ? `<div>Ph: ${esc(customer.phone)}</div>` : ''}
+      ${customer.email ? `<div>${esc(customer.email)}</div>` : ''}
+      ${customer.gstin ? `<div>GSTIN: ${esc(customer.gstin)}</div>` : ''}
+    </div>` : '';
+  return `<div class="parties">${shop}${cust}</div>`;
 }
 
 const RECEIPT_CSS = `
@@ -90,6 +132,10 @@ const RECEIPT_CSS = `
   .meta-right { text-align: right; }
   .meta-date  { font-weight: 700; font-size: 10px; }
   .meta-time  { font-size: 9px; color: #666; }
+  .parties { display: flex; gap: 6px; padding: 6px 10px; border-bottom: 1px solid #ddd; }
+  .party { flex: 1 1 50%; min-width: 0; font-size: 9px; color: #444; line-height: 1.4; word-wrap: break-word; }
+  .party-name { font-weight: 700; font-size: 10.5px; color: #111; }
+  .party + .party { border-left: 1px dashed #bbb; padding-left: 6px; }
   .billed-to  { padding: 6px 10px; border-bottom: 1px solid #eee; background: #fffafa; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .section-title { font-size: 7px; font-weight: 700; letter-spacing: 1px; color: #888; text-transform: uppercase; margin-bottom: 3px; }
   .customer-name   { font-weight: 700; font-size: 11px; }
@@ -161,17 +207,6 @@ const RECEIPT_CSS = `
   hr.dash { border: none; border-top: 1px dashed #bbb; margin: 0; }
   @page { margin: 0; size: 80mm auto; }
   @media print { body { width: 72mm; } }
-  .print-bar {
-    position: sticky; top: 0; z-index: 10;
-    display: flex; gap: 8px; padding: 8px; background: #f3f4f6;
-    border-bottom: 1px solid #ddd;
-  }
-  .print-bar button {
-    flex: 1; padding: 8px; border: none; border-radius: 6px;
-    background: #7f1d1d; color: #fff; font-size: 12px; font-weight: 700;
-    font-family: Arial, Helvetica, sans-serif; cursor: pointer;
-  }
-  @media print { .print-bar { display: none; } }
 `;
 
 function buildHtml(invoice: PrintInvoice): string {
@@ -180,17 +215,13 @@ function buildHtml(invoice: PrintInvoice): string {
   const hasDiscount = parseFloat(invoice.discountAmount) > 0;
   const gstApplied = invoice.gstApplied !== false;
 
-  const customerHtml = invoice.customer ? `
+  const cf = invoice.customer?.customFields;
+  const customerHtml = (cf?.vehicle_no || cf?.re_model) ? `
     <div class="billed-to">
-      <div class="section-title">Billed To</div>
-      <div class="customer-name">${esc(invoice.customer.name || 'Walk-in Customer')}</div>
-      ${invoice.customer.phone ? `<div class="customer-detail">${esc(invoice.customer.phone)}</div>` : ''}
-      ${invoice.customer.email ? `<div class="customer-detail">${esc(invoice.customer.email)}</div>` : ''}
-      ${(invoice.customer.customFields?.vehicle_no || invoice.customer.customFields?.re_model) ? `
-        <div class="vehicle-row">
-          ${invoice.customer.customFields?.vehicle_no ? `<span class="vehicle-badge">${esc(invoice.customer.customFields.vehicle_no)}</span>` : ''}
-          ${invoice.customer.customFields?.re_model ? `<span class="model-badge">${esc(invoice.customer.customFields.re_model)}</span>` : ''}
-        </div>` : ''}
+      <div class="vehicle-row">
+        ${cf.vehicle_no ? `<span class="vehicle-badge">${esc(cf.vehicle_no)}</span>` : ''}
+        ${cf.re_model ? `<span class="model-badge">${esc(cf.re_model)}</span>` : ''}
+      </div>
     </div>` : '';
 
   const itemsHtml = invoice.items.map((item, i) => {
@@ -198,9 +229,9 @@ function buildHtml(invoice: PrintInvoice): string {
     return `
       <div class="item-row ${i % 2 === 1 ? 'alt' : ''}">
         <div class="col-item">
-          <div class="item-name">${esc(item.sku.product.name)}</div>
-          <div class="item-variant">${esc(item.sku.variantName)}</div>
-          ${item.sku.product.partNumber ? `<div class="item-part">Part# ${esc(item.sku.product.partNumber)}</div>` : ''}
+          <div class="item-name">${esc(item.description || item.sku.product.name)}</div>
+          ${item.description ? '' : `<div class="item-variant">${esc(item.sku.variantName)}</div>`}
+          ${!item.description && item.sku.product.partNumber ? `<div class="item-part">Part# ${esc(item.sku.product.partNumber)}</div>` : ''}
           ${serial?.serialNumber ? `<div class="item-serial">S/N: ${esc(serial.serialNumber)}</div>` : ''}
           ${serial?.batchNumber ? `<div class="item-serial">Batch: ${esc(serial.batchNumber)}</div>` : ''}
           ${item.sku.product.hsnCode ? `<div class="item-hsn">HSN: ${esc(item.sku.product.hsnCode)}</div>` : ''}
@@ -233,21 +264,16 @@ function buildHtml(invoice: PrintInvoice): string {
   <style>${RECEIPT_CSS}</style>
 </head>
 <body>
-  <div class="print-bar"><button onclick="window.print()">Print Receipt</button></div>
   <div class="brand-band">
     <div class="store-name">${esc(invoice.store.name)}</div>
   </div>
 
-  <div class="store-details">
-    ${invoice.store.address ? `<div>${esc(invoice.store.address)}</div>` : ''}
-    ${invoice.store.phone ? `<div>&#128222; ${esc(invoice.store.phone)}</div>` : ''}
-    ${invoice.store.gstNumber ? `<div>GSTIN: ${esc(invoice.store.gstNumber)}</div>` : ''}
-  </div>
+  ${partiesHtml(invoice.store, invoice.customer, 'Billed To')}
 
   <div class="meta-box">
     <div>
-      <div class="meta-label">Tax Invoice</div>
-      <div class="meta-inv">${esc(invoice.invoiceNumber)}</div>
+      <div class="meta-label">${invoice.billType === 'SERVICE' ? 'Service Bill' : gstApplied ? 'Tax Invoice' : 'Bill'}</div>
+      <div class="meta-inv">${invoice.billNo ? `No. ${esc(invoice.billNo)}` : esc(invoice.invoiceNumber)}</div>
     </div>
     <div class="meta-right">
       <div class="meta-date">${date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
@@ -286,57 +312,19 @@ function buildHtml(invoice: PrintInvoice): string {
     ${invoice.createdBy ? `<div class="served-by">Served by: <strong>${esc(invoice.createdBy.name)}</strong></div>` : ''}
   </div>
 
-  <script>
-    // Printing is a manual click (see .print-bar above) so the user can
-    // scroll and review the receipt first — auto-firing window.print() on
-    // load used to force the print dialog open immediately, which is what
-    // made the page feel unscrollable. Close only after an actual print
-    // attempt (printed or cancelled), never on a timer.
-    window.onafterprint = function() { window.close(); };
-  </script>
 </body>
 </html>`;
 }
 
-// Shared by printReceipt and printQuotation — opens a scrollable popup with
-// the given document and a manual Print button; falls back to a hidden
-// iframe (sized to its actual content) if the popup is blocked.
-function renderInNewWindow(win: Window | null, html: string): void {
-  if (!win) {
-    const iframe = document.createElement('iframe');
-    iframe.style.position = 'fixed';
-    iframe.style.top = '-9999px';
-    iframe.style.left = '-9999px';
-    iframe.style.width = '80mm';
-    // Height set from the rendered content below — a fixed guess here would
-    // clip anything taller (long documents) before it ever reaches print.
-    iframe.style.height = '600px';
-    document.body.appendChild(iframe);
-    const doc = iframe.contentDocument || iframe.contentWindow?.document;
-    if (doc) {
-      doc.open();
-      doc.write(html);
-      doc.close();
-      setTimeout(() => {
-        const fullHeight = doc.body?.scrollHeight || 600;
-        iframe.style.height = `${fullHeight}px`;
-        iframe.contentWindow?.print();
-        setTimeout(() => document.body.removeChild(iframe), 2000);
-      }, 500);
-    }
-    return;
-  }
-
-  win.document.open();
-  win.document.write(html);
-  win.document.close();
-  win.focus();
-}
-
+// GST tax invoices and service bills open on the A4 layout (the formats the
+// client files / hands over); plain counter bills open on the thermal slip.
 export function printReceipt(invoice: PrintInvoice): void {
-  // Open the window synchronously within the user gesture so iOS Safari allows it.
-  const win = window.open('', '_blank', 'width=420,height=700,scrollbars=yes,resizable=yes');
-  renderInNewWindow(win, buildHtml(invoice));
+  const a4 = { label: 'A4 Bill', html: buildA4InvoiceHtml(invoice) };
+  const slip = { label: '80mm Receipt', html: buildHtml(invoice) };
+  const gst = invoice.gstApplied !== false && parseFloat(invoice.taxAmount) > 0;
+  const a4First = invoice.billType === 'SERVICE' || gst;
+  const kind = invoice.billType === 'SERVICE' ? 'Service Bill' : gst ? 'Tax Invoice' : 'Bill';
+  openPrintPreview(a4First ? [a4, slip] : [slip, a4], `${kind} ${invoice.billNo || invoice.invoiceNumber}`);
 }
 
 export interface PrintQuotation {
@@ -346,7 +334,7 @@ export interface PrintQuotation {
   validUntil?: string | null;
   notes?: string | null;
   store: { name: string; address?: string | null; phone?: string | null; gstNumber?: string | null };
-  customer?: { name?: string | null; phone?: string | null; email?: string | null } | null;
+  customer?: { name?: string | null; phone?: string | null; email?: string | null; address?: string | null; gstin?: string | null } | null;
   items: Array<{
     sku: {
       product: { name: string; partNumber?: string | null; hsnCode?: string | null };
@@ -372,14 +360,6 @@ function buildQuotationHtml(quotation: PrintQuotation): string {
   const hasDiscount = parseFloat(quotation.discountAmount) > 0;
   const gstApplied = quotation.gstApplied !== false;
 
-  const customerHtml = quotation.customer ? `
-    <div class="billed-to">
-      <div class="section-title">Quoted To</div>
-      <div class="customer-name">${esc(quotation.customer.name || 'Walk-in Customer')}</div>
-      ${quotation.customer.phone ? `<div class="customer-detail">${esc(quotation.customer.phone)}</div>` : ''}
-      ${quotation.customer.email ? `<div class="customer-detail">${esc(quotation.customer.email)}</div>` : ''}
-    </div>` : '';
-
   const itemsHtml = quotation.items.map((item, i) => `
       <div class="item-row ${i % 2 === 1 ? 'alt' : ''}">
         <div class="col-item">
@@ -403,16 +383,11 @@ function buildQuotationHtml(quotation: PrintQuotation): string {
   <style>${RECEIPT_CSS}</style>
 </head>
 <body>
-  <div class="print-bar"><button onclick="window.print()">Print / Save as PDF</button></div>
   <div class="brand-band">
     <div class="store-name">${esc(quotation.store.name)}</div>
   </div>
 
-  <div class="store-details">
-    ${quotation.store.address ? `<div>${esc(quotation.store.address)}</div>` : ''}
-    ${quotation.store.phone ? `<div>&#128222; ${esc(quotation.store.phone)}</div>` : ''}
-    ${quotation.store.gstNumber ? `<div>GSTIN: ${esc(quotation.store.gstNumber)}</div>` : ''}
-  </div>
+  ${partiesHtml(quotation.store, quotation.customer, 'Quoted To')}
 
   <div class="meta-box">
     <div>
@@ -424,8 +399,6 @@ function buildQuotationHtml(quotation: PrintQuotation): string {
       ${quotation.validUntil ? `<div class="meta-time">Valid till ${new Date(quotation.validUntil).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</div>` : ''}
     </div>
   </div>
-
-  ${customerHtml}
 
   <div class="items-header">
     <span class="col-item">Item</span>
@@ -451,14 +424,10 @@ function buildQuotationHtml(quotation: PrintQuotation): string {
     ${quotation.createdBy ? `<div class="served-by">Prepared by: <strong>${esc(quotation.createdBy.name)}</strong></div>` : ''}
   </div>
 
-  <script>
-    window.onafterprint = function() { window.close(); };
-  </script>
 </body>
 </html>`;
 }
 
 export function printQuotation(quotation: PrintQuotation): void {
-  const win = window.open('', '_blank', 'width=420,height=700,scrollbars=yes,resizable=yes');
-  renderInNewWindow(win, buildQuotationHtml(quotation));
+  openPrintPreview(buildQuotationHtml(quotation), `Quotation ${quotation.quotationNumber}`);
 }

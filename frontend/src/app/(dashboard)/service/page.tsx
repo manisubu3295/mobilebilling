@@ -1,12 +1,13 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Wrench, CheckCircle, UserPlus, Plus, CalendarClock, Search, Phone, MessageCircle, MapPin, XCircle, AlertTriangle, Receipt, Pencil, RotateCcw, MessageSquare, Eye } from 'lucide-react';
+import { Wrench, CheckCircle, UserPlus, Plus, CalendarClock, Search, Phone, MessageCircle, MapPin, XCircle, AlertTriangle, Receipt, Pencil, RotateCcw, MessageSquare, Eye, ShieldCheck } from 'lucide-react';
 import api from '@/lib/api';
 import { printReceipt } from '@/lib/print-receipt';
 import { AmcOnboardModal } from '@/components/service/AmcOnboardModal';
+import { WarrantyCardModal } from '@/components/service/WarrantyCardModal';
 
-interface WarrantyCustomer { id: string; name: string; phone: string; address: string | null }
+interface WarrantyCustomer { id: string; name: string; phone: string; address: string | null; cardNo?: string | null }
 interface WarrantyProduct { id: string; name: string; brand?: string | null }
 // Only present when this warranty came from an actual sale in this system —
 // null for a standalone/imported AMC (no serial number to show either way).
@@ -47,7 +48,7 @@ interface ServiceJob {
   customerChargeAmount: string | null;
   customerChargeNotes: string | null;
   invoiceId: string | null;
-  invoice: { id: string; invoiceNumber: string; totalAmount: string } | null;
+  invoice: { id: string; invoiceNumber: string; billNo?: string | null; totalAmount: string } | null;
   parts: ServiceJobPart[];
   warranty: {
     customer: WarrantyCustomer;
@@ -159,6 +160,7 @@ export default function ServiceAdminPage() {
   const [billing, setBilling] = useState<ServiceJob | null>(null);
   const [cancellingJob, setCancellingJob] = useState<ServiceJob | null>(null);
   const [editingAmc, setEditingAmc] = useState<Warranty | null>(null);
+  const [cardFor, setCardFor] = useState<string | null>(null);
   const [reactivatingAmc, setReactivatingAmc] = useState<Warranty | null>(null);
   const [cancellingAmc, setCancellingAmc] = useState<Warranty | null>(null);
   const [jobQuery, setJobQuery] = useState('');
@@ -259,6 +261,7 @@ export default function ServiceAdminPage() {
       return (
         w.customer.name.toLowerCase().includes(q) ||
         w.customer.phone.includes(q) ||
+        (w.customer.cardNo || '').toLowerCase() === q ||
         w.product.name.toLowerCase().includes(q)
       );
     });
@@ -455,7 +458,7 @@ export default function ServiceAdminPage() {
                         className="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full font-medium bg-green-100 text-green-700 hover:bg-green-200 disabled:opacity-50"
                         title="View / print this invoice"
                       >
-                        <Receipt className="h-3 w-3" /> {j.invoice.invoiceNumber}
+                        <Receipt className="h-3 w-3" /> {j.invoice.billNo ? `Bill No. ${j.invoice.billNo}` : j.invoice.invoiceNumber}
                       </button>
                     ) : jobBillTotal(j) > 0 ? (
                       <span className="text-xs px-1.5 py-0.5 rounded-full font-medium bg-amber-100 text-amber-700">
@@ -535,7 +538,7 @@ export default function ServiceAdminPage() {
                   type="text"
                   value={amcQuery}
                   onChange={(e) => setAmcQuery(e.target.value)}
-                  placeholder="Search by customer, phone, or product…"
+                  placeholder="Search by customer, phone, card no or product…"
                   className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-red-500"
                 />
               </div>
@@ -590,7 +593,10 @@ export default function ServiceAdminPage() {
                           {w.product.name}
                           {serial && <span className="ml-2 text-xs font-mono text-gray-400">S/N {serial}</span>}
                         </p>
-                        <p className="text-sm text-gray-500">{w.customer.name} · {w.customer.phone}</p>
+                        <p className="text-sm text-gray-500">
+                          {w.customer.cardNo && <span className="mr-1 font-mono text-xs font-semibold text-blue-700">#{w.customer.cardNo}</span>}
+                          {w.customer.name} · {w.customer.phone}
+                        </p>
                         <div className="flex items-center gap-2 mt-1 flex-wrap">
                           <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${AMC_STATUS_STYLE[w.status]}`}>
                             {w.status.replace('_', ' ')}
@@ -603,6 +609,12 @@ export default function ServiceAdminPage() {
                         </div>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          onClick={() => setCardFor(w.id)}
+                          className="flex items-center gap-1.5 px-3 py-2 border border-blue-200 rounded-lg text-sm font-medium text-blue-700 hover:bg-blue-50"
+                        >
+                          <ShieldCheck className="h-4 w-4" /> <span className="hidden sm:inline">Card</span>
+                        </button>
                         {w.status === 'ACTIVE' && (
                           <>
                             <button
@@ -691,6 +703,9 @@ export default function ServiceAdminPage() {
           onClose={() => setCancellingJob(null)}
           onSaved={() => { setCancellingJob(null); load(); }}
         />
+      )}
+      {cardFor && (
+        <WarrantyCardModal warrantyId={cardFor} onClose={() => setCardFor(null)} onSaved={load} />
       )}
       {editingAmc && (
         <EditAmcModal
@@ -903,6 +918,8 @@ function CancelJobModal({ job, onClose, onSaved }: { job: ServiceJob; onClose: (
 
 function BillModal({ job, onClose, onSaved }: { job: ServiceJob; onClose: () => void; onSaved: () => void }) {
   const [mode, setMode] = useState<'CASH' | 'UPI' | 'CREDIT_CARD' | 'DEBIT_CARD' | 'BANK_TRANSFER' | 'EMI'>('CASH');
+  const [billNo, setBillNo] = useState('');
+  const [category, setCategory] = useState<'WARRANTY' | 'OUT_OF_WARRANTY' | 'OTHER_SERVICE' | 'IRF' | 'AMC'>('WARRANTY');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -919,6 +936,8 @@ function BillModal({ job, onClose, onSaved }: { job: ServiceJob; onClose: () => 
     try {
       const { data } = await api.patch(`/warranty/service-jobs/${job.id}/bill`, {
         payments: [{ mode, amount }],
+        billNo: billNo.trim() || undefined,
+        serviceCategory: category,
       });
       printReceipt(data);
       onSaved();
@@ -959,6 +978,28 @@ function BillModal({ job, onClose, onSaved }: { job: ServiceJob; onClose: () => 
             <span className="text-sm text-gray-500">Total to bill</span>
             <span className="text-xl font-bold text-gray-900">₹{amount.toLocaleString('en-IN')}</span>
           </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Bill No</label>
+              <input
+                value={billNo}
+                onChange={(e) => setBillNo(e.target.value)}
+                placeholder="Auto"
+                className="w-full border rounded-lg px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Service type</label>
+              <select value={category} onChange={(e) => setCategory(e.target.value as any)} className="w-full border rounded-lg px-3 py-2 text-sm">
+                <option value="WARRANTY">Warranty</option>
+                <option value="OUT_OF_WARRANTY">Out of Warranty</option>
+                <option value="OTHER_SERVICE">Other Service</option>
+                <option value="IRF">IRF</option>
+                <option value="AMC">AMC</option>
+              </select>
+            </div>
+          </div>
+          <p className="text-[11px] text-gray-400 -mt-1">Type the paper bill number if the technician already wrote one; otherwise the next number is used.</p>
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Payment Mode</label>
             <select value={mode} onChange={(e) => setMode(e.target.value as any)} className="w-full border rounded-lg px-3 py-2 text-sm">
@@ -970,7 +1011,7 @@ function BillModal({ job, onClose, onSaved }: { job: ServiceJob; onClose: () => 
               <option value="EMI">EMI</option>
             </select>
           </div>
-          <p className="text-xs text-gray-400">This creates a real GST invoice and payment record for this visit, and prints a receipt.</p>
+          <p className="text-xs text-gray-400">This creates a service bill and payment record for this visit, and prints it.</p>
         </div>
         <div className="flex gap-3 p-6 border-t">
           <button onClick={onClose} className="flex-1 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>

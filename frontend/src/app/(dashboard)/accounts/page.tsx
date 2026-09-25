@@ -7,6 +7,7 @@ import {
   FileDown, FileText, Receipt, FileSpreadsheet,
 } from 'lucide-react';
 import api from '@/lib/api';
+import { isInterState } from '@/lib/print-a4';
 import { useAuthStore } from '@/store/auth.store';
 
 /* ── Types ─────────────────────────────────────────────────────────────── */
@@ -39,11 +40,18 @@ interface CollectionsData {
   outstandingInvoices: OutstandingInvoice[];
 }
 
+// Taxable value = bill value after the discount (GST is charged on that).
+const taxableOf = (r: { subtotal: string; discountAmount?: string }) =>
+  parseFloat(r.subtotal) - parseFloat(r.discountAmount || '0');
+
 interface GstInvoiceRow {
   invoiceNumber: string;
+  billNo?: string | null;
+  store?: { gstNumber: string | null } | null;
   createdAt: string;
   customer: { name: string; gstin: string | null } | null;
   subtotal: string;
+  discountAmount?: string;
   taxAmount: string;
   totalAmount: string;
   gstApplied?: boolean;
@@ -167,8 +175,10 @@ export default function AccountsPage() {
     setGstLoading(true);
     try {
       const { from, to } = getRangeDates(range, customFrom, customTo);
+      // GST tax invoices only — the register filed with the auditor. Non-GST
+      // sales and service bills are left out on purpose.
       const { data: rows } = await api.get<GstInvoiceRow[]>('/billing/invoices/export', {
-        params: { from: from.slice(0, 10), to: to.slice(0, 10) },
+        params: { from: from.slice(0, 10), to: to.slice(0, 10), type: 'GST' },
       });
       setGstRows(rows.filter((r) => r.status !== 'CANCELLED'));
     } catch {
@@ -182,25 +192,41 @@ export default function AccountsPage() {
 
   const gstTotals = gstRows.reduce(
     (acc, r) => ({
-      taxable: acc.taxable + parseFloat(r.subtotal),
+      taxable: acc.taxable + taxableOf(r),
       tax: acc.tax + parseFloat(r.taxAmount),
       total: acc.total + parseFloat(r.totalAmount),
     }),
     { taxable: 0, tax: 0, total: 0 },
   );
 
-  const gstCsvRows = () => gstRows.map((r) => [
-    r.invoiceNumber,
-    new Date(r.createdAt).toLocaleDateString('en-IN'),
-    r.customer?.name || 'Walk-in',
-    r.customer?.gstin || '',
-    r.gstApplied === false ? 'No' : 'Yes',
-    r.subtotal,
-    r.taxAmount,
-    r.totalAmount,
-    r.status,
-  ]);
-  const GST_HEADERS = ['Invoice No', 'Date', 'Customer', 'GSTIN', 'GST Applied', 'Taxable Value (INR)', 'Tax Amount (INR)', 'Total (INR)', 'Status'];
+  // Intra-state: GST splits evenly into CGST + SGST. Inter-state (customer
+  // GSTIN from another state): the whole amount is IGST.
+  const taxSplit = (r: GstInvoiceRow) => {
+    const tax = parseFloat(r.taxAmount);
+    return isInterState(r.store?.gstNumber, r.customer?.gstin)
+      ? { cgst: 0, sgst: 0, igst: tax }
+      : { cgst: tax / 2, sgst: tax / 2, igst: 0 };
+  };
+  const gstCsvRows = () => gstRows.map((r) => {
+    const t = taxSplit(r);
+    return [
+      r.billNo || r.invoiceNumber,
+      new Date(r.createdAt).toLocaleDateString('en-IN'),
+      r.customer?.name || 'Walk-in',
+      r.customer?.gstin || '',
+      taxableOf(r).toFixed(2),
+      t.cgst.toFixed(2),
+      t.sgst.toFixed(2),
+      t.igst.toFixed(2),
+      r.totalAmount,
+      r.status,
+    ];
+  });
+  const GST_HEADERS = ['Bill No', 'Date', 'Customer', 'GSTIN', 'Taxable Value (INR)', 'CGST (INR)', 'SGST (INR)', 'IGST (INR)', 'Total (INR)', 'Status'];
+  const gstFoot = () => {
+    const t = gstRows.map(taxSplit).reduce((a, x) => ({ cgst: a.cgst + x.cgst, sgst: a.sgst + x.sgst, igst: a.igst + x.igst }), { cgst: 0, sgst: 0, igst: 0 });
+    return ['Totals', '', '', '', gstTotals.taxable.toFixed(2), t.cgst.toFixed(2), t.sgst.toFixed(2), t.igst.toFixed(2), gstTotals.total.toFixed(2), ''];
+  };
 
   const exportGstCsv = () => {
     const esc = (v: string | number) => {
@@ -214,7 +240,7 @@ export default function AccountsPage() {
       GST_HEADERS.join(','),
       ...gstCsvRows().map((r) => r.map(esc).join(',')),
       '',
-      `Totals,,,,,${gstTotals.taxable.toFixed(2)},${gstTotals.tax.toFixed(2)},${gstTotals.total.toFixed(2)},`,
+      gstFoot().join(','),
     ];
     const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
@@ -227,9 +253,9 @@ export default function AccountsPage() {
 
   const exportGstExcel = async () => {
     const { utils, writeFile } = await import('xlsx');
-    const wsData = [GST_HEADERS, ...gstCsvRows(), [], ['Totals', '', '', '', '', gstTotals.taxable.toFixed(2), gstTotals.tax.toFixed(2), gstTotals.total.toFixed(2), '']];
+    const wsData = [GST_HEADERS, ...gstCsvRows(), [], gstFoot()];
     const ws = utils.aoa_to_sheet(wsData);
-    ws['!cols'] = [{ wch: 16 }, { wch: 12 }, { wch: 22 }, { wch: 16 }, { wch: 10 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 12 }];
+    ws['!cols'] = [{ wch: 16 }, { wch: 12 }, { wch: 22 }, { wch: 16 }, { wch: 16 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 16 }, { wch: 12 }];
     const wb = utils.book_new();
     utils.book_append_sheet(wb, ws, 'GST Report');
     writeFile(wb, `gst-report-${range}-${dateTag}.xlsx`);
@@ -258,7 +284,7 @@ export default function AccountsPage() {
         startY: 22,
         head: [GST_HEADERS],
         body: gstCsvRows(),
-        foot: [['Totals', '', '', '', '', gstTotals.taxable.toFixed(2), gstTotals.tax.toFixed(2), gstTotals.total.toFixed(2), '']],
+        foot: [gstFoot()],
         headStyles: { fillColor: [31, 41, 55], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
         footStyles: { fillColor: [243, 244, 246], textColor: [17, 24, 39], fontStyle: 'bold', fontSize: 8 },
         bodyStyles: { fontSize: 8 },
@@ -922,10 +948,10 @@ export default function AccountsPage() {
                       <tbody className="divide-y divide-gray-50">
                         {gstRows.map((r) => (
                           <tr key={r.invoiceNumber} className="hover:bg-gray-50/60">
-                            <td className="px-4 py-2.5 font-mono text-xs text-red-700 font-bold">{r.invoiceNumber}</td>
+                            <td className="px-4 py-2.5 font-mono text-xs text-red-700 font-bold">{r.billNo || r.invoiceNumber}</td>
                             <td className="px-4 py-2.5 text-gray-700">{r.customer?.name || 'Walk-in'}</td>
                             <td className="px-4 py-2.5 text-xs font-mono text-gray-500">{r.customer?.gstin || '—'}</td>
-                            <td className="px-4 py-2.5 text-right text-gray-700">{fmt(r.subtotal)}</td>
+                            <td className="px-4 py-2.5 text-right text-gray-700">{fmt(taxableOf(r))}</td>
                             <td className="px-4 py-2.5 text-right text-gray-700">{fmt(r.taxAmount)}</td>
                             <td className="px-4 py-2.5 text-right font-medium text-gray-900">{fmt(r.totalAmount)}</td>
                             <td className="px-4 py-2.5 text-center text-xs text-gray-500">

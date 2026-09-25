@@ -15,6 +15,9 @@ type InvoiceStatus = 'DRAFT' | 'PAID' | 'PARTIALLY_PAID' | 'CANCELLED' | 'RETURN
 interface InvoiceRow {
   id: string;
   invoiceNumber: string;
+  billNo?: string | null;
+  billType?: 'SALES' | 'SERVICE';
+  gstApplied?: boolean;
   status: InvoiceStatus;
   totalAmount: string;
   paidAmount: string;
@@ -32,6 +35,7 @@ interface InvoiceDetail extends InvoiceRow {
   notes?: string;
   items: Array<{
     id: string;
+    description?: string | null;
     quantity: number;
     returnedQty: number;
     unitPrice: string;
@@ -64,6 +68,17 @@ const PAYMENT_LABELS: Record<string, string> = {
   DEBIT_CARD: 'Debit Card', BANK_TRANSFER: 'Bank Transfer', EMI: 'EMI',
 };
 
+type TypeFilter = '' | 'SALES' | 'SERVICE' | 'GST';
+const TYPE_TABS: Array<[TypeFilter, string]> = [['', 'All'], ['SALES', 'Sales'], ['SERVICE', 'Service'], ['GST', 'GST']];
+
+// Printed bill number with its series, e.g. "GST 004", "SRV 1450"; invoices
+// from before bill series existed fall back to the internal invoice number.
+function billLabel(inv: Pick<InvoiceRow, 'billNo' | 'billType' | 'gstApplied' | 'invoiceNumber'>) {
+  if (!inv.billNo) return inv.invoiceNumber;
+  const prefix = inv.billType === 'SERVICE' ? 'SRV' : inv.gstApplied !== false ? 'GST' : 'BILL';
+  return `${prefix} ${inv.billNo}`;
+}
+
 function fmt(v: string | number) {
   return '₹' + parseFloat(String(v)).toLocaleString('en-IN', { minimumFractionDigits: 2 });
 }
@@ -85,6 +100,9 @@ export default function InvoicesPage() {
   const [dateFrom, setDateFrom]   = useState(today);
   const [dateTo, setDateTo]       = useState(today);
   const [statusFilter, setStatus] = useState('');
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>('');
+  const [editBillNo, setEditBillNo] = useState<string | null>(null);
+  const [savingBillNo, setSavingBillNo] = useState(false);
   const searchTimer               = useRef<ReturnType<typeof setTimeout>>();
 
   /* modal state */
@@ -108,7 +126,7 @@ export default function InvoicesPage() {
 
   /* ── Load list ────────────────────────────────────────────────── */
   const load = useCallback(async (
-    p = 1, sq = search, from = dateFrom, to = dateTo, st = statusFilter,
+    p = 1, sq = search, from = dateFrom, to = dateTo, st = statusFilter, ty = typeFilter,
   ) => {
     setLoading(true);
     setListError('');
@@ -118,6 +136,7 @@ export default function InvoicesPage() {
       if (from)      params.set('from', from);   // plain YYYY-MM-DD; backend adds IST offset
       if (to)        params.set('to',   to);
       if (st)        params.set('status', st);
+      if (ty)        params.set('type', ty);
       const { data } = await api.get(`/billing/invoices?${params}`);
       setInvoices(data.data);
       setTotal(data.total);
@@ -127,14 +146,14 @@ export default function InvoicesPage() {
     } finally {
       setLoading(false);
     }
-  }, [search, dateFrom, dateTo, statusFilter]);
+  }, [search, dateFrom, dateTo, statusFilter, typeFilter]);
 
   /* debounce all filter changes; fires on mount too (initial load) */
   useEffect(() => {
     clearTimeout(searchTimer.current);
-    searchTimer.current = setTimeout(() => load(1, search, dateFrom, dateTo, statusFilter), 300);
+    searchTimer.current = setTimeout(() => load(1, search, dateFrom, dateTo, statusFilter, typeFilter), 300);
     return () => clearTimeout(searchTimer.current);
-  }, [search, dateFrom, dateTo, statusFilter]);
+  }, [search, dateFrom, dateTo, statusFilter, typeFilter]);
 
   /* ── View detail ──────────────────────────────────────────────── */
   const handleView = async (id: string) => {
@@ -149,6 +168,23 @@ export default function InvoicesPage() {
     } catch (e: any) {
       setActionError(e?.response?.data?.message || 'Could not load invoice');
     } finally { setML(false); }
+  };
+
+  /* ── Correct a service bill number ─────────────────────────────── */
+  const saveBillNo = async () => {
+    if (!selected || editBillNo === null || !editBillNo.trim()) return;
+    setSavingBillNo(true);
+    setActionError(null);
+    try {
+      const { data } = await api.patch(`/billing/invoices/${selected.id}/bill-no`, { billNo: editBillNo.trim() });
+      setSelected(data);
+      setEditBillNo(null);
+      load(page);
+    } catch (e: any) {
+      setActionError(e?.response?.data?.message || 'Could not change the bill number');
+    } finally {
+      setSavingBillNo(false);
+    }
   };
 
   /* ── Print receipt ────────────────────────────────────────────── */
@@ -253,6 +289,21 @@ export default function InvoicesPage() {
           </button>
         </div>
 
+        {/* Bill type tabs */}
+        <div className="flex gap-1 mb-2">
+          {TYPE_TABS.map(([key, label]) => (
+            <button
+              key={key || 'all'}
+              onClick={() => setTypeFilter(key)}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold ${
+                typeFilter === key ? 'bg-red-700 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
         {/* Filters row */}
         <div className="flex flex-col gap-2">
           <div className="flex flex-col sm:flex-row gap-2">
@@ -262,7 +313,7 @@ export default function InvoicesPage() {
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Invoice number, customer name or mobile…"
+                placeholder="Bill no, customer name, mobile or card no…"
                 className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
               />
               {search && (
@@ -340,7 +391,7 @@ export default function InvoicesPage() {
                 <div key={inv.id} className="bg-white rounded-xl border p-4 space-y-2">
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <p className="font-mono text-red-700 font-semibold text-sm">{inv.invoiceNumber}</p>
+                      <p className="font-mono text-red-700 font-semibold text-sm">{billLabel(inv)}</p>
                       <p className="text-xs text-gray-500">
                         {new Date(inv.createdAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
                       </p>
@@ -371,7 +422,7 @@ export default function InvoicesPage() {
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 border-b">
                   <tr>
-                    <th className="text-left px-4 py-3 font-medium text-gray-600 text-xs uppercase">Invoice #</th>
+                    <th className="text-left px-4 py-3 font-medium text-gray-600 text-xs uppercase">Bill No</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-600 text-xs uppercase">Customer</th>
                     <th className="text-left px-4 py-3 font-medium text-gray-600 text-xs uppercase">Status</th>
                     <th className="text-right px-4 py-3 font-medium text-gray-600 text-xs uppercase">Total</th>
@@ -384,7 +435,10 @@ export default function InvoicesPage() {
                 <tbody className="divide-y divide-gray-50">
                   {invoices.map((inv) => (
                     <tr key={inv.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => handleView(inv.id)}>
-                      <td className="px-4 py-3 font-mono text-red-700 font-semibold text-xs">{inv.invoiceNumber}</td>
+                      <td className="px-4 py-3 font-mono text-red-700 font-semibold text-xs">
+                        {billLabel(inv)}
+                        {inv.billNo && <div className="font-normal text-[10px] text-gray-400">{inv.invoiceNumber}</div>}
+                      </td>
                       <td className="px-4 py-3">
                         {inv.customer ? (
                           <div>
@@ -467,7 +521,29 @@ export default function InvoicesPage() {
                 <div className="flex items-start justify-between p-5 border-b">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <h2 className="text-base font-bold font-mono text-red-700">{selected.invoiceNumber}</h2>
+                      {editBillNo !== null ? (
+                        <span className="flex items-center gap-1">
+                          <input
+                            value={editBillNo}
+                            onChange={(e) => setEditBillNo(e.target.value)}
+                            className="w-24 border rounded px-2 py-1 text-sm font-mono"
+                            autoFocus
+                          />
+                          <button onClick={saveBillNo} disabled={savingBillNo} className="text-xs font-semibold text-white bg-red-700 rounded px-2 py-1 disabled:opacity-50">
+                            {savingBillNo ? '…' : 'Save'}
+                          </button>
+                          <button onClick={() => setEditBillNo(null)} className="text-xs text-gray-500 px-1">Cancel</button>
+                        </span>
+                      ) : (
+                        <>
+                          <h2 className="text-base font-bold font-mono text-red-700">{billLabel(selected)}</h2>
+                          {isManager && selected.billType === 'SERVICE' && (
+                            <button onClick={() => setEditBillNo(selected.billNo || '')} className="text-xs text-red-700 underline">
+                              Edit no.
+                            </button>
+                          )}
+                        </>
+                      )}
                       <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${STATUS_STYLE[selected.status as InvoiceStatus]}`}>
                         {STATUS_LABEL[selected.status as InvoiceStatus]}
                       </span>
@@ -477,7 +553,7 @@ export default function InvoicesPage() {
                       {selected.createdBy && ` · ${selected.createdBy.name}`}
                     </p>
                   </div>
-                  <button onClick={() => { setSelected(null); setReturnModal(false); setConfirmCancel(false); setActionError(null); }} className="text-gray-400 hover:text-gray-700 ml-3">
+                  <button onClick={() => { setSelected(null); setReturnModal(false); setConfirmCancel(false); setActionError(null); setEditBillNo(null); }} className="text-gray-400 hover:text-gray-700 ml-3">
                     <X className="h-5 w-5" />
                   </button>
                 </div>
@@ -658,7 +734,7 @@ export default function InvoicesPage() {
                           return (
                             <div key={item.id} className="flex items-center gap-3">
                               <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-gray-800 truncate">{item.sku.product.name}</p>
+                                <p className="text-sm font-medium text-gray-800 truncate">{item.description || item.sku.product.name}</p>
                                 <p className="text-xs text-gray-500">{item.sku.variantName} · Max returnable: {max}</p>
                               </div>
                               <div className="flex items-center gap-1">

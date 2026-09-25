@@ -150,14 +150,20 @@ export const useBillingStore = create<BillingState>()(
         ),
 
       subtotal: () => get().items.reduce((s, i) => s + i.unitPrice * i.quantity, 0),
-      taxTotal: () =>
-        get().gstApplied
-          ? get().items.reduce((s, i) => s + (i.unitPrice * i.quantity * i.taxRate) / 100, 0)
-          : 0,
+      // Mirrors BillingService.createInvoice: GST is charged on the value
+      // after the discount (spread across lines in proportion to their price).
+      taxTotal: () => {
+        const { gstApplied, items, subtotal, discountAmount } = get();
+        if (!gstApplied) return 0;
+        const sub = subtotal();
+        const ratio = sub > 0 ? (sub - discountAmount()) / sub : 1;
+        return items.reduce((s, i) => s + Math.round(i.unitPrice * i.quantity * ratio * i.taxRate) / 100, 0);
+      },
       discountAmount: () => {
         const { discountType, discountValue, subtotal } = get();
-        if (discountType === 'PERCENT') return (subtotal() * discountValue) / 100;
-        if (discountType === 'FLAT') return discountValue;
+        const sub = subtotal();
+        if (discountType === 'PERCENT') return Math.min(sub, (sub * discountValue) / 100);
+        if (discountType === 'FLAT') return Math.min(sub, discountValue);
         return 0;
       },
       total: () => get().subtotal() + get().taxTotal() - get().discountAmount(),

@@ -10,14 +10,38 @@ import {
   ValidateNested,
   IsIn,
   Matches,
+  MaxLength,
+  ValidateIf,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { PaymentMode } from '@prisma/client';
+import { BillType, PaymentMode, ServiceCategory } from '@prisma/client';
 
 export class InvoiceItemDto {
+  // Omitted for a free-typed line (service bills: "IRF media changed",
+  // "Service charges") — those are billed against the store's non-stock
+  // service-charge SKU and need description + unitPrice instead.
+  @ValidateIf((o) => !o.description)
   @IsString()
   @IsNotEmpty()
-  skuId: string;
+  skuId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  description?: string;
+
+  // Price before GST. Only honoured on service bills and free-typed lines —
+  // counter sales always bill at the SKU's selling price.
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  unitPrice?: number;
+
+  // GST % for a free-typed line (defaults to the service-charge SKU's rate).
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  taxRate?: number;
 
   // 0.001 (not 1) so weight/volume/length units (KG, LITER, METER) can be sold
   // in fractional amounts — BillingService rejects non-integer quantities for
@@ -92,4 +116,40 @@ export class CreateInvoiceDto {
   @IsOptional()
   @IsBoolean()
   gstApplied?: boolean;
+
+  @IsOptional()
+  @IsEnum(BillType)
+  billType?: BillType;
+
+  // Typed-in bill number (entering an existing paper bill). Left out, the
+  // next number in the bill's series is used.
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  billNo?: string;
+
+  @IsOptional()
+  @IsEnum(ServiceCategory)
+  serviceCategory?: ServiceCategory;
+
+  @IsOptional()
+  @IsString()
+  technicianId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  tdsRaw?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  tdsTreated?: string;
+}
+
+export class UpdateBillNoDto {
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(30)
+  billNo: string;
 }

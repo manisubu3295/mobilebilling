@@ -12,7 +12,7 @@ import {
 import { Request } from 'express';
 import { SkipThrottle } from '@nestjs/throttler';
 import { BillingService } from './billing.service';
-import { CreateInvoiceDto, PaymentDto } from './dto/create-invoice.dto';
+import { CreateInvoiceDto, PaymentDto, UpdateBillNoDto } from './dto/create-invoice.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -45,8 +45,9 @@ export class BillingController {
     @Query('from') from?: string,
     @Query('to') to?: string,
     @Query('status') status?: string,
+    @Query('type') type?: string,
   ) {
-    return this.billingService.listInvoices(storeId, +page, +limit, search, from, to, status);
+    return this.billingService.listInvoices(storeId, +page, +limit, search, from, to, status, type);
   }
 
   @Get('invoices/export')
@@ -55,8 +56,15 @@ export class BillingController {
     @CurrentUser('storeId') storeId: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
+    @Query('type') type?: string,
   ) {
-    return this.billingService.listInvoicesForExport(storeId, from, to);
+    return this.billingService.listInvoicesForExport(storeId, from, to, type);
+  }
+
+  @Patch('invoices/:id/bill-no')
+  @Roles(Role.SUPER_ADMIN, Role.STORE_MANAGER)
+  updateBillNo(@Param('id') id: string, @Body() dto: UpdateBillNoDto, @CurrentUser() user: any) {
+    return this.billingService.updateBillNo(id, user.storeId, user.id, dto.billNo);
   }
 
   @Get('invoices/:id')

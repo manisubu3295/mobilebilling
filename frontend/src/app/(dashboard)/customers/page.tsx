@@ -10,7 +10,10 @@ interface Customer {
   phone: string;
   email: string | null;
   address: string | null;
+  city?: string | null;
+  landmark?: string | null;
   gstin: string | null;
+  cardNo?: string | null;
   isActive: boolean;
   customFields: Record<string, any> | null;
   createdAt: string;
@@ -212,7 +215,9 @@ export default function CustomersPage() {
             <div className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-3 text-sm">
                 {selected.email && <div><span className="text-gray-500">Email:</span> <span className="font-medium">{selected.email}</span></div>}
-                {selected.address && <div><span className="text-gray-500">Address:</span> <span className="font-medium">{selected.address}</span></div>}
+                {selected.cardNo && <div><span className="text-gray-500">Card No:</span> <span className="font-medium font-mono">{selected.cardNo}</span></div>}
+                {selected.address && <div><span className="text-gray-500">Address:</span> <span className="font-medium">{[selected.address, selected.city].filter(Boolean).join(', ')}</span></div>}
+                {selected.landmark && <div><span className="text-gray-500">Landmark:</span> <span className="font-medium">{selected.landmark}</span></div>}
                 {selected.gstin && <div><span className="text-gray-500">GSTIN:</span> <span className="font-medium font-mono">{selected.gstin}</span></div>}
                 {selected.customFields?.vehicle_no && <div><span className="text-gray-500">Vehicle No:</span> <span className="font-medium font-mono">{selected.customFields.vehicle_no}</span></div>}
                 {selected.customFields?.re_model && <div><span className="text-gray-500">Model:</span> <span className="font-medium">{selected.customFields.re_model}</span></div>}
@@ -267,7 +272,10 @@ function CustomerFormModal({ customer, onClose, onSave }: { customer?: Customer;
     phone: customer?.phone ?? '',
     email: customer?.email ?? '',
     address: customer?.address ?? '',
+    city: customer?.city ?? '',
+    landmark: customer?.landmark ?? '',
     gstin: customer?.gstin ?? '',
+    cardNo: customer?.cardNo ?? '',
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -308,7 +316,10 @@ function CustomerFormModal({ customer, onClose, onSave }: { customer?: Customer;
             { label: 'Phone *', key: 'phone', placeholder: '9876543210' },
             { label: 'Email', key: 'email', placeholder: '' },
             { label: 'Address', key: 'address', placeholder: '' },
+            { label: 'City', key: 'city', placeholder: '' },
+            { label: 'Land Mark', key: 'landmark', placeholder: '' },
             { label: 'GSTIN', key: 'gstin', placeholder: '33XXXXX1234X1ZX' },
+            { label: 'Card No / Customer ID', key: 'cardNo', placeholder: 'Number on the warranty card' },
           ].map(({ label, key, placeholder }) => (
             <div key={key}>
               <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>

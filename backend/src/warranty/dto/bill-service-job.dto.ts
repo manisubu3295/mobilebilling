@@ -1,4 +1,5 @@
-import { IsArray, ValidateNested } from 'class-validator';
+import { IsArray, IsEnum, IsOptional, IsString, MaxLength, ValidateNested } from 'class-validator';
+import { ServiceCategory } from '@prisma/client';
 import { Type } from 'class-transformer';
 import { PaymentDto } from '../../billing/dto/create-invoice.dto';
 
@@ -10,4 +11,15 @@ export class BillServiceJobDto {
   @ValidateNested({ each: true })
   @Type(() => PaymentDto)
   payments: PaymentDto[];
+
+  // Paper service-bill number, when the technician already wrote one out;
+  // left out, the next SERVICE series number is used.
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  billNo?: string;
+
+  @IsOptional()
+  @IsEnum(ServiceCategory)
+  serviceCategory?: ServiceCategory;
 }

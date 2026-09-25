@@ -94,6 +94,30 @@ enum StockStatus {
   DEFECTIVE_RMA
 }
 
+// SALES = counter sale / checkout; SERVICE = technician service bill.
+enum BillType {
+  SALES
+  SERVICE
+}
+
+// Which running number a bill takes. GST sales bills get their own series
+// (the only bills filed with the auditor); non-GST sales and service bills
+// each have theirs.
+enum BillSeries {
+  GST_SALES
+  SALES
+  SERVICE
+}
+
+// The tick-box row on the technician's paper service bill.
+enum ServiceCategory {
+  WARRANTY
+  OUT_OF_WARRANTY
+  OTHER_SERVICE
+  IRF
+  AMC
+}
+
 enum InvoiceStatus {
   DRAFT
   PAID
@@ -138,6 +162,9 @@ model Store {
   // Default lookahead window (in days) for the "Next Service" screen — how
   // far ahead an upcoming service visit shows up before its due date.
   nextServiceLookaheadDays Int @default(30) @map("next_service_lookahead_days")
+  // Customer-care terms printed on the warranty card (the client's card has
+  // a Tamil block here). Plain text, one line per row.
+  warrantyCardTerms String? @map("warranty_card_terms")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
@@ -154,6 +181,7 @@ model Store {
   quotations           Quotation[]
   notifications        Notification[]
   websiteProducts      WebsiteProduct[]
+  websiteCategories    WebsiteCategory[]
   leads                Lead[]
 
   @@map("stores")
@@ -173,7 +201,8 @@ model User {
   updatedAt    DateTime @updatedAt @map("updated_at")
 
   refreshTokens RefreshToken[]
-  invoices      Invoice[]
+  invoices      Invoice[] @relation("InvoiceCreatedBy")
+  technicianInvoices Invoice[] @relation("InvoiceTechnician")
   auditLogs     AuditLog[]
   approvedWarranties  Warranty[]
   assignedServiceJobs ServiceJob[]
@@ -357,7 +386,11 @@ model Customer {
   phone     String   @unique
   email     String?
   address   String?
+  city      String?
+  landmark  String?
   gstin     String?
+  // "Customer ID" on the paper warranty card / service record (e.g. 301).
+  cardNo    String?  @unique @map("card_no")
   isActive  Boolean  @default(true) @map("is_active")
   customFields Json? @map("custom_fields")
   createdAt DateTime @default(now()) @map("created_at")
@@ -381,8 +414,20 @@ model Invoice {
   customerId     String?       @map("customer_id")
   customer       Customer?     @relation(fields: [customerId], references: [id])
   createdById    String        @map("created_by_id")
-  createdBy      User          @relation(fields: [createdById], references: [id])
+  createdBy      User          @relation("InvoiceCreatedBy", fields: [createdById], references: [id])
   status         InvoiceStatus @default(DRAFT)
+  // Printed bill number — short running number per series (GST bills reset
+  // each financial year, the others run continuously), or typed in by hand
+  // when entering an existing paper bill. invoiceNumber stays the internal id.
+  billType        BillType         @default(SALES) @map("bill_type")
+  billSeries      BillSeries?      @map("bill_series")
+  billFy          String?          @map("bill_fy")
+  billNo          String?          @map("bill_no")
+  serviceCategory ServiceCategory? @map("service_category")
+  technicianId    String?          @map("technician_id")
+  technician      User?            @relation("InvoiceTechnician", fields: [technicianId], references: [id])
+  tdsRaw          String?          @map("tds_raw")
+  tdsTreated      String?          @map("tds_treated")
   subtotal       Decimal       @db.Decimal(10, 2)
   discountType   String?       @map("discount_type")
   discountValue  Decimal       @default(0) @map("discount_value") @db.Decimal(10, 2)
@@ -403,10 +448,12 @@ model Invoice {
   quotationOrigin Quotation?
   serviceJobOrigin ServiceJob?
 
+  @@unique([storeId, billSeries, billFy, billNo])
   @@index([invoiceNumber])
   @@index([storeId])
   @@index([customerId])
   @@index([createdAt])
+  @@index([storeId, billType])
   @@map("invoices")
 }
 
@@ -423,6 +470,9 @@ model InvoiceItem {
   taxAmount    Decimal @map("tax_amount") @db.Decimal(10, 2)
   lineTotal    Decimal @map("line_total") @db.Decimal(10, 2)
   hsnCode      String? @map("hsn_code")
+  // Free-typed line text (service bills: "IRF media changed", "Service
+  // charges") — printed instead of the product name when set.
+  description  String?
 
   serialUnits SerialInventory[]
   warranty    Warranty?
@@ -490,6 +540,24 @@ model Warranty {
   approvedAt           DateTime?         @map("approved_at")
   startDate            DateTime          @map("start_date") // = sale date
   nextServiceDueAt     DateTime?         @map("next_service_due_at")
+  // Warranty card / service record details (client's paper card layout).
+  cardDate             DateTime?         @map("card_date")
+  tds                  String?
+  hardness             String?
+  iron                 String?
+  otherImpurities      String?           @map("other_impurities")
+  brand                String?
+  model                String?
+  pump                 String?
+  membrane             String?
+  power                String?
+  vessel               String?
+  valve                String?
+  media                String?
+  soldBy               String?           @map("sold_by")
+  installedBy          String?           @map("installed_by")
+  amcFrom              DateTime?         @map("amc_from")
+  amcTo                DateTime?         @map("amc_to")
   createdAt            DateTime          @default(now()) @map("created_at")
   updatedAt            DateTime          @updatedAt @map("updated_at")
 
@@ -632,11 +700,39 @@ model QuotationItem {
 // PlatformAccount.siteKey in the master DB, not a JWT) for the storefront
 // itself, and the normal authenticated tenant API for admin management here.
 
+// Two-level storefront catalog tree, like the supplier app the client showed:
+// "Domestic RO System" → "12 LPH", "Domestic Spares" → "Membrane"…
+model WebsiteCategory {
+  id        String   @id @default(cuid())
+  storeId   String   @map("store_id")
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  name      String
+  parentId  String?  @map("parent_id")
+  parent    WebsiteCategory?  @relation("CategoryTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children  WebsiteCategory[] @relation("CategoryTree")
+  sortOrder Int      @default(0) @map("sort_order")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  products    WebsiteProduct[] @relation("ProductCategory")
+  subProducts WebsiteProduct[] @relation("ProductSubCategory")
+
+  @@index([storeId, parentId])
+  @@map("website_categories")
+}
+
 model WebsiteProduct {
   id               String   @id @default(cuid())
   storeId          String   @map("store_id")
   store            Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  // Display name of the top-level category — kept in sync from categoryId
+  // when one is picked, so older storefront code reading it keeps working.
   category         String   // e.g. "Household RO/UV/Softener", "Commercial RO Plants"
+  categoryId       String?  @map("category_id")
+  categoryRef      WebsiteCategory? @relation("ProductCategory", fields: [categoryId], references: [id], onDelete: SetNull)
+  subCategoryId    String?  @map("sub_category_id")
+  subCategory      WebsiteCategory? @relation("ProductSubCategory", fields: [subCategoryId], references: [id], onDelete: SetNull)
+  brand            String?
   name             String
   shortDescription String?  @map("short_description")
   description      String?
@@ -674,4 +770,18 @@ model Lead {
 
   @@index([storeId, status])
   @@map("leads")
+}
+
+// Running counters for printed document numbers (bill series, warranty card
+// numbers). Incremented with a single UPDATE … RETURNING so two bills saved
+// at the same moment can't take the same number. fy is "2026-27" for series
+// that reset each financial year, "ALL" for continuous ones.
+model DocSequence {
+  storeId String @map("store_id")
+  key     String // BillSeries value, or "CARD"
+  fy      String
+  next    Int    @default(1)
+
+  @@id([storeId, key, fy])
+  @@map("doc_sequences")
 }

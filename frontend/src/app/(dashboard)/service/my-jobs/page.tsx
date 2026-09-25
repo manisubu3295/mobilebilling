@@ -25,7 +25,7 @@ interface ServiceJob {
   customerChargeNotes: string | null;
   closedAt: string | null;
   invoiceId: string | null;
-  invoice: { id: string; invoiceNumber: string; totalAmount: string } | null;
+  invoice: { id: string; invoiceNumber: string; billNo?: string | null; totalAmount: string } | null;
   parts: ServiceJobPart[];
   warranty: {
     customer: { name: string; phone: string; address: string | null };
@@ -177,6 +177,8 @@ function JobDetailSheet({ job, onClose, onSaved }: { job: ServiceJob; onClose: (
   const [error, setError] = useState('');
   const [billMode, setBillMode] = useState<'CASH' | 'UPI' | 'CREDIT_CARD' | 'DEBIT_CARD' | 'BANK_TRANSFER' | 'EMI'>('CASH');
   const [billing, setBilling] = useState(false);
+  const [billNo, setBillNo] = useState('');
+  const [billCategory, setBillCategory] = useState<'WARRANTY' | 'OUT_OF_WARRANTY' | 'OTHER_SERVICE' | 'IRF' | 'AMC'>('WARRANTY');
 
   const [parts, setParts] = useState<ServiceJobPart[]>(job.parts || []);
   const [partQuery, setPartQuery] = useState('');
@@ -244,6 +246,8 @@ function JobDetailSheet({ job, onClose, onSaved }: { job: ServiceJob; onClose: (
       await api.patch(`/warranty/service-jobs/${job.id}/update`, buildPayload());
       const { data } = await api.patch(`/warranty/service-jobs/${job.id}/bill`, {
         payments: [{ mode: billMode, amount: billTotal }],
+        billNo: billNo.trim() || undefined,
+        serviceCategory: billCategory,
       });
       printReceipt(data);
       onSaved();
@@ -410,7 +414,7 @@ function JobDetailSheet({ job, onClose, onSaved }: { job: ServiceJob; onClose: (
             <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
               <Receipt className="h-4 w-4 text-green-700 shrink-0" />
               <span className="text-sm text-green-800 font-medium">
-                Billed — {job.invoice.invoiceNumber} · ₹{parseFloat(job.invoice.totalAmount).toLocaleString('en-IN')}
+                Billed — {job.invoice.billNo ? `Bill No. ${job.invoice.billNo}` : job.invoice.invoiceNumber} · ₹{parseFloat(job.invoice.totalAmount).toLocaleString('en-IN')}
               </span>
             </div>
           ) : billTotal > 0 ? (
@@ -418,6 +422,21 @@ function JobDetailSheet({ job, onClose, onSaved }: { job: ServiceJob; onClose: (
               <p className="text-xs font-medium text-gray-600">
                 Bill {parts.length > 0 && `${parts.length} part(s)`}{parts.length > 0 && savedChargeAmount > 0 && ' + '}{savedChargeAmount > 0 && 'visit charge'} — ₹{billTotal.toLocaleString('en-IN')} total
               </p>
+              <div className="flex gap-2">
+                <input
+                  value={billNo}
+                  onChange={(e) => setBillNo(e.target.value)}
+                  placeholder="Bill no (auto)"
+                  className="w-28 border rounded-lg px-2 py-2 text-sm bg-white"
+                />
+                <select value={billCategory} onChange={(e) => setBillCategory(e.target.value as any)} className="flex-1 border rounded-lg px-2 py-2 text-sm bg-white">
+                  <option value="WARRANTY">Warranty</option>
+                  <option value="OUT_OF_WARRANTY">Out of Warranty</option>
+                  <option value="OTHER_SERVICE">Other Service</option>
+                  <option value="IRF">IRF</option>
+                  <option value="AMC">AMC</option>
+                </select>
+              </div>
               <div className="flex gap-2">
                 <select value={billMode} onChange={(e) => setBillMode(e.target.value as any)} className="flex-1 border rounded-lg px-2 py-2 text-sm bg-white">
                   <option value="CASH">Cash</option>

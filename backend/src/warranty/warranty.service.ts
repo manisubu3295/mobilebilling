@@ -8,7 +8,9 @@ import { CreateServiceJobDto } from './dto/create-service-job.dto';
 import { BillServiceJobDto } from './dto/bill-service-job.dto';
 import { AddServiceJobPartDto } from './dto/add-service-job-part.dto';
 import { CreateStandaloneWarrantyDto } from './dto/create-standalone-warranty.dto';
-import { Role, ServiceFrequency, ServiceJobStatus, WarrantyStatus, AuditAction, InvoiceStatus, ProductType, NotificationType } from '@prisma/client';
+import { UpdateWarrantyCardDto } from './dto/warranty-card.dto';
+import { Role, ServiceFrequency, ServiceJobStatus, WarrantyStatus, AuditAction, InvoiceStatus, ProductType, NotificationType, BillType, BillSeries, ServiceCategory } from '@prisma/client';
+import { assignBillNo, nextInvoiceNumber } from '../billing/bill-numbers';
 import { Decimal } from '@prisma/client/runtime/library';
 
 const ADMIN_ROLES: Role[] = [Role.SUPER_ADMIN, Role.STORE_MANAGER];
@@ -24,7 +26,7 @@ function addFrequency(date: Date, frequency: ServiceFrequency): Date {
 }
 
 const warrantyInclude = {
-  customer: { select: { id: true, name: true, phone: true, address: true } },
+  customer: { select: { id: true, name: true, phone: true, address: true, cardNo: true } },
   // Always present — the reliable source for "what product is this AMC for",
   // whether or not the warranty came from an actual sale in this system.
   product: { select: { id: true, name: true, brand: true } },
@@ -42,15 +44,13 @@ const warrantyInclude = {
 const serviceJobInclude = {
   warranty: { include: warrantyInclude },
   assignedTo: { select: { id: true, name: true } },
-  invoice: { select: { id: true, invoiceNumber: true, totalAmount: true } },
+  invoice: { select: { id: true, invoiceNumber: true, billNo: true, totalAmount: true } },
   parts: {
     include: { sku: { include: { product: { select: { name: true } } } } },
     orderBy: { createdAt: 'asc' as const },
   },
 };
 
-const SERVICE_CHARGE_PRODUCT_NAME = 'Service Visit Charge';
-const SERVICE_CHARGE_CATEGORY_NAME = 'Services';
 
 @Injectable()
 export class WarrantyService {
@@ -136,6 +136,69 @@ export class WarrantyService {
   // visits again; one that was cancelled while still PENDING_APPROVAL (a
   // rejected claim) goes back into the approval queue instead, since it was
   // never actually active.
+  // Everything the printed warranty card needs: full customer, product, store
+  // (name, address, phones, card terms) and the card's own fields.
+  async getWarrantyCard(id: string, storeId: string) {
+    const warranty = await this.prisma.warranty.findFirst({
+      where: { id, storeId },
+      include: {
+        customer: true,
+        product: { select: { id: true, name: true, brand: true } },
+        store: true,
+        invoiceItem: { include: { serialUnits: { select: { serialNumber: true }, take: 1 } } },
+      },
+    });
+    if (!warranty) throw new NotFoundException('Warranty not found');
+    return warranty;
+  }
+
+  async updateWarrantyCard(id: string, storeId: string, dto: UpdateWarrantyCardDto) {
+    const warranty = await this.prisma.warranty.findFirst({ where: { id, storeId } });
+    if (!warranty) throw new NotFoundException('Warranty not found');
+
+    const text = (v?: string) => (v === undefined ? undefined : v.trim() || null);
+    const date = (v?: string | null) => (v === undefined ? undefined : v ? new Date(v) : null);
+
+    const cardNo = text(dto.cardNo);
+    if (cardNo) {
+      const clash = await this.prisma.customer.findFirst({
+        where: { cardNo, id: { not: warranty.customerId } },
+        select: { name: true },
+      });
+      if (clash) throw new BadRequestException(`Card no ${cardNo} is already given to ${clash.name}`);
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.customer.update({
+        where: { id: warranty.customerId },
+        data: { cardNo, address: text(dto.address), city: text(dto.city), landmark: text(dto.landmark) },
+      }),
+      this.prisma.warranty.update({
+        where: { id },
+        data: {
+          cardDate: date(dto.cardDate),
+          tds: text(dto.tds),
+          hardness: text(dto.hardness),
+          iron: text(dto.iron),
+          otherImpurities: text(dto.otherImpurities),
+          brand: text(dto.brand),
+          model: text(dto.model),
+          pump: text(dto.pump),
+          membrane: text(dto.membrane),
+          power: text(dto.power),
+          vessel: text(dto.vessel),
+          valve: text(dto.valve),
+          media: text(dto.media),
+          soldBy: text(dto.soldBy),
+          installedBy: text(dto.installedBy),
+          amcFrom: date(dto.amcFrom),
+          amcTo: date(dto.amcTo),
+        },
+      }),
+    ]);
+    return this.getWarrantyCard(id, storeId);
+  }
+
   async reactivateWarranty(id: string, storeId: string) {
     const warranty = await this.prisma.warranty.findFirst({ where: { id, storeId } });
     if (!warranty) throw new NotFoundException('Warranty not found');
@@ -360,47 +423,6 @@ export class WarrantyService {
     });
   }
 
-  // Lazily provisions a non-stock "Service Visit Charge" SKU the first time a
-  // store bills a service job — keeps this out of the normal Add Product flow
-  // (it isn't a physical good) while still reusing the real Invoice/Payment
-  // machinery (GST, receipts, Accounts reporting) instead of a separate ledger.
-  private async _getOrCreateServiceChargeSku(storeId: string) {
-    const existing = await this.prisma.sKU.findFirst({
-      where: { storeId, product: { name: SERVICE_CHARGE_PRODUCT_NAME } },
-    });
-    if (existing) return existing;
-
-    let category = await this.prisma.category.findUnique({ where: { name: SERVICE_CHARGE_CATEGORY_NAME } });
-    if (!category) category = await this.prisma.category.create({ data: { name: SERVICE_CHARGE_CATEGORY_NAME } });
-
-    const product = await this.prisma.product.create({
-      data: {
-        name: SERVICE_CHARGE_PRODUCT_NAME,
-        categoryId: category.id,
-        storeId,
-        requiresService: false,
-        type: ProductType.SERVICE,
-        skus: {
-          create: [{
-            variantName: 'Standard',
-            unit: 'PCS',
-            isSerialized: false,
-            stockQty: 0,
-            // No GST by default — edit this SKU from Inventory (it appears
-            // under "Services") if the store wants to charge GST on visits.
-            costPrice: new Decimal(0),
-            sellingPrice: new Decimal(0),
-            taxRate: new Decimal(0),
-            lowStockThreshold: 0,
-            storeId,
-          }],
-        },
-      },
-      include: { skus: true },
-    });
-    return product.skus[0];
-  }
-
   async billServiceJob(jobId: string, storeId: string, userId: string, dto: BillServiceJobDto) {
     const job = await this.prisma.serviceJob.findFirst({
       where: { id: jobId, storeId },
@@ -423,7 +445,7 @@ export class WarrantyService {
     // as tax-inclusive, same as before parts existed).
     type LineItem = {
       skuId: string; quantity: Decimal; unitPrice: Decimal; taxRate: Decimal;
-      taxAmount: Decimal; lineTotal: Decimal; hsnCode: string | null;
+      taxAmount: Decimal; lineTotal: Decimal; hsnCode: string | null; description?: string | null;
     };
     const lineItems: LineItem[] = job.parts.map((p) => {
       const lineSubtotal = p.unitPrice.mul(p.quantity);
@@ -440,7 +462,7 @@ export class WarrantyService {
     });
 
     if (laborTotal.greaterThan(0)) {
-      const chargeSku = await this._getOrCreateServiceChargeSku(storeId);
+      const chargeSku = await this.billingService.getOrCreateServiceChargeSku(storeId);
       const divisor = new Decimal(1).add(chargeSku.taxRate.div(100));
       const unitPrice = laborTotal.div(divisor);
       const taxAmount = laborTotal.sub(unitPrice);
@@ -452,6 +474,7 @@ export class WarrantyService {
         taxAmount,
         lineTotal: laborTotal,
         hsnCode: null,
+        description: job.customerChargeNotes?.trim() || 'Service charges',
       });
     }
 
@@ -461,12 +484,18 @@ export class WarrantyService {
     const paidDecimal = new Decimal(paidTotal);
 
     const invoice = await this.prisma.$transaction(async (tx) => {
-      const count = await tx.invoice.count({ where: { storeId } });
-      const invoiceNumber = `INV-${storeId.slice(-4).toUpperCase()}-${String(count + 1).padStart(6, '0')}`;
+      const invoiceNumber = await nextInvoiceNumber(tx, storeId);
+      // System-generated service bill — same SERVICE series as bills entered
+      // from the Service Bill screen.
+      const bill = await assignBillNo(tx, storeId, BillSeries.SERVICE, new Date(), dto.billNo);
 
       const newInvoice = await tx.invoice.create({
         data: {
           invoiceNumber,
+          billType: BillType.SERVICE,
+          ...bill,
+          serviceCategory: dto.serviceCategory ?? ServiceCategory.WARRANTY,
+          technicianId: job.assignedToId,
           storeId,
           customerId: job.warranty.customerId,
           createdById: userId,
@@ -491,6 +520,7 @@ export class WarrantyService {
             taxAmount: item.taxAmount,
             lineTotal: item.lineTotal,
             hsnCode: item.hsnCode,
+            description: item.description ?? null,
           },
         });
       }
@@ -513,7 +543,7 @@ export class WarrantyService {
           action: AuditAction.INVOICE_CREATE,
           entityType: 'Invoice',
           entityId: newInvoice.id,
-          newValues: { invoiceNumber, totalAmount: total.toString(), fromServiceJob: jobId },
+          newValues: { invoiceNumber, billNo: bill.billNo, totalAmount: total.toString(), fromServiceJob: jobId },
         },
       });
 

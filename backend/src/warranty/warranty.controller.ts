@@ -9,6 +9,7 @@ import { RescheduleServiceJobDto } from './dto/reschedule-service-job.dto';
 import { BillServiceJobDto } from './dto/bill-service-job.dto';
 import { AddServiceJobPartDto } from './dto/add-service-job-part.dto';
 import { CreateStandaloneWarrantyDto } from './dto/create-standalone-warranty.dto';
+import { UpdateWarrantyCardDto } from './dto/warranty-card.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { ServiceModuleGuard } from '../common/guards/service-module.guard';
@@ -74,6 +75,22 @@ export class WarrantyController {
     @CurrentUser('storeId') storeId: string,
   ) {
     return this.warrantyService.updateWarranty(id, storeId, dto);
+  }
+
+  @Get(':id/card')
+  @Roles(...ADMIN_ROLES)
+  getWarrantyCard(@Param('id') id: string, @CurrentUser('storeId') storeId: string) {
+    return this.warrantyService.getWarrantyCard(id, storeId);
+  }
+
+  @Patch(':id/card')
+  @Roles(...ADMIN_ROLES)
+  updateWarrantyCard(
+    @Param('id') id: string,
+    @Body() dto: UpdateWarrantyCardDto,
+    @CurrentUser('storeId') storeId: string,
+  ) {
+    return this.warrantyService.updateWarrantyCard(id, storeId, dto);
   }
 
   @Patch(':id/reactivate')

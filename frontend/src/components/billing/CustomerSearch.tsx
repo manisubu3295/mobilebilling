@@ -9,6 +9,7 @@ interface Customer {
   name: string;
   phone: string;
   email?: string;
+  cardNo?: string | null;
   customFields?: Record<string, any>;
 }
 
@@ -23,7 +24,7 @@ export function CustomerSearch({ selectedId, onSelect }: CustomerSearchProps) {
   const [selected, setSelected] = useState<Customer | null>(null);
   const [loading, setLoading] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
-  const [newCustomer, setNewCustomer] = useState({ name: '', phone: '', email: '', address: '', gstin: '' });
+  const [newCustomer, setNewCustomer] = useState({ name: '', phone: '', email: '', address: '', city: '', gstin: '', cardNo: '' });
 
   const selectedRef = useRef<Customer | null>(null);
   useEffect(() => { selectedRef.current = selected; }, [selected]);
@@ -95,11 +96,13 @@ export function CustomerSearch({ selectedId, onSelect }: CustomerSearchProps) {
         ...newCustomer,
         email: newCustomer.email.trim() || undefined,
         address: newCustomer.address.trim() || undefined,
+        city: newCustomer.city.trim() || undefined,
         gstin: newCustomer.gstin.trim() || undefined,
+        cardNo: newCustomer.cardNo.trim() || undefined,
       });
       handleSelect(data);
       setShowCreate(false);
-      setNewCustomer({ name: '', phone: '', email: '', address: '', gstin: '' });
+      setNewCustomer({ name: '', phone: '', email: '', address: '', city: '', gstin: '', cardNo: '' });
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to create customer');
     }
@@ -111,6 +114,7 @@ export function CustomerSearch({ selectedId, onSelect }: CustomerSearchProps) {
         <div>
           <p className="text-sm font-semibold text-red-900">{selected.name}</p>
           <p className="text-xs text-red-600">
+            {selected.cardNo && `#${selected.cardNo} · `}
             {selected.phone}
             {selected.customFields?.vehicle_no && ` · ${selected.customFields.vehicle_no}`}
             {selected.customFields?.re_model && ` · ${selected.customFields.re_model}`}
@@ -132,7 +136,7 @@ export function CustomerSearch({ selectedId, onSelect }: CustomerSearchProps) {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search customer by name or phone..."
+            placeholder="Search customer by name, phone or card no..."
             className="w-full pl-9 pr-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
           />
         </div>
@@ -156,7 +160,7 @@ export function CustomerSearch({ selectedId, onSelect }: CustomerSearchProps) {
               className="w-full text-left px-3 py-2 hover:bg-gray-50 flex justify-between text-sm"
             >
               <span className="font-medium">{c.name}</span>
-              <span className="text-gray-500">{c.phone}</span>
+              <span className="text-gray-500">{c.cardNo ? `#${c.cardNo} · ` : ''}{c.phone}</span>
             </button>
           ))}
         </div>
@@ -190,6 +194,20 @@ export function CustomerSearch({ selectedId, onSelect }: CustomerSearchProps) {
               onChange={(e) => setNewCustomer((p) => ({ ...p, address: e.target.value }))}
               className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
             />
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                placeholder="City (optional)"
+                value={newCustomer.city}
+                onChange={(e) => setNewCustomer((p) => ({ ...p, city: e.target.value }))}
+                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+              />
+              <input
+                placeholder="Card No (optional)"
+                value={newCustomer.cardNo}
+                onChange={(e) => setNewCustomer((p) => ({ ...p, cardNo: e.target.value }))}
+                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+              />
+            </div>
             <input
               placeholder="GSTIN (optional)"
               value={newCustomer.gstin}

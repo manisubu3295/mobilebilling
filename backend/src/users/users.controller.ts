@@ -45,6 +45,14 @@ export class UsersController {
     return this.usersService.listUsers(storeId);
   }
 
+  // Name-only list for the Service Bill technician picker — open to billing
+  // clerks, who can't see the full staff list above.
+  @Get('technicians')
+  @Roles(Role.SUPER_ADMIN, Role.STORE_MANAGER, Role.BILLING_CLERK)
+  listTechnicians(@CurrentUser('storeId') storeId: string) {
+    return this.usersService.listTechnicians(storeId);
+  }
+
   @Patch(':id/toggle')
   @Roles(Role.SUPER_ADMIN, Role.STORE_MANAGER)
   toggleUser(@Param('id') id: string, @CurrentUser('storeId') storeId: string) {

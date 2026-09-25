@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Globe, Plus, Pencil, Trash2, Star, EyeOff, Upload, X, FileText } from 'lucide-react';
+import { Globe, Plus, Pencil, Trash2, Star, EyeOff, Upload, X, FileText, FolderTree } from 'lucide-react';
 import api from '@/lib/api';
+import { CategoryManager, WebsiteCategory } from '@/components/website/CategoryManager';
 
 const MAX_IMAGES = 6;
 const MAX_PDF_BYTES = 8 * 1024 * 1024; // 8MB — spec sheets go straight to base64, no resizing possible
@@ -48,6 +49,9 @@ function fileToDataUrl(file: File): Promise<string> {
 interface WebsiteProduct {
   id: string;
   category: string;
+  categoryId: string | null;
+  subCategoryId: string | null;
+  brand: string | null;
   name: string;
   shortDescription: string | null;
   description: string | null;
@@ -63,6 +67,9 @@ interface WebsiteProduct {
 
 type FormState = {
   category: string;
+  categoryId: string;
+  subCategoryId: string;
+  brand: string;
   name: string;
   shortDescription: string;
   description: string;
@@ -79,6 +86,9 @@ type FormState = {
 
 const EMPTY_FORM: FormState = {
   category: 'Household RO/UV/Softener',
+  categoryId: '',
+  subCategoryId: '',
+  brand: '',
   name: '',
   shortDescription: '',
   description: '',
@@ -100,6 +110,8 @@ function fmt(v: string | null) {
 
 export default function WebsiteProductsPage() {
   const [products, setProducts] = useState<WebsiteProduct[]>([]);
+  const [categoryList, setCategoryList] = useState<WebsiteCategory[]>([]);
+  const [showCategories, setShowCategories] = useState(false);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<WebsiteProduct | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -115,8 +127,12 @@ export default function WebsiteProductsPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await api.get('/website-products');
+      const [{ data }, { data: cats }] = await Promise.all([
+        api.get('/website-products'),
+        api.get('/website-categories').catch(() => ({ data: [] })),
+      ]);
       setProducts(data);
+      setCategoryList(cats);
     } finally {
       setLoading(false);
     }
@@ -129,6 +145,9 @@ export default function WebsiteProductsPage() {
     setEditing(p);
     setForm({
       category: p.category,
+      categoryId: p.categoryId || '',
+      subCategoryId: p.subCategoryId || '',
+      brand: p.brand || '',
       name: p.name,
       shortDescription: p.shortDescription || '',
       description: p.description || '',
@@ -147,11 +166,18 @@ export default function WebsiteProductsPage() {
   };
 
   const handleSave = async () => {
-    if (!form.name.trim() || !form.category.trim()) { setError('Name and category are required.'); return; }
+    const usesTree = topCategories.length > 0;
+    if (!form.name.trim() || (usesTree ? !form.categoryId : !form.category.trim())) {
+      setError('Name and category are required.');
+      return;
+    }
     setError('');
     setSaving(true);
     const payload = {
-      category: form.category.trim(),
+      ...(usesTree
+        ? { categoryId: form.categoryId, subCategoryId: form.subCategoryId || null }
+        : { category: form.category.trim() }),
+      brand: form.brand.trim() || null,
       name: form.name.trim(),
       shortDescription: form.shortDescription.trim() || undefined,
       description: form.description.trim() || undefined,
@@ -226,6 +252,10 @@ export default function WebsiteProductsPage() {
   };
 
   const categories = Array.from(new Set(products.map((p) => p.category)));
+  const topCategories = categoryList.filter((c) => !c.parentId && (c.isActive || c.id === form.categoryId));
+  const subCategories = categoryList.filter((c) => c.parentId === form.categoryId && (c.isActive || c.id === form.subCategoryId));
+  const categoryName = (id: string | null) => categoryList.find((c) => c.id === id)?.name;
+  const brands = Array.from(new Set(products.map((p) => p.brand).filter(Boolean))) as string[];
 
   return (
     <div className="h-full flex flex-col bg-gray-50">
@@ -234,12 +264,20 @@ export default function WebsiteProductsPage() {
           <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2"><Globe className="h-5 w-5 text-red-700" /> Website Products</h1>
           <p className="text-sm text-gray-500 mt-0.5">The catalog shown on the public website's shop — {products.length} products</p>
         </div>
-        <button
-          onClick={openAdd}
-          className="flex items-center gap-2 px-4 py-2 bg-red-700 text-white rounded-lg text-sm font-medium hover:bg-red-800 shrink-0"
-        >
-          <Plus className="h-4 w-4" /> <span className="hidden sm:inline">Add Product</span>
-        </button>
+        <div className="flex gap-2 shrink-0">
+          <button
+            onClick={() => setShowCategories(true)}
+            className="flex items-center gap-2 px-3 py-2 border rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            <FolderTree className="h-4 w-4" /> <span className="hidden sm:inline">Categories</span>
+          </button>
+          <button
+            onClick={openAdd}
+            className="flex items-center gap-2 px-4 py-2 bg-red-700 text-white rounded-lg text-sm font-medium hover:bg-red-800"
+          >
+            <Plus className="h-4 w-4" /> <span className="hidden sm:inline">Add Product</span>
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-auto p-4 sm:p-6 space-y-6">
@@ -269,6 +307,12 @@ export default function WebsiteProductsPage() {
                             <span className="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full font-medium bg-gray-100 text-gray-500">
                               <EyeOff className="h-3 w-3" /> Hidden
                             </span>
+                          )}
+                          {p.subCategoryId && categoryName(p.subCategoryId) && (
+                            <span className="text-xs px-1.5 py-0.5 rounded-full font-medium bg-gray-100 text-gray-600">{categoryName(p.subCategoryId)}</span>
+                          )}
+                          {p.brand && (
+                            <span className="text-xs px-1.5 py-0.5 rounded-full font-medium bg-amber-50 text-amber-700">{p.brand}</span>
                           )}
                           {p.capacityLph && (
                             <span className="text-xs px-1.5 py-0.5 rounded-full font-medium bg-blue-50 text-blue-700">{p.capacityLph} LPH</span>
@@ -313,6 +357,10 @@ export default function WebsiteProductsPage() {
         )}
       </div>
 
+      {showCategories && (
+        <CategoryManager categories={categoryList} onChange={load} onClose={() => setShowCategories(false)} />
+      )}
+
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4 overflow-auto">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg my-8">
@@ -322,18 +370,60 @@ export default function WebsiteProductsPage() {
             </div>
             <div className="p-6 space-y-3">
               {error && <p className="text-sm text-red-600 bg-red-50 p-2 rounded">{error}</p>}
+              {topCategories.length > 0 ? (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Category</label>
+                    <select
+                      value={form.categoryId}
+                      onChange={(e) => setForm((f) => ({ ...f, categoryId: e.target.value, subCategoryId: '' }))}
+                      className="w-full border rounded-lg px-3 py-2 text-sm bg-white"
+                    >
+                      <option value="">Select…</option>
+                      {topCategories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Sub-category</label>
+                    <select
+                      value={form.subCategoryId}
+                      onChange={(e) => setForm((f) => ({ ...f, subCategoryId: e.target.value }))}
+                      disabled={subCategories.length === 0}
+                      className="w-full border rounded-lg px-3 py-2 text-sm bg-white disabled:bg-gray-50"
+                    >
+                      <option value="">{subCategories.length === 0 ? '—' : 'None'}</option>
+                      {subCategories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Category</label>
+                  <input
+                    list="website-categories"
+                    value={form.category}
+                    onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
+                    placeholder="e.g. Household RO/UV/Softener, Commercial RO Plants"
+                    className="w-full border rounded-lg px-3 py-2 text-sm"
+                  />
+                  <datalist id="website-categories">
+                    <option value="Household RO/UV/Softener" />
+                    <option value="Commercial RO Plants" />
+                  </datalist>
+                  <p className="text-xs text-gray-400 mt-1">Set up categories (top right) for a category → sub-category menu on the website.</p>
+                </div>
+              )}
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Category</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Brand</label>
                 <input
-                  list="website-categories"
-                  value={form.category}
-                  onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
-                  placeholder="e.g. Household RO/UV/Softener, Commercial RO Plants"
+                  list="website-brands"
+                  value={form.brand}
+                  onChange={(e) => setForm((f) => ({ ...f, brand: e.target.value }))}
+                  placeholder="e.g. Chrome, Merlin, Wave, Olivar"
                   className="w-full border rounded-lg px-3 py-2 text-sm"
                 />
-                <datalist id="website-categories">
-                  <option value="Household RO/UV/Softener" />
-                  <option value="Commercial RO Plants" />
+                <datalist id="website-brands">
+                  {brands.map((b) => <option key={b} value={b} />)}
                 </datalist>
               </div>
               <div>

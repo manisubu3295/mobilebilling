@@ -15,6 +15,7 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { Role } from '@prisma/client';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 @Controller('customers')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -30,6 +31,11 @@ export class CustomersController {
   @Get()
   findAll(@Query('search') search?: string, @Query('includeInactive') includeInactive?: string) {
     return this.customersService.findAll(search, includeInactive === 'true');
+  }
+
+  @Get('next-card-no')
+  nextCardNo(@CurrentUser('storeId') storeId: string) {
+    return this.customersService.nextCardNo(storeId);
   }
 
   @Get(':id')

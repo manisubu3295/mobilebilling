@@ -8,6 +8,18 @@ export class UpdateWebsiteProductDto {
 
   @IsOptional()
   @IsString()
+  categoryId?: string | null;
+
+  @IsOptional()
+  @IsString()
+  subCategoryId?: string | null;
+
+  @IsOptional()
+  @IsString()
+  brand?: string | null;
+
+  @IsOptional()
+  @IsString()
   @IsNotEmpty()
   name?: string;
 

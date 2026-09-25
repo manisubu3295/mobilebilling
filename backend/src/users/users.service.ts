@@ -110,4 +110,12 @@ export class UsersService {
 
     return { tempPassword };
   }
+
+  listTechnicians(storeId: string) {
+    return this.prisma.user.findMany({
+      where: { storeId, isActive: true, role: { in: ['SERVICE_STAFF', 'STORE_MANAGER', 'SUPER_ADMIN'] } },
+      select: { id: true, name: true, role: true },
+      orderBy: [{ role: 'desc' }, { name: 'asc' }],
+    });
+  }
 }

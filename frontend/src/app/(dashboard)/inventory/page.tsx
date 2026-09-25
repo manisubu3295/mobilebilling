@@ -3,6 +3,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Plus, AlertTriangle, Package, Search, ChevronDown, ChevronRight, Tag, QrCode, Printer, ArrowUpDown, Pencil, Power } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
+import QRCode from 'qrcode';
+import { openPrintPreview } from '@/store/print.store';
 import api from '@/lib/api';
 import { ExportImportModal } from '@/components/inventory/ExportImportModal';
 import { useAuthStore } from '@/store/auth.store';
@@ -987,48 +989,40 @@ function Field({ label, value, onChange, type = 'text', placeholder = '' }: {
 function QrLabelModal({ data, storeName, onClose }: { data: QrLabelData; storeName: string; onClose: () => void }) {
   const [copies, setCopies] = useState(1);
 
-  const handlePrint = () => {
-    const win = window.open('', '_blank', 'width=600,height=500');
-    if (!win) return;
-    const labels = Array.from({ length: copies }).map(() => `
+  const handlePrint = async () => {
+    // QR is rendered to an image up front (no CDN script) and the sheet opens
+    // in the in-app print preview — a popup window here used to take over the
+    // Android app's WebView with no way back.
+    const qrImg = await QRCode.toDataURL(data.qrValue, { width: 180, margin: 0, errorCorrectionLevel: 'H' });
+    const esc = (v: string) => v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const label = `
       <div style="
         width:60mm; border:1px solid #ccc; border-radius:6px;
         padding:4mm; font-family:Arial,sans-serif; text-align:center;
         page-break-inside:avoid; display:inline-block; margin:2mm;
-        box-sizing:border-box;
+        box-sizing:border-box; vertical-align:top;
       ">
         <div style="font-size:7pt;font-weight:700;color:#7f1d1d;letter-spacing:0.5px;text-transform:uppercase;">
-          ${storeName}
+          ${esc(storeName)}
         </div>
-        <div style="font-size:9pt;font-weight:800;margin:1mm 0;line-height:1.2;">${data.productName}</div>
-        <div style="font-size:7.5pt;color:#444;margin-bottom:1mm;">${data.variantName}</div>
-        ${data.partNumber ? `<div style="font-size:7pt;font-family:monospace;color:#7f1d1d;">Code: ${data.partNumber}</div>` : ''}
-        <div id="qr-${Math.random().toString(36).slice(2)}" style="margin:2mm auto;width:fit-content;"></div>
-        <div style="font-size:7pt;font-family:monospace;color:#333;margin:1mm 0;">${data.qrValue}</div>
-        <div style="font-size:10pt;font-weight:800;color:#111;">₹${parseFloat(data.price).toLocaleString('en-IN')} / ${data.unit}</div>
-      </div>
-    `).join('');
+        <div style="font-size:9pt;font-weight:800;margin:1mm 0;line-height:1.2;">${esc(data.productName)}</div>
+        <div style="font-size:7.5pt;color:#444;margin-bottom:1mm;">${esc(data.variantName)}</div>
+        ${data.partNumber ? `<div style="font-size:7pt;font-family:monospace;color:#7f1d1d;">Code: ${esc(data.partNumber)}</div>` : ''}
+        <img src="${qrImg}" alt="" style="display:block;margin:2mm auto;width:24mm;height:24mm;" />
+        <div style="font-size:7pt;font-family:monospace;color:#333;margin:1mm 0;">${esc(data.qrValue)}</div>
+        <div style="font-size:10pt;font-weight:800;color:#111;">&#8377;${parseFloat(data.price).toLocaleString('en-IN')} / ${esc(data.unit)}</div>
+      </div>`;
 
-    win.document.write(`<!DOCTYPE html><html><head>
+    openPrintPreview(`<!DOCTYPE html><html><head>
+      <meta charset="UTF-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
       <title>QR Labels</title>
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
       <style>
         body { margin: 4mm; background: #fff; }
         @media print { @page { margin: 4mm; } }
       </style>
-    </head><body>
-      ${labels}
-      <script>
-        document.querySelectorAll('[id^="qr-"]').forEach(function(el) {
-          new QRCode(el, {
-            text: "${data.qrValue.replace(/"/g, '\\"')}",
-            width: 90, height: 90, correctLevel: QRCode.CorrectLevel.H
-          });
-        });
-        setTimeout(function() { window.print(); }, 800);
-      <\/script>
-    </body></html>`);
-    win.document.close();
+    </head><body>${label.repeat(copies)}</body></html>`, `QR Label — ${data.productName}`);
+    onClose();
   };
 
   return (
