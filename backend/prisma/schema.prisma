@@ -22,6 +22,8 @@ enum ServiceFrequency {
   QUARTERLY
   HALF_YEARLY
   YEARLY
+  // Any other interval — the number of months is in Warranty.frequencyMonths.
+  CUSTOM
 }
 
 // PHYSICAL = a stocked good (tracked quantity, sellable only while in stock).
@@ -39,6 +41,8 @@ enum WarrantyStatus {
 }
 
 enum ServiceJobStatus {
+  // Asked for by a technician; waits for an admin to approve or reject.
+  REQUESTED
   SCHEDULED
   ASSIGNED
   IN_PROGRESS
@@ -49,6 +53,9 @@ enum ServiceJobStatus {
 enum NotificationType {
   SERVICE_JOB_COMPLETED
   NEW_LEAD
+  SERVICE_REQUESTED  // technician asked for a visit → admins
+  JOB_ASSIGNED       // a visit was assigned to a technician → that technician
+  REQUEST_DECIDED    // admin approved/rejected a technician's request → requester
 }
 
 enum NotificationStatus {
@@ -207,6 +214,8 @@ model User {
   approvedWarranties  Warranty[]
   assignedServiceJobs ServiceJob[] @relation("ServiceJobAssignee")
   remindedServiceJobs ServiceJob[] @relation("ServiceJobReminder")
+  requestedServiceJobs ServiceJob[] @relation("ServiceJobRequester")
+  notifications       Notification[] @relation("NotificationRecipient")
   quotations          Quotation[]
 
   @@index([email])
@@ -539,6 +548,9 @@ model Warranty {
   status               WarrantyStatus    @default(PENDING_APPROVAL)
   warrantyPeriodMonths Int?              @map("warranty_period_months")
   serviceFrequency     ServiceFrequency? @map("service_frequency")
+  // Months between visits when serviceFrequency is CUSTOM.
+  frequencyMonths      Int?              @map("frequency_months")
+  notes                String?
   approvedById         String?           @map("approved_by_id")
   approvedBy           User?             @relation(fields: [approvedById], references: [id])
   approvedAt           DateTime?         @map("approved_at")
@@ -599,6 +611,14 @@ model ServiceJob {
   remindedAt           DateTime?        @map("reminded_at")
   remindedById         String?          @map("reminded_by_id")
   remindedBy           User?            @relation("ServiceJobReminder", fields: [remindedById], references: [id])
+  // Extra visit outside the regular AMC cycle (e.g. a technician's request):
+  // closing it does not schedule the next regular visit.
+  isExtra              Boolean          @default(false) @map("is_extra")
+  requestedById        String?          @map("requested_by_id")
+  requestedBy          User?            @relation("ServiceJobRequester", fields: [requestedById], references: [id])
+  requestNote          String?          @map("request_note")
+  reviewNote           String?          @map("review_note")
+  serviceCategory      ServiceCategory? @map("service_category")
   createdAt            DateTime         @default(now()) @map("created_at")
   updatedAt            DateTime         @updatedAt @map("updated_at")
 
@@ -652,8 +672,12 @@ model Notification {
   createdAt    DateTime            @default(now()) @map("created_at")
   resolvedAt   DateTime?           @map("resolved_at")
   resolvedById String?             @map("resolved_by_id")
+  // Null = for the store's admins; set = for that one user (e.g. a technician).
+  recipientUserId String?          @map("recipient_user_id")
+  recipient       User?            @relation("NotificationRecipient", fields: [recipientUserId], references: [id], onDelete: Cascade)
 
   @@index([storeId, status])
+  @@index([recipientUserId, status])
   @@map("notifications")
 }
 

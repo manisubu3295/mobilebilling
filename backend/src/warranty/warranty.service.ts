@@ -4,10 +4,12 @@ import { BillingService } from '../billing/billing.service';
 import { ApproveWarrantyDto } from './dto/approve-warranty.dto';
 import { UpdateWarrantyDto } from './dto/update-warranty.dto';
 import { UpdateServiceJobDto } from './dto/update-service-job.dto';
-import { CreateServiceJobDto } from './dto/create-service-job.dto';
 import { BillServiceJobDto } from './dto/bill-service-job.dto';
 import { AddServiceJobPartDto } from './dto/add-service-job-part.dto';
 import { CreateStandaloneWarrantyDto } from './dto/create-standalone-warranty.dto';
+import {
+  AdminCreateServiceJobDto, AdminUpdateServiceJobDto, ApproveServiceRequestDto, CreateServiceRequestDto, RejectServiceRequestDto,
+} from './dto/service-admin.dto';
 import { UpdateWarrantyCardDto } from './dto/warranty-card.dto';
 import { Role, ServiceFrequency, ServiceJobStatus, WarrantyStatus, AuditAction, InvoiceStatus, ProductType, NotificationType, BillType, BillSeries, ServiceCategory } from '@prisma/client';
 import { assignBillNo, nextInvoiceNumber } from '../billing/bill-numbers';
@@ -17,15 +19,20 @@ import { Decimal } from '@prisma/client/runtime/library';
 
 const ADMIN_ROLES: Role[] = [Role.SUPER_ADMIN, Role.STORE_MANAGER];
 
-function addFrequency(date: Date, frequency: ServiceFrequency): Date {
-  const next = new Date(date);
-  const monthsToAdd =
-    frequency === ServiceFrequency.MONTHLY ? 1 :
+export function frequencyMonths(frequency: ServiceFrequency, customMonths?: number | null): number {
+  if (frequency === ServiceFrequency.CUSTOM) return customMonths && customMonths > 0 ? customMonths : 3;
+  return frequency === ServiceFrequency.MONTHLY ? 1 :
     frequency === ServiceFrequency.QUARTERLY ? 3 :
     frequency === ServiceFrequency.HALF_YEARLY ? 6 : 12;
-  next.setMonth(next.getMonth() + monthsToAdd);
+}
+
+function addFrequency(date: Date, frequency: ServiceFrequency, customMonths?: number | null): Date {
+  const next = new Date(date);
+  next.setMonth(next.getMonth() + frequencyMonths(frequency, customMonths));
   return next;
 }
+
+const OPEN_JOB_STATUSES = [ServiceJobStatus.SCHEDULED, ServiceJobStatus.ASSIGNED, ServiceJobStatus.IN_PROGRESS];
 
 const warrantyInclude = {
   customer: { select: { id: true, name: true, phone: true, address: true, cardNo: true } },
@@ -47,6 +54,7 @@ const serviceJobInclude = {
   warranty: { include: warrantyInclude },
   assignedTo: { select: { id: true, name: true } },
   remindedBy: { select: { id: true, name: true } },
+  requestedBy: { select: { id: true, name: true } },
   invoice: { select: { id: true, invoiceNumber: true, billNo: true, totalAmount: true } },
   parts: {
     include: { sku: { include: { product: { select: { name: true } } } } },
@@ -62,10 +70,26 @@ export class WarrantyService {
     private billingService: BillingService,
   ) {}
 
-  listWarranties(storeId: string, status?: WarrantyStatus) {
+  // withJobs: the merged Service screen shows every AMC with its visits.
+  listWarranties(storeId: string, status?: WarrantyStatus, withJobs = false) {
     return this.prisma.warranty.findMany({
       where: { storeId, ...(status ? { status } : {}) },
-      include: warrantyInclude,
+      include: {
+        ...warrantyInclude,
+        ...(withJobs
+          ? {
+              serviceJobs: {
+                orderBy: { dueDate: 'desc' as const },
+                include: {
+                  assignedTo: { select: { id: true, name: true } },
+                  requestedBy: { select: { id: true, name: true } },
+                  invoice: { select: { id: true, billNo: true, invoiceNumber: true, totalAmount: true } },
+                  parts: { include: { sku: { select: { product: { select: { name: true } } } } } },
+                },
+              },
+            }
+          : {}),
+      },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -77,7 +101,7 @@ export class WarrantyService {
       throw new BadRequestException('Only a pending warranty claim can be approved');
     }
 
-    const firstDueDate = addFrequency(warranty.startDate, dto.serviceFrequency);
+    const firstDueDate = addFrequency(warranty.startDate, dto.serviceFrequency, dto.frequencyMonths);
 
     return this.prisma.$transaction(async (tx) => {
       const updated = await tx.warranty.update({
@@ -86,6 +110,7 @@ export class WarrantyService {
           status: WarrantyStatus.ACTIVE,
           warrantyPeriodMonths: dto.warrantyPeriodMonths,
           serviceFrequency: dto.serviceFrequency,
+          frequencyMonths: dto.serviceFrequency === ServiceFrequency.CUSTOM ? dto.frequencyMonths ?? 3 : null,
           approvedById: approverId,
           approvedAt: new Date(),
           nextServiceDueAt: firstDueDate,
@@ -115,22 +140,55 @@ export class WarrantyService {
     });
   }
 
-  // Corrects an active AMC's terms going forward — doesn't rewrite jobs
-  // already scheduled under the old frequency, only future ones (closeServiceJob
-  // reads the current warranty row each time it schedules the next visit).
+  // Admin edit of an AMC: product, dates, period, frequency (incl. custom
+  // every-N-months), AMC period, notes. With recalcNextDue the next open
+  // regular visit moves to match the new schedule (counted from the last
+  // completed regular visit, or from the start date if none yet).
   async updateWarranty(id: string, storeId: string, dto: UpdateWarrantyDto) {
     const warranty = await this.prisma.warranty.findFirst({ where: { id, storeId } });
     if (!warranty) throw new NotFoundException('Warranty not found');
-    if (warranty.status !== WarrantyStatus.ACTIVE) {
-      throw new BadRequestException('Only an active AMC can be edited here');
+
+    if (dto.productId && dto.productId !== warranty.productId) {
+      const product = await this.prisma.product.findFirst({ where: { id: dto.productId, storeId } });
+      if (!product) throw new NotFoundException('Product not found');
     }
-    return this.prisma.warranty.update({
-      where: { id },
-      data: {
-        ...(dto.warrantyPeriodMonths !== undefined && { warrantyPeriodMonths: dto.warrantyPeriodMonths }),
-        ...(dto.serviceFrequency !== undefined && { serviceFrequency: dto.serviceFrequency }),
-      },
-      include: warrantyInclude,
+    const serviceFrequency = dto.serviceFrequency ?? warranty.serviceFrequency;
+    const customMonths = serviceFrequency === ServiceFrequency.CUSTOM
+      ? dto.frequencyMonths ?? warranty.frequencyMonths ?? 3
+      : null;
+    const date = (v?: string | null) => (v === undefined ? undefined : v ? new Date(v) : null);
+    const startDate = dto.startDate ? new Date(dto.startDate) : warranty.startDate;
+
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.warranty.update({
+        where: { id },
+        data: {
+          ...(dto.productId ? { productId: dto.productId } : {}),
+          ...(dto.startDate ? { startDate } : {}),
+          ...(dto.warrantyPeriodMonths !== undefined ? { warrantyPeriodMonths: dto.warrantyPeriodMonths } : {}),
+          ...(dto.serviceFrequency !== undefined ? { serviceFrequency } : {}),
+          frequencyMonths: customMonths,
+          amcFrom: date(dto.amcFrom),
+          amcTo: date(dto.amcTo),
+          ...(dto.notes !== undefined ? { notes: dto.notes.trim() || null } : {}),
+        },
+        include: warrantyInclude,
+      });
+
+      if (dto.recalcNextDue && serviceFrequency) {
+        const lastDone = await tx.serviceJob.findFirst({
+          where: { warrantyId: id, status: ServiceJobStatus.COMPLETED, isExtra: false },
+          orderBy: { closedAt: 'desc' },
+        });
+        const nextDue = addFrequency(lastDone?.closedAt ?? startDate, serviceFrequency, customMonths);
+        const open = await tx.serviceJob.findFirst({
+          where: { warrantyId: id, status: { in: OPEN_JOB_STATUSES }, isExtra: false },
+          orderBy: { dueDate: 'asc' },
+        });
+        if (open) await tx.serviceJob.update({ where: { id: open.id }, data: { dueDate: nextDue } });
+        await tx.warranty.update({ where: { id }, data: { nextServiceDueAt: nextDue } });
+      }
+      return updated;
     });
   }
 
@@ -219,7 +277,7 @@ export class WarrantyService {
 
     const now = new Date();
     const nextDueDate = !warranty.nextServiceDueAt || warranty.nextServiceDueAt < now
-      ? addFrequency(now, warranty.serviceFrequency)
+      ? addFrequency(now, warranty.serviceFrequency, warranty.frequencyMonths)
       : warranty.nextServiceDueAt;
 
     return this.prisma.$transaction(async (tx) => {
@@ -257,7 +315,8 @@ export class WarrantyService {
     const startDate = dto.startDate ? new Date(dto.startDate) : new Date();
     const serviceFrequency = dto.serviceFrequency ?? ServiceFrequency.QUARTERLY;
     const warrantyPeriodMonths = dto.warrantyPeriodMonths ?? 12;
-    const firstDueDate = addFrequency(startDate, serviceFrequency);
+    const customMonths = serviceFrequency === ServiceFrequency.CUSTOM ? dto.frequencyMonths ?? 3 : null;
+    const firstDueDate = addFrequency(startDate, serviceFrequency, customMonths);
 
     return this.prisma.$transaction(async (tx) => {
       const warranty = await tx.warranty.create({
@@ -268,6 +327,7 @@ export class WarrantyService {
           status: WarrantyStatus.ACTIVE,
           warrantyPeriodMonths,
           serviceFrequency,
+          frequencyMonths: customMonths,
           approvedById: userId,
           approvedAt: new Date(),
           startDate,
@@ -385,16 +445,247 @@ export class WarrantyService {
     });
   }
 
-  async createServiceJob(storeId: string, dto: CreateServiceJobDto) {
+  async createServiceJob(storeId: string, dto: AdminCreateServiceJobDto) {
     const warranty = await this.prisma.warranty.findFirst({
       where: { id: dto.warrantyId, storeId, status: WarrantyStatus.ACTIVE },
     });
     if (!warranty) throw new NotFoundException('Active warranty not found');
+    if (dto.assignedToId) await this._assertTechnician(storeId, dto.assignedToId);
 
-    return this.prisma.serviceJob.create({
-      data: { warrantyId: dto.warrantyId, storeId, dueDate: new Date(dto.dueDate) },
+    const job = await this.prisma.serviceJob.create({
+      data: {
+        warrantyId: dto.warrantyId,
+        storeId,
+        dueDate: new Date(dto.dueDate),
+        isExtra: dto.isExtra ?? true,
+        serviceCategory: dto.serviceCategory ?? null,
+        ...(dto.assignedToId
+          ? { assignedToId: dto.assignedToId, assignedAt: new Date(), status: ServiceJobStatus.ASSIGNED }
+          : {}),
+      },
       include: serviceJobInclude,
     });
+    if (dto.assignedToId) await this._notifyAssigned(this.prisma, job);
+    return job;
+  }
+
+  private async _assertTechnician(storeId: string, userId: string) {
+    const staff = await this.prisma.user.findFirst({ where: { id: userId, storeId, role: Role.SERVICE_STAFF, isActive: true } });
+    if (!staff) throw new NotFoundException('Active service staff member not found');
+    return staff;
+  }
+
+  // Tells a technician a visit is now theirs (shown in their bell / list).
+  private async _notifyAssigned(tx: any, job: { id: string; storeId: string; assignedToId: string | null; dueDate: Date; warranty: { customer: { name: string }; product: { name: string } } }) {
+    if (!job.assignedToId) return;
+    await tx.notification.create({
+      data: {
+        storeId: job.storeId,
+        type: NotificationType.JOB_ASSIGNED,
+        serviceJobId: job.id,
+        recipientUserId: job.assignedToId,
+        title: `New visit — ${job.warranty.product.name}`,
+        body: `${job.warranty.customer.name} · due ${job.dueDate.toLocaleDateString('en-IN', { dateStyle: 'medium' })}`,
+      },
+    });
+  }
+
+  // ─── Technician service requests ──────────────────────────────────────
+
+  // A technician asks for a visit under one of the customer's active AMCs;
+  // it waits as REQUESTED for an admin to approve (→ assigned) or reject.
+  async createServiceRequest(storeId: string, userId: string, dto: CreateServiceRequestDto) {
+    const warranty = await this.prisma.warranty.findFirst({
+      where: { id: dto.warrantyId, storeId, status: WarrantyStatus.ACTIVE },
+      include: { customer: { select: { name: true } }, product: { select: { name: true } } },
+    });
+    if (!warranty) throw new NotFoundException('Active AMC not found for this customer');
+    const requester = await this.prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
+
+    return this.prisma.$transaction(async (tx) => {
+      const job = await tx.serviceJob.create({
+        data: {
+          warrantyId: warranty.id,
+          storeId,
+          dueDate: new Date(dto.preferredDate),
+          status: ServiceJobStatus.REQUESTED,
+          isExtra: true,
+          requestedById: userId,
+          requestNote: dto.note?.trim() || null,
+        },
+        include: serviceJobInclude,
+      });
+      await tx.notification.create({
+        data: {
+          storeId,
+          type: NotificationType.SERVICE_REQUESTED,
+          serviceJobId: job.id,
+          title: `Service request — ${warranty.product.name}`,
+          body: `${requester?.name ?? 'A technician'} asked for a visit to ${warranty.customer.name} on ${job.dueDate.toLocaleDateString('en-IN', { dateStyle: 'medium' })}${job.requestNote ? ` · "${job.requestNote}"` : ''}`,
+        },
+      });
+      return job;
+    });
+  }
+
+  customerActiveWarranties(storeId: string, customerId: string) {
+    return this.prisma.warranty.findMany({
+      where: { storeId, customerId, status: WarrantyStatus.ACTIVE },
+      include: {
+        product: { select: { id: true, name: true } },
+        serviceJobs: {
+          where: { status: { in: [...OPEN_JOB_STATUSES, ServiceJobStatus.REQUESTED] } },
+          select: { id: true, dueDate: true, status: true, assignedTo: { select: { name: true } } },
+          orderBy: { dueDate: 'asc' },
+        },
+      },
+      orderBy: { startDate: 'desc' },
+    });
+  }
+
+  myServiceRequests(storeId: string, userId: string) {
+    return this.prisma.serviceJob.findMany({
+      where: { storeId, requestedById: userId },
+      include: serviceJobInclude,
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
+  }
+
+  async approveServiceRequest(jobId: string, storeId: string, dto: ApproveServiceRequestDto) {
+    const job = await this.prisma.serviceJob.findFirst({ where: { id: jobId, storeId } });
+    if (!job) throw new NotFoundException('Service request not found');
+    if (job.status !== ServiceJobStatus.REQUESTED) throw new BadRequestException('This request has already been handled');
+    const assignee = dto.assignedToId ?? job.requestedById;
+    if (!assignee) throw new BadRequestException('Choose a technician for this visit');
+    await this._assertTechnician(storeId, assignee);
+
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.serviceJob.update({
+        where: { id: jobId },
+        data: {
+          status: ServiceJobStatus.ASSIGNED,
+          assignedToId: assignee,
+          assignedAt: new Date(),
+          ...(dto.dueDate ? { dueDate: new Date(dto.dueDate) } : {}),
+          reviewNote: dto.note?.trim() || null,
+        },
+        include: serviceJobInclude,
+      });
+      if (job.requestedById) {
+        await tx.notification.create({
+          data: {
+            storeId,
+            type: NotificationType.REQUEST_DECIDED,
+            serviceJobId: jobId,
+            recipientUserId: job.requestedById,
+            title: `Request approved — ${updated.warranty.product.name}`,
+            body: `${updated.warranty.customer.name} · visit on ${updated.dueDate.toLocaleDateString('en-IN', { dateStyle: 'medium' })}${assignee !== job.requestedById ? ` · assigned to ${updated.assignedTo?.name}` : ''}${updated.reviewNote ? ` · "${updated.reviewNote}"` : ''}`,
+          },
+        });
+      }
+      if (assignee !== job.requestedById) await this._notifyAssigned(tx, updated);
+      await this._resolveRequestNotice(tx, jobId);
+      return updated;
+    });
+  }
+
+  async rejectServiceRequest(jobId: string, storeId: string, dto: RejectServiceRequestDto) {
+    const job = await this.prisma.serviceJob.findFirst({ where: { id: jobId, storeId } });
+    if (!job) throw new NotFoundException('Service request not found');
+    if (job.status !== ServiceJobStatus.REQUESTED) throw new BadRequestException('This request has already been handled');
+
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.serviceJob.update({
+        where: { id: jobId },
+        data: { status: ServiceJobStatus.CANCELLED, reviewNote: dto.reason.trim() },
+        include: serviceJobInclude,
+      });
+      if (job.requestedById) {
+        await tx.notification.create({
+          data: {
+            storeId,
+            type: NotificationType.REQUEST_DECIDED,
+            serviceJobId: jobId,
+            recipientUserId: job.requestedById,
+            title: `Request not approved — ${updated.warranty.product.name}`,
+            body: `${updated.warranty.customer.name} · ${dto.reason.trim()}`,
+          },
+        });
+      }
+      await this._resolveRequestNotice(tx, jobId);
+      return updated;
+    });
+  }
+
+  // The admin's "service requested" alert is done once the request is decided.
+  private async _resolveRequestNotice(tx: any, jobId: string) {
+    await tx.notification.updateMany({
+      where: { serviceJobId: jobId, type: NotificationType.SERVICE_REQUESTED, recipientUserId: null, status: { not: 'RESOLVED' } },
+      data: { status: 'RESOLVED', resolvedAt: new Date() },
+    });
+  }
+
+  // ─── Admin corrections ─────────────────────────────────────────────────
+
+  async adminUpdateServiceJob(jobId: string, storeId: string, dto: AdminUpdateServiceJobDto) {
+    const job = await this.prisma.serviceJob.findFirst({ where: { id: jobId, storeId } });
+    if (!job) throw new NotFoundException('Service job not found');
+    if (dto.assignedToId) await this._assertTechnician(storeId, dto.assignedToId);
+
+    const closed = job.status === ServiceJobStatus.COMPLETED || job.status === ServiceJobStatus.CANCELLED;
+    let status = job.status;
+    if (dto.reopen && closed) status = dto.assignedToId ?? job.assignedToId ? ServiceJobStatus.ASSIGNED : ServiceJobStatus.SCHEDULED;
+    if (dto.assignedToId !== undefined && (status === ServiceJobStatus.SCHEDULED || status === ServiceJobStatus.ASSIGNED)) {
+      status = dto.assignedToId ? ServiceJobStatus.ASSIGNED : ServiceJobStatus.SCHEDULED;
+    }
+    const newAssignee = dto.assignedToId !== undefined && dto.assignedToId !== job.assignedToId ? dto.assignedToId : undefined;
+    const d = (v?: string | null) => (v === undefined ? undefined : v ? new Date(v) : null);
+
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.serviceJob.update({
+        where: { id: jobId },
+        data: {
+          status,
+          ...(dto.reopen && closed ? { closedAt: null } : {}),
+          ...(dto.dueDate ? { dueDate: new Date(dto.dueDate) } : {}),
+          ...(dto.assignedToId !== undefined ? { assignedToId: dto.assignedToId, assignedAt: dto.assignedToId ? new Date() : null } : {}),
+          ...(dto.serviceCategory !== undefined ? { serviceCategory: dto.serviceCategory } : {}),
+          ...(dto.visitDate !== undefined ? { visitDate: d(dto.visitDate) } : {}),
+          ...(dto.customerFeedback !== undefined ? { customerFeedback: dto.customerFeedback } : {}),
+          ...(dto.customerChargeAmount !== undefined ? { customerChargeAmount: dto.customerChargeAmount } : {}),
+          ...(dto.customerChargeNotes !== undefined ? { customerChargeNotes: dto.customerChargeNotes } : {}),
+          ...(dto.staffExpenseAmount !== undefined ? { staffExpenseAmount: dto.staffExpenseAmount } : {}),
+          ...(dto.staffExpenseNotes !== undefined ? { staffExpenseNotes: dto.staffExpenseNotes } : {}),
+        },
+        include: serviceJobInclude,
+      });
+      if (newAssignee) await this._notifyAssigned(tx, updated);
+      return updated;
+    });
+  }
+
+  // Removes a visit created by mistake. Billed visits can't be deleted (cancel
+  // the bill instead); spares logged on it go back into stock.
+  async deleteServiceJob(jobId: string, storeId: string) {
+    const job = await this.prisma.serviceJob.findFirst({ where: { id: jobId, storeId }, include: { parts: { include: { sku: true } } } });
+    if (!job) throw new NotFoundException('Service job not found');
+    if (job.invoiceId) throw new BadRequestException('This visit is billed — cancel the bill first');
+
+    await this.prisma.$transaction(async (tx) => {
+      for (const part of job.parts) {
+        if (!part.sku.isSerialized) {
+          await tx.sKU.update({ where: { id: part.skuId }, data: { stockQty: { increment: part.quantity } } });
+        }
+      }
+      await tx.serviceJob.delete({ where: { id: jobId } });
+      const next = await tx.serviceJob.findFirst({
+        where: { warrantyId: job.warrantyId, status: { in: OPEN_JOB_STATUSES }, isExtra: false },
+        orderBy: { dueDate: 'asc' },
+      });
+      await tx.warranty.update({ where: { id: job.warrantyId }, data: { nextServiceDueAt: next?.dueDate ?? null } });
+    });
+    return { deleted: true };
   }
 
   async rescheduleServiceJob(jobId: string, storeId: string, dueDate: string) {
@@ -686,15 +977,22 @@ export class WarrantyService {
     if (job.status === ServiceJobStatus.COMPLETED || job.status === ServiceJobStatus.CANCELLED) {
       throw new BadRequestException('Cannot assign a job that is already closed');
     }
+    if (job.status === ServiceJobStatus.REQUESTED) {
+      throw new BadRequestException('Approve this service request first');
+    }
+    await this._assertTechnician(storeId, assignedToId);
 
-    const staff = await this.prisma.user.findFirst({ where: { id: assignedToId, storeId, role: Role.SERVICE_STAFF, isActive: true } });
-    if (!staff) throw new NotFoundException('Active service staff member not found');
-
-    return this.prisma.serviceJob.update({
+    const updated = await this.prisma.serviceJob.update({
       where: { id: jobId },
-      data: { assignedToId, assignedAt: new Date(), status: ServiceJobStatus.ASSIGNED },
+      data: {
+        assignedToId,
+        assignedAt: new Date(),
+        status: job.status === ServiceJobStatus.IN_PROGRESS ? job.status : ServiceJobStatus.ASSIGNED,
+      },
       include: serviceJobInclude,
     });
+    if (assignedToId !== job.assignedToId) await this._notifyAssigned(this.prisma, updated);
+    return updated;
   }
 
   private async _assertJobAccess(jobId: string, storeId: string, userId: string, role: Role) {
@@ -740,12 +1038,19 @@ export class WarrantyService {
     }
 
     const warranty = await this.prisma.warranty.findUnique({ where: { id: job.warrantyId } });
-    if (!warranty?.serviceFrequency) {
+    // Extra visits (technician requests, one-off call-outs) don't move the
+    // regular AMC cycle, and an AMC that already has an open regular visit
+    // doesn't get a second one.
+    const hasOpenRegular = await this.prisma.serviceJob.count({
+      where: { warrantyId: job.warrantyId, id: { not: jobId }, isExtra: false, status: { in: OPEN_JOB_STATUSES } },
+    });
+    const scheduleNext = !job.isExtra && !hasOpenRegular && warranty?.status === WarrantyStatus.ACTIVE;
+    if (scheduleNext && !warranty?.serviceFrequency) {
       throw new BadRequestException('Warranty has no service frequency set — cannot schedule the next visit');
     }
 
     const closedAt = new Date();
-    const nextDueDate = addFrequency(closedAt, warranty.serviceFrequency);
+    const nextDueDate = scheduleNext ? addFrequency(closedAt, warranty!.serviceFrequency!, warranty!.frequencyMonths) : null;
 
     return this.prisma.$transaction(async (tx) => {
       const closed = await tx.serviceJob.update({
@@ -766,11 +1071,17 @@ export class WarrantyService {
       // AMC-style: the service cycle keeps recurring indefinitely on the chosen
       // frequency, independent of warrantyPeriodMonths (that field only decides
       // whether a given visit falls inside the free warranty window or is billable).
-      const nextJob = await tx.serviceJob.create({
-        data: { warrantyId: job.warrantyId, storeId, dueDate: nextDueDate },
-        include: serviceJobInclude,
-      });
-      await tx.warranty.update({ where: { id: job.warrantyId }, data: { nextServiceDueAt: nextDueDate } });
+      const nextJob = nextDueDate
+        ? await tx.serviceJob.create({
+            // The same technician keeps the customer unless an admin changes it.
+            data: {
+              warrantyId: job.warrantyId, storeId, dueDate: nextDueDate,
+              ...(job.assignedToId ? { assignedToId: job.assignedToId, assignedAt: new Date(), status: ServiceJobStatus.ASSIGNED } : {}),
+            },
+            include: serviceJobInclude,
+          })
+        : null;
+      if (nextDueDate) await tx.warranty.update({ where: { id: job.warrantyId }, data: { nextServiceDueAt: nextDueDate } });
 
       // Flag the completion for an admin to look at — mirrors what a
       // technician would otherwise have had to call in and report by hand.
@@ -844,7 +1155,85 @@ export class WarrantyService {
     };
   }
 
-  async nearingDue(storeId: string, role: Role, userId: string, daysAhead?: number) {
+  // Per-technician performance for a period: visits assigned (due in the
+  // period), completed and on time, still overdue, service bills raised and
+  // billed amount, expenses, requests — and a score out of 100:
+  // 40 × on-time % + 30 × completion % + 30 × min(billed ÷ team average, 1).
+  async staffReport(storeId: string, from: Date, to: Date) {
+    const staff = await this.prisma.user.findMany({
+      where: { storeId, role: Role.SERVICE_STAFF },
+      select: { id: true, name: true, isActive: true },
+      orderBy: { name: 'asc' },
+    });
+    const now = new Date();
+    const [assigned, completed, overdue, bills, requests] = await Promise.all([
+      this.prisma.serviceJob.findMany({
+        where: { storeId, assignedToId: { not: null }, dueDate: { gte: from, lte: to }, status: { notIn: [ServiceJobStatus.REQUESTED, ServiceJobStatus.CANCELLED] } },
+        select: { id: true, assignedToId: true },
+      }),
+      this.prisma.serviceJob.findMany({
+        where: { storeId, status: ServiceJobStatus.COMPLETED, closedAt: { gte: from, lte: to } },
+        select: {
+          id: true, assignedToId: true, dueDate: true, closedAt: true, staffExpenseAmount: true, customerFeedback: true,
+          warranty: { select: { customer: { select: { name: true, cardNo: true } }, product: { select: { name: true } } } },
+        },
+      }),
+      this.prisma.serviceJob.findMany({
+        where: { storeId, status: { in: OPEN_JOB_STATUSES }, dueDate: { lt: now, gte: from }, assignedToId: { not: null } },
+        select: { assignedToId: true },
+      }),
+      this.prisma.invoice.findMany({
+        where: { storeId, billType: 'SERVICE', technicianId: { not: null }, createdAt: { gte: from, lte: to }, status: { not: 'CANCELLED' } },
+        select: { technicianId: true, totalAmount: true },
+      }),
+      this.prisma.serviceJob.findMany({
+        where: { storeId, requestedById: { not: null }, createdAt: { gte: from, lte: to } },
+        select: { requestedById: true },
+      }),
+    ]);
+
+    const endOfDay = (d: Date) => new Date(d.getTime() + 24 * 60 * 60 * 1000 - 1);
+    const rows = staff.map((u) => {
+      const done = completed.filter((j) => j.assignedToId === u.id);
+      const onTime = done.filter((j) => j.closedAt! <= endOfDay(j.dueDate)).length;
+      const myBills = bills.filter((b) => b.technicianId === u.id);
+      return {
+        staffId: u.id,
+        name: u.name,
+        isActive: u.isActive,
+        // Work in the period: visits due in it plus any closed in it (a late
+        // visit closed this month still counts), so completed <= assigned.
+        assigned: new Set([...assigned.filter((j) => j.assignedToId === u.id).map((j) => j.id), ...done.map((j) => j.id)]).size,
+        completed: done.length,
+        onTime,
+        overdueOpen: overdue.filter((j) => j.assignedToId === u.id).length,
+        billsCount: myBills.length,
+        billed: Math.round(myBills.reduce((s, b) => s + Number(b.totalAmount), 0) * 100) / 100,
+        expenses: Math.round(done.reduce((s, j) => s + Number(j.staffExpenseAmount ?? 0), 0) * 100) / 100,
+        requests: requests.filter((r) => r.requestedById === u.id).length,
+        visits: done.map((j) => ({
+          id: j.id, dueDate: j.dueDate, closedAt: j.closedAt, onTime: j.closedAt! <= endOfDay(j.dueDate),
+          customer: j.warranty.customer.name, cardNo: j.warranty.customer.cardNo, product: j.warranty.product.name,
+          feedback: j.customerFeedback,
+        })),
+      };
+    });
+
+    const active = rows.filter((r) => r.assigned || r.completed || r.billsCount);
+    const teamAvgBilled = active.length ? active.reduce((s, r) => s + r.billed, 0) / active.length : 0;
+    const scored = rows.map((r) => {
+      const onTimePct = r.completed ? r.onTime / r.completed : 0;
+      const completionPct = r.assigned ? Math.min(r.completed / r.assigned, 1) : r.completed ? 1 : 0;
+      // Nobody billed anything in the period → billing doesn't count against anyone.
+      const billingRatio = teamAvgBilled > 0 ? Math.min(r.billed / teamAvgBilled, 1) : 1;
+      const hasWork = r.assigned > 0 || r.completed > 0;
+      const score = hasWork ? Math.round(40 * onTimePct + 30 * completionPct + 30 * billingRatio) : null;
+      return { ...r, onTimePct: Math.round(onTimePct * 100), completionPct: Math.round(completionPct * 100), billingPct: Math.round(billingRatio * 100), score };
+    });
+    return { from, to, teamAvgBilled: Math.round(teamAvgBilled * 100) / 100, staff: scored.sort((a, b) => (b.score ?? -1) - (a.score ?? -1)) };
+  }
+
+  async nearingDue(storeId: string, role: Role, userId: string, daysAhead?: number, range?: { from?: string; until?: string }) {
     // No explicit window requested — fall back to the store's own configured
     // "Next Service" lookahead instead of a hardcoded number, so the bell
     // badge, the notifications page, and the Next Service screen all agree
@@ -857,13 +1246,17 @@ export class WarrantyService {
 
     const horizon = new Date();
     horizon.setDate(horizon.getDate() + effectiveDays);
+    // "Until date" / custom range from the Next Service screen. Without a
+    // "from", overdue visits are always included.
+    if (range?.until) horizon.setTime(new Date(range.until + 'T23:59:59+05:30').getTime());
+    const fromDate = range?.from ? new Date(range.from + 'T00:00:00+05:30') : null;
 
     const isStaff = role === Role.SERVICE_STAFF;
     const jobs = await this.prisma.serviceJob.findMany({
       where: {
         storeId,
         status: { in: [ServiceJobStatus.SCHEDULED, ServiceJobStatus.ASSIGNED, ServiceJobStatus.IN_PROGRESS] },
-        dueDate: { lte: horizon },
+        dueDate: { lte: horizon, ...(fromDate ? { gte: fromDate } : {}) },
         ...(isStaff ? { assignedToId: userId } : {}),
       },
       include: serviceJobInclude,

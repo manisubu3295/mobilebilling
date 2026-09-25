@@ -5,6 +5,7 @@ import { BarChart2, Wallet, IndianRupee, TrendingDown, FileDown, FileSpreadsheet
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
+import { StaffPerformance } from '@/components/service/StaffPerformance';
 
 interface Report {
   totals: { expense: number; charge: number; net: number; jobCount: number };
@@ -25,7 +26,37 @@ const RANGES = [
   { label: 'Custom', id: 'custom' },
 ] as const;
 
+// Service Reports: staff performance (default) and the money in / out report.
 export default function ServiceReportsPage() {
+  const [view, setView] = useState<'staff' | 'money'>('staff');
+  return (
+    <div className="h-full flex flex-col bg-gray-50">
+      <div className="flex gap-1 border-b bg-white px-4 pt-3 sm:px-6">
+        {([['staff', 'Staff performance'], ['money', 'Money in / out']] as const).map(([k, l]) => (
+          <button
+            key={k}
+            onClick={() => setView(k)}
+            className={`-mb-px border-b-2 px-3 py-2 text-sm font-semibold ${view === k ? 'border-red-700 text-red-700' : 'border-transparent text-gray-500 hover:text-gray-800'}`}
+          >
+            {l}
+          </button>
+        ))}
+      </div>
+      <div className="min-h-0 flex-1">
+        {view === 'money' ? (
+          <MoneyReport />
+        ) : (
+          <div className="h-full overflow-auto p-4 sm:p-6">
+            <h1 className="mb-3 flex items-center gap-2 text-xl font-bold text-gray-900"><BarChart2 className="h-5 w-5 text-red-700" /> Staff performance</h1>
+            <StaffPerformance />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MoneyReport() {
   const { user } = useAuthStore();
   const now = new Date();
   const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);

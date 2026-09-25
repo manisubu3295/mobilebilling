@@ -14,6 +14,7 @@ import { useBillingStore } from '@/store/billing.store';
 import api from '@/lib/api';
 import { ChangePasswordModal } from '@/components/account/ChangePasswordModal';
 import { PrintPreviewHost } from '@/components/common/PrintPreview';
+import { localDateString } from '@/lib/local-date';
 
 interface NavItem {
   href: string;
@@ -93,11 +94,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   // Notification badge: nearing/overdue AMC visits + unresolved real
   // notifications (service-completion alerts), summed. Computed live on the
   // backend rather than pushed, so a periodic poll is enough for v1.
+  // Technicians get the bell too: their overdue + due-today visits and their
+  // own unread notifications (jobs assigned, replies to their requests).
+  const isStaffRole = user?.role === 'SERVICE_STAFF';
   useEffect(() => {
-    if (!account?.serviceModuleEnabled || !isAdminRole) return;
+    if (!account?.serviceModuleEnabled || !(isAdminRole || isStaffRole)) return;
     const load = () => {
       Promise.all([
-        api.get('/warranty/nearing-due'),
+        api.get('/warranty/nearing-due', isStaffRole ? { params: { until: localDateString() } } : undefined),
         api.get('/notifications/unread-count'),
       ]).then(([due, unread]) => {
         setDueCount((due.data.overdueCount ?? 0) + (due.data.upcomingCount ?? 0) + (unread.data ?? 0));
@@ -106,7 +110,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     load();
     const interval = setInterval(load, 60000);
     return () => clearInterval(interval);
-  }, [account?.serviceModuleEnabled, isAdminRole]);
+  }, [account?.serviceModuleEnabled, isAdminRole, isStaffRole]);
 
   // Website Leads badge: unread NEW_LEAD notifications, polled separately
   // from the service due-count since it's gated by websiteModule, not
@@ -264,7 +268,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div className="flex-1" />
 
           <div className="flex items-center gap-1 shrink-0">
-            {account?.serviceModuleEnabled && isAdminRole && (
+            {account?.serviceModuleEnabled && (isAdminRole || isStaffRole) && (
               <Link
                 href="/service/notifications"
                 className="relative text-gray-400 hover:text-white p-2 rounded-lg hover:bg-gray-800"

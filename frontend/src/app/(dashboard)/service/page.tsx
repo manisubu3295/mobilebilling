@@ -3,11 +3,14 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Wrench, CheckCircle, UserPlus, Plus, CalendarClock, Search, Phone, MessageCircle, MapPin, XCircle, AlertTriangle, Receipt, Pencil, RotateCcw, MessageSquare, Eye, ShieldCheck } from 'lucide-react';
+import { Wrench, UserPlus, Plus, Search, Phone, MessageCircle, MapPin, XCircle, Receipt, Pencil, RotateCcw, ShieldCheck, ChevronDown, ChevronUp } from 'lucide-react';
 import api from '@/lib/api';
 import { printReceipt } from '@/lib/print-receipt';
 import { AmcOnboardModal } from '@/components/service/AmcOnboardModal';
 import { WarrantyCardModal } from '@/components/service/WarrantyCardModal';
+import {
+  AddVisitModal, AmcEditModal, ApproveRequestModal, FrequencyPicker, VisitEditModal, frequencyLabel,
+} from '@/components/service/ServiceAdminModals';
 
 interface WarrantyCustomer { id: string; name: string; phone: string; address: string | null; cardNo?: string | null }
 interface WarrantyProduct { id: string; name: string; brand?: string | null }
@@ -22,6 +25,10 @@ interface Warranty {
   status: 'PENDING_APPROVAL' | 'ACTIVE' | 'CANCELLED';
   warrantyPeriodMonths: number | null;
   serviceFrequency: string | null;
+  frequencyMonths?: number | null;
+  amcFrom?: string | null;
+  amcTo?: string | null;
+  notes?: string | null;
   startDate: string;
   nextServiceDueAt: string | null;
   customer: WarrantyCustomer;
@@ -42,7 +49,9 @@ interface ServiceJob {
   dueDate: string;
   visitDate: string | null;
   closedAt: string | null;
-  status: 'SCHEDULED' | 'ASSIGNED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+  status: 'REQUESTED' | 'SCHEDULED' | 'ASSIGNED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+  isExtra?: boolean;
+  serviceCategory?: string | null;
   assignedTo: { id: string; name: string } | null;
   customerFeedback: string | null;
   staffExpenseAmount: string | null;
@@ -60,6 +69,7 @@ interface ServiceJob {
 }
 
 const JOB_STATUS_STYLE: Record<string, string> = {
+  REQUESTED: 'bg-amber-100 text-amber-700',
   SCHEDULED: 'bg-gray-100 text-gray-600',
   ASSIGNED: 'bg-blue-100 text-blue-700',
   IN_PROGRESS: 'bg-amber-100 text-amber-700',
@@ -146,47 +156,72 @@ function DateRangeFilter({
   );
 }
 
+type AmcWithJobs = Warranty & { serviceJobs: AmcJob[] };
+type AmcJob = Omit<ServiceJob, 'warranty'>;
+type ReviewRequest = ServiceJob & { requestNote: string | null; requestedBy: { id: string; name: string } | null };
+
+const OPEN_STATUSES = ['SCHEDULED', 'ASSIGNED', 'IN_PROGRESS'];
+const dateText = (d: string | null | undefined) => (d ? new Date(d).toLocaleDateString('en-IN', { dateStyle: 'medium' }) : '—');
+const isOpenJob = (j: { status: string }) => OPEN_STATUSES.includes(j.status);
+const jobOverdue = (j: { status: string; dueDate: string }) => isOpenJob(j) && new Date(j.dueDate) < new Date(new Date().toDateString());
+
+// Next open regular visit of an AMC (falls back to any open visit).
+function nextVisit(a: AmcWithJobs) {
+  const open = a.serviceJobs.filter(isOpenJob).sort((x, y) => new Date(x.dueDate).getTime() - new Date(y.dueDate).getTime());
+  return open.find((j) => !j.isExtra) ?? open[0] ?? null;
+}
+
+// Service screen: everything about AMCs and their visits in one list — each
+// AMC row expands to its visits (done / upcoming / overdue) with actions —
+// plus a "To review" tab for pending AMC claims and technicians' requests.
 export default function ServiceAdminPage() {
-  const [tab, setTab] = useState<'pending' | 'jobs' | 'amcs'>('pending');
-  const [warranties, setWarranties] = useState<Warranty[]>([]);
-  const [allWarranties, setAllWarranties] = useState<Warranty[]>([]);
-  const [jobs, setJobs] = useState<ServiceJob[]>([]);
+  const [tab, setTab] = useState<'review' | 'service'>('service');
+  const [pending, setPending] = useState<Warranty[]>([]);
+  const [requests, setRequests] = useState<ReviewRequest[]>([]);
+  const [amcs, setAmcs] = useState<AmcWithJobs[]>([]);
   const [staff, setStaff] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
+
+  // filters
+  const [query, setQuery] = useState('');
+  const [techFilter, setTechFilter] = useState('ALL');
+  const [statusFilter, setStatusFilter] = useState<'OPEN' | 'OVERDUE' | 'UNASSIGNED' | 'ALL' | 'CANCELLED'>('OPEN');
+  const [dates, setDates] = useState(defaultDateRange);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+
+  // modals
   const [approving, setApproving] = useState<Warranty | null>(null);
+  const [rejecting, setRejecting] = useState<Warranty | null>(null);
+  const [approvingReq, setApprovingReq] = useState<ReviewRequest | null>(null);
+  const [rejectingReq, setRejectingReq] = useState<ReviewRequest | null>(null);
+  const [rejectReason, setRejectReason] = useState('');
   const [assigning, setAssigning] = useState<ServiceJob | null>(null);
   const [rescheduling, setRescheduling] = useState<ServiceJob | null>(null);
-  const [showCreateJob, setShowCreateJob] = useState(false);
-  const [showAmcOnboard, setShowAmcOnboard] = useState(false);
-  const [rejecting, setRejecting] = useState<Warranty | null>(null);
-  const router = useRouter();
   const [cancellingJob, setCancellingJob] = useState<ServiceJob | null>(null);
-  const [editingAmc, setEditingAmc] = useState<Warranty | null>(null);
+  const [editingVisit, setEditingVisit] = useState<{ job: AmcJob; title: string } | null>(null);
+  const [editingAmc, setEditingAmc] = useState<AmcWithJobs | null>(null);
+  const [addingVisit, setAddingVisit] = useState<AmcWithJobs | null>(null);
   const [cardFor, setCardFor] = useState<string | null>(null);
   const [reactivatingAmc, setReactivatingAmc] = useState<Warranty | null>(null);
   const [cancellingAmc, setCancellingAmc] = useState<Warranty | null>(null);
-  const [jobQuery, setJobQuery] = useState('');
-  const [jobStatusFilter, setJobStatusFilter] = useState<'ALL' | 'OVERDUE' | ServiceJob['status']>('ALL');
-  const [jobSort, setJobSort] = useState<'date' | 'customer' | 'product'>('date');
-  const [jobDates, setJobDates] = useState(defaultDateRange);
-  const [amcQuery, setAmcQuery] = useState('');
-  const [amcStatusFilter, setAmcStatusFilter] = useState<'ALL' | Warranty['status']>('ALL');
-  const [amcSort, setAmcSort] = useState<'date' | 'customer' | 'product'>('date');
-  const [amcDates, setAmcDates] = useState(defaultDateRange);
+  const [showAmcOnboard, setShowAmcOnboard] = useState(false);
+  const [error, setError] = useState('');
+  const [viewingInvoiceId, setViewingInvoiceId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [w, all, j, u] = await Promise.all([
+      const [p, all, r, u] = await Promise.all([
         api.get('/warranty', { params: { status: 'PENDING_APPROVAL' } }),
-        api.get('/warranty'),
-        api.get('/warranty/service-jobs'),
-        api.get('/users'),
+        api.get('/warranty', { params: { withJobs: 1 } }),
+        api.get('/warranty/service-jobs', { params: { status: 'REQUESTED' } }),
+        api.get('/users/technicians'),
       ]);
-      setWarranties(w.data);
-      setAllWarranties(all.data);
-      setJobs(j.data);
-      setStaff(u.data.filter((usr: any) => usr.role === 'SERVICE_STAFF' && usr.isActive));
+      setPending(p.data);
+      setAmcs(all.data.filter((w: Warranty) => w.status !== 'PENDING_APPROVAL'));
+      setRequests(r.data);
+      setStaff(u.data.filter((usr: any) => usr.role === 'SERVICE_STAFF'));
     } finally {
       setLoading(false);
     }
@@ -194,20 +229,9 @@ export default function ServiceAdminPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const isOverdue = (j: ServiceJob) =>
-    j.status !== 'COMPLETED' && j.status !== 'CANCELLED' && new Date(j.dueDate) < new Date();
+  const withWarranty = (a: AmcWithJobs, j: AmcJob): ServiceJob =>
+    ({ ...j, warranty: { customer: a.customer, product: a.product, invoiceItem: a.invoiceItem } }) as ServiceJob;
 
-  // Parts used carry their own price/tax snapshot; the labor/visit charge is
-  // the flat customerChargeAmount staff enters — billing combines both.
-  const jobBillTotal = (j: ServiceJob) => {
-    const partsTotal = (j.parts || []).reduce((s, p) => {
-      const line = parseFloat(p.unitPrice) * parseFloat(p.quantity);
-      return s + line + (line * parseFloat(p.taxRate)) / 100;
-    }, 0);
-    return partsTotal + parseFloat(j.customerChargeAmount || '0');
-  };
-
-  const [viewingInvoiceId, setViewingInvoiceId] = useState<string | null>(null);
   const handleViewInvoice = async (invoiceId: string) => {
     setViewingInvoiceId(invoiceId);
     try {
@@ -218,437 +242,330 @@ export default function ServiceAdminPage() {
     }
   };
 
-  const visibleJobs = useMemo(() => {
-    const q = jobQuery.trim().toLowerCase();
-    const from = jobDates.from ? new Date(jobDates.from + 'T00:00:00') : null;
-    const to = jobDates.to ? new Date(jobDates.to + 'T23:59:59') : null;
-    const filtered = jobs.filter((j) => {
-      if (jobStatusFilter === 'OVERDUE' && !isOverdue(j)) return false;
-      if (jobStatusFilter !== 'ALL' && jobStatusFilter !== 'OVERDUE' && j.status !== jobStatusFilter) return false;
-      const due = new Date(j.dueDate);
-      if (from && due < from) return false;
-      if (to && due > to) return false;
-      if (!q) return true;
-      return (
-        j.warranty.customer.name.toLowerCase().includes(q) ||
-        j.warranty.customer.phone.includes(q) ||
-        (j.warranty.customer.cardNo || '').toLowerCase() === q ||
-        j.warranty.product.name.toLowerCase().includes(q) ||
-        (j.assignedTo?.name.toLowerCase().includes(q) ?? false)
-      );
-    });
-    return [...filtered].sort((a, b) => {
-      if (jobSort === 'customer') return a.warranty.customer.name.localeCompare(b.warranty.customer.name);
-      if (jobSort === 'product') return a.warranty.product.name.localeCompare(b.warranty.product.name);
-      return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
-    });
-  }, [jobs, jobQuery, jobStatusFilter, jobSort, jobDates]);
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const from = dates.from ? new Date(dates.from + 'T00:00:00') : null;
+    const to = dates.to ? new Date(dates.to + 'T23:59:59') : null;
+    return amcs
+      .filter((a) => {
+        if (statusFilter === 'CANCELLED') { if (a.status !== 'CANCELLED') return false; }
+        else if (statusFilter !== 'ALL' && a.status !== 'ACTIVE') return false;
+        const next = nextVisit(a);
+        if (statusFilter === 'OPEN' && !next) return false;
+        if (statusFilter === 'OVERDUE' && !a.serviceJobs.some(jobOverdue)) return false;
+        if (statusFilter === 'UNASSIGNED' && !a.serviceJobs.some((j) => isOpenJob(j) && !j.assignedTo)) return false;
+        if (techFilter !== 'ALL') {
+          const open = a.serviceJobs.filter(isOpenJob);
+          if (techFilter === 'NONE' ? !open.some((j) => !j.assignedTo) : !a.serviceJobs.some((j) => j.assignedTo?.id === techFilter)) return false;
+        }
+        if (next && statusFilter !== 'ALL' && statusFilter !== 'CANCELLED' && statusFilter !== 'OVERDUE') {
+          const due = new Date(next.dueDate);
+          if ((from && due < from && !jobOverdue(next)) || (to && due > to)) return false;
+        }
+        if (!q) return true;
+        return (
+          a.customer.name.toLowerCase().includes(q) ||
+          a.customer.phone.includes(q) ||
+          (a.customer.cardNo || '').toLowerCase() === q ||
+          a.product.name.toLowerCase().includes(q) ||
+          a.serviceJobs.some((j) => j.assignedTo?.name.toLowerCase().includes(q))
+        );
+      })
+      .sort((x, y) => {
+        const nx = nextVisit(x), ny = nextVisit(y);
+        return (nx ? new Date(nx.dueDate).getTime() : Infinity) - (ny ? new Date(ny.dueDate).getTime() : Infinity);
+      });
+  }, [amcs, query, statusFilter, techFilter, dates]);
 
-  const overdueCount = jobs.filter(isOverdue).length;
+  const overdueCount = amcs.filter((a) => a.status === 'ACTIVE' && a.serviceJobs.some(jobOverdue)).length;
+  const reviewCount = pending.length + requests.length;
 
-  const visibleAmcs = useMemo(() => {
-    const q = amcQuery.trim().toLowerCase();
-    const from = amcDates.from ? new Date(amcDates.from + 'T00:00:00') : null;
-    const to = amcDates.to ? new Date(amcDates.to + 'T23:59:59') : null;
-    const filtered = allWarranties.filter((w) => {
-      if (amcStatusFilter !== 'ALL' && w.status !== amcStatusFilter) return false;
-      // AMCs with no next-service date (pending claims, or ones never
-      // approved) aren't date-scoped the same way a job is — hiding them
-      // behind a date window would bury something that needs review.
-      if (w.nextServiceDueAt) {
-        const due = new Date(w.nextServiceDueAt);
-        if (from && due < from) return false;
-        if (to && due > to) return false;
-      }
-      if (!q) return true;
-      return (
-        w.customer.name.toLowerCase().includes(q) ||
-        w.customer.phone.includes(q) ||
-        (w.customer.cardNo || '').toLowerCase() === q ||
-        w.product.name.toLowerCase().includes(q)
-      );
-    });
-    return [...filtered].sort((a, b) => {
-      if (amcSort === 'customer') return a.customer.name.localeCompare(b.customer.name);
-      if (amcSort === 'product') return a.product.name.localeCompare(b.product.name);
-      const aDue = a.nextServiceDueAt ? new Date(a.nextServiceDueAt).getTime() : Infinity;
-      const bDue = b.nextServiceDueAt ? new Date(b.nextServiceDueAt).getTime() : Infinity;
-      return aDue - bDue;
-    });
-  }, [allWarranties, amcQuery, amcStatusFilter, amcSort, amcDates]);
+  const rejectRequest = async () => {
+    if (!rejectingReq || !rejectReason.trim()) return;
+    setError('');
+    try {
+      await api.patch(`/warranty/service-requests/${rejectingReq.id}/reject`, { reason: rejectReason.trim() });
+      setRejectingReq(null);
+      setRejectReason('');
+      load();
+    } catch (e: any) {
+      setError(e.response?.data?.message || 'Could not reject the request');
+    }
+  };
 
   return (
     <div className="h-full flex flex-col bg-gray-50">
       <div className="bg-white border-b px-4 sm:px-6 py-4">
         <div className="flex items-center justify-between gap-3">
           <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2"><Wrench className="h-5 w-5 text-red-700" /> Service</h1>
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={() => setShowAmcOnboard(true)}
-              className="flex items-center gap-2 px-3 py-2 border border-red-200 text-red-700 rounded-lg text-sm font-medium hover:bg-red-50"
-            >
-              <UserPlus className="h-4 w-4" /> <span className="hidden sm:inline">Register AMC</span>
-            </button>
-            {tab === 'jobs' && (
-              <button
-                onClick={() => setShowCreateJob(true)}
-                className="flex items-center gap-2 px-3 py-2 bg-red-700 text-white rounded-lg text-sm font-medium hover:bg-red-800"
-              >
-                <Plus className="h-4 w-4" /> <span className="hidden sm:inline">New Service Job</span>
-              </button>
-            )}
-          </div>
+          <button
+            onClick={() => setShowAmcOnboard(true)}
+            className="flex items-center gap-2 px-3 py-2 bg-red-700 text-white rounded-lg text-sm font-medium hover:bg-red-800"
+          >
+            <UserPlus className="h-4 w-4" /> <span className="hidden sm:inline">Register AMC</span>
+          </button>
         </div>
         <div className="flex gap-1 mt-3">
           <button
-            onClick={() => setTab('pending')}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium ${tab === 'pending' ? 'bg-red-700 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+            onClick={() => setTab('service')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium ${tab === 'service' ? 'bg-red-700 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
           >
-            Pending Approval {warranties.length > 0 && `(${warranties.length})`}
-          </button>
-          <button
-            onClick={() => setTab('jobs')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium ${tab === 'jobs' ? 'bg-red-700 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
-          >
-            Service Jobs
+            AMCs &amp; visits
             {overdueCount > 0 && (
-              <span className={`text-xs px-1.5 py-0.5 rounded-full font-bold ${tab === 'jobs' ? 'bg-white/20' : 'bg-red-100 text-red-600'}`}>
-                {overdueCount} overdue
-              </span>
+              <span className={`text-xs px-1.5 py-0.5 rounded-full font-bold ${tab === 'service' ? 'bg-white/20' : 'bg-red-100 text-red-600'}`}>{overdueCount} overdue</span>
             )}
           </button>
           <button
-            onClick={() => setTab('amcs')}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium ${tab === 'amcs' ? 'bg-red-700 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+            onClick={() => setTab('review')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium ${tab === 'review' ? 'bg-red-700 text-white' : 'text-gray-600 hover:bg-gray-100'}`}
           >
-            All AMCs
+            To review
+            {reviewCount > 0 && (
+              <span className={`text-xs px-1.5 py-0.5 rounded-full font-bold ${tab === 'review' ? 'bg-white/20' : 'bg-amber-100 text-amber-700'}`}>{reviewCount}</span>
+            )}
           </button>
         </div>
       </div>
 
       <div className="flex-1 overflow-auto p-4 sm:p-6">
+        {error && <p className="mb-3 rounded-lg bg-red-50 p-2 text-sm text-red-700">{error}</p>}
         {loading ? (
           <div className="flex justify-center items-center h-40 text-gray-400">Loading…</div>
-        ) : tab === 'pending' ? (
-          warranties.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-40 text-gray-400 gap-2">
-              <CheckCircle className="h-10 w-10 opacity-40" />
-              <p>No AMC claims waiting for approval</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {warranties.map((w) => {
-                const serial = w.invoiceItem?.serialUnits?.[0]?.serialNumber;
-                return (
-                  <div key={w.id} className="bg-white rounded-xl border p-4 flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="font-semibold text-gray-900">
-                        {w.product.name}
-                        {serial && <span className="ml-2 text-xs font-mono text-gray-400">S/N {serial}</span>}
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        {w.customer.cardNo && <span className="mr-1 font-mono text-xs font-semibold text-blue-700">#{w.customer.cardNo}</span>}
-                        <Link href={`/customers/${w.customer.id}`} className="hover:underline">{w.customer.name}</Link> · {w.customer.phone}
-                      </p>
-                      <ContactLinks customer={w.customer} />
-                      <p className="text-xs text-gray-400 mt-1">Sold {new Date(w.startDate).toLocaleDateString('en-IN', { dateStyle: 'medium' })}</p>
+        ) : tab === 'review' ? (
+          <div className="space-y-6">
+            <section>
+              <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Service requests from technicians ({requests.length})</h2>
+              {requests.length === 0 ? (
+                <p className="rounded-xl border bg-white p-4 text-sm text-gray-400">No requests waiting</p>
+              ) : (
+                <div className="space-y-3">
+                  {requests.map((r) => (
+                    <div key={r.id} className="bg-white rounded-xl border p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-semibold text-gray-900">{r.warranty.product.name}</p>
+                          <p className="text-sm text-gray-500">
+                            {r.warranty.customer.cardNo && <span className="mr-1 font-mono text-xs font-semibold text-blue-700">#{r.warranty.customer.cardNo}</span>}
+                            <Link href={`/customers/${r.warranty.customer.id}`} className="hover:underline">{r.warranty.customer.name}</Link> · {r.warranty.customer.phone}
+                          </p>
+                          <p className="mt-1 text-sm text-gray-700">
+                            <span className="font-medium">{r.requestedBy?.name ?? 'Technician'}</span> asked for {dateText(r.dueDate)}
+                            {r.requestNote && <span className="text-gray-500"> · &ldquo;{r.requestNote}&rdquo;</span>}
+                          </p>
+                        </div>
+                        {rejectingReq?.id === r.id ? (
+                          <div className="flex w-full gap-2 sm:w-auto">
+                            <input autoFocus value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} placeholder="Reason" className="flex-1 rounded-lg border px-3 py-1.5 text-sm" />
+                            <button onClick={rejectRequest} disabled={!rejectReason.trim()} className="rounded-lg bg-red-700 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50">Reject</button>
+                            <button onClick={() => setRejectingReq(null)} className="rounded-lg border px-3 py-1.5 text-sm text-gray-600">Cancel</button>
+                          </div>
+                        ) : (
+                          <div className="flex gap-2">
+                            <button onClick={() => { setRejectingReq(r); setRejectReason(''); }} className="flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium text-gray-500 hover:bg-gray-50">
+                              <XCircle className="h-4 w-4" /> Reject
+                            </button>
+                            <button onClick={() => setApprovingReq(r)} className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700">Approve</button>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <button
-                        onClick={() => setRejecting(w)}
-                        className="flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm font-medium text-gray-500 hover:bg-gray-50"
-                        title="Reject this AMC claim"
-                      >
-                        <XCircle className="h-4 w-4" /> <span className="hidden sm:inline">Reject</span>
-                      </button>
-                      <button
-                        onClick={() => setApproving(w)}
-                        className="px-4 py-2 bg-red-700 text-white rounded-lg text-sm font-medium hover:bg-red-800"
-                      >
-                        Approve
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )
-        ) : tab === 'jobs' ? (
-          <>
-            <div className="flex flex-col sm:flex-row gap-2 mb-4">
-              <div className="relative flex-1">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <input
-                  type="text"
-                  value={jobQuery}
-                  onChange={(e) => setJobQuery(e.target.value)}
-                  placeholder="Search by customer, phone, card no, product, or technician…"
-                  className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-red-500"
-                />
-              </div>
-              <select
-                value={jobStatusFilter}
-                onChange={(e) => setJobStatusFilter(e.target.value as any)}
-                className="border rounded-lg px-3 py-2 text-sm bg-white"
-              >
-                <option value="ALL">All statuses</option>
-                <option value="OVERDUE">Overdue</option>
-                <option value="SCHEDULED">Scheduled</option>
-                <option value="ASSIGNED">Assigned</option>
-                <option value="IN_PROGRESS">In Progress</option>
-                <option value="COMPLETED">Completed</option>
-                <option value="CANCELLED">Cancelled</option>
-              </select>
-              <select
-                value={jobSort}
-                onChange={(e) => setJobSort(e.target.value as any)}
-                className="border rounded-lg px-3 py-2 text-sm bg-white"
-              >
-                <option value="date">Sort: Due Date</option>
-                <option value="customer">Sort: Customer</option>
-                <option value="product">Sort: Product</option>
-              </select>
-            </div>
-            <div className="mb-4">
-              <DateRangeFilter
-                from={jobDates.from}
-                to={jobDates.to}
-                onChange={(from, to) => setJobDates({ from, to })}
-                onReset={() => setJobDates(defaultDateRange())}
-              />
-            </div>
+                  ))}
+                </div>
+              )}
+            </section>
 
-            {jobs.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-40 text-gray-400 gap-2">
-                <Wrench className="h-10 w-10 opacity-40" />
-                <p>No service jobs yet</p>
-              </div>
-            ) : visibleJobs.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-40 text-gray-400 gap-2">
-                <Search className="h-10 w-10 opacity-40" />
-                <p>No jobs match your search/filter</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {visibleJobs.map((j) => {
-                  const overdue = isOverdue(j);
-                  const serial = j.warranty.invoiceItem?.serialUnits?.[0]?.serialNumber;
-                  return (
-              <div key={j.id} className={`bg-white rounded-xl border p-4 ${overdue ? 'border-l-4 border-l-red-500' : ''}`}>
-                <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="font-semibold text-gray-900">
-                    {j.warranty.product.name}
-                    {serial && <span className="ml-2 text-xs font-mono text-gray-400">S/N {serial}</span>}
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    {j.warranty.customer.cardNo && <span className="mr-1 font-mono text-xs font-semibold text-blue-700">#{j.warranty.customer.cardNo}</span>}
-                    <Link href={`/customers/${j.warranty.customer.id}`} className="hover:underline">{j.warranty.customer.name}</Link> · {j.warranty.customer.phone}
-                  </p>
-                  <ContactLinks customer={j.warranty.customer} />
-                  <div className="flex items-center gap-2 mt-1 flex-wrap">
-                    <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${JOB_STATUS_STYLE[j.status]}`}>{j.status.replace('_', ' ')}</span>
-                    {overdue && (
-                      <span className="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full font-medium bg-red-100 text-red-700">
-                        <AlertTriangle className="h-3 w-3" /> Overdue
-                      </span>
-                    )}
-                    <span className="text-xs text-gray-400">Due {new Date(j.dueDate).toLocaleDateString('en-IN', { dateStyle: 'medium' })}</span>
-                    {j.assignedTo && <span className="text-xs text-gray-500">· {j.assignedTo.name}</span>}
-                    {j.parts?.length > 0 && (
-                      <span className="text-xs px-1.5 py-0.5 rounded-full font-medium bg-blue-50 text-blue-700">
-                        {j.parts.length} part{j.parts.length > 1 ? 's' : ''} used
-                      </span>
-                    )}
-                    {j.invoice ? (
-                      <button
-                        onClick={() => handleViewInvoice(j.invoice!.id)}
-                        disabled={viewingInvoiceId === j.invoice.id}
-                        className="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full font-medium bg-green-100 text-green-700 hover:bg-green-200 disabled:opacity-50"
-                        title="View / print this invoice"
-                      >
-                        <Receipt className="h-3 w-3" /> {j.invoice.billNo ? `Bill No. ${j.invoice.billNo}` : j.invoice.invoiceNumber}
-                      </button>
-                    ) : jobBillTotal(j) > 0 ? (
-                      <span className="text-xs px-1.5 py-0.5 rounded-full font-medium bg-amber-100 text-amber-700">
-                        ₹{jobBillTotal(j).toLocaleString('en-IN')} not yet billed
-                      </span>
-                    ) : null}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-                  {!j.invoice && jobBillTotal(j) > 0 && (
-                    <button
-                      onClick={() => router.push(`/billing/service-bill?jobId=${j.id}`)}
-                      className="flex items-center gap-1.5 px-3 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700"
-                    >
-                      <Receipt className="h-4 w-4" /> <span className="hidden sm:inline">Bill Customer</span>
-                    </button>
-                  )}
-                  {j.status !== 'COMPLETED' && j.status !== 'CANCELLED' && (
-                    <>
-                      <button
-                        onClick={() => setRescheduling(j)}
-                        className="flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
-                      >
-                        <CalendarClock className="h-4 w-4" /> <span className="hidden sm:inline">Reschedule</span>
-                      </button>
-                      <button
-                        onClick={() => setAssigning(j)}
-                        className="flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
-                      >
-                        <UserPlus className="h-4 w-4" /> {j.assignedTo ? 'Reassign' : 'Assign'}
-                      </button>
-                      <button
-                        onClick={() => setCancellingJob(j)}
-                        className="flex items-center gap-1.5 px-3 py-2 border border-red-200 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50"
-                        title="Cancel this job"
-                      >
-                        <XCircle className="h-4 w-4" /> <span className="hidden sm:inline">Cancel</span>
-                      </button>
-                    </>
-                  )}
-                </div>
-                </div>
-                {(j.customerFeedback || j.staffExpenseAmount || j.customerChargeNotes) && (
-                  <div className="mt-3 pt-3 border-t space-y-1.5">
-                    {j.customerFeedback && (
-                      <p className="flex items-start gap-1.5 text-sm text-gray-700">
-                        <MessageSquare className="h-3.5 w-3.5 mt-0.5 shrink-0 text-gray-400" />
-                        <span><span className="font-medium">Feedback:</span> {j.customerFeedback}</span>
-                      </p>
-                    )}
-                    {j.staffExpenseAmount && parseFloat(j.staffExpenseAmount) > 0 && (
-                      <p className="text-xs text-gray-500">
-                        <span className="font-medium">Staff expense:</span> ₹{parseFloat(j.staffExpenseAmount).toLocaleString('en-IN')}
-                        {j.staffExpenseNotes && ` — ${j.staffExpenseNotes}`}
-                      </p>
-                    )}
-                    {j.customerChargeNotes && (
-                      <p className="text-xs text-gray-500"><span className="font-medium">Charge notes:</span> {j.customerChargeNotes}</p>
-                    )}
-                    {j.visitDate && (
-                      <p className="text-xs text-gray-400">Visited {new Date(j.visitDate).toLocaleDateString('en-IN', { dateStyle: 'medium' })}</p>
-                    )}
-                  </div>
-                )}
-              </div>
-                  );
-                })}
-              </div>
-            )}
-          </>
-        ) : (
-          <>
-            <div className="flex flex-col sm:flex-row gap-2 mb-4">
-              <div className="relative flex-1">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <input
-                  type="text"
-                  value={amcQuery}
-                  onChange={(e) => setAmcQuery(e.target.value)}
-                  placeholder="Search by customer, phone, card no or product…"
-                  className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-red-500"
-                />
-              </div>
-              <select
-                value={amcStatusFilter}
-                onChange={(e) => setAmcStatusFilter(e.target.value as any)}
-                className="border rounded-lg px-3 py-2 text-sm bg-white"
-              >
-                <option value="ALL">All statuses</option>
-                <option value="PENDING_APPROVAL">Pending Approval</option>
-                <option value="ACTIVE">Active</option>
-                <option value="CANCELLED">Cancelled</option>
-              </select>
-              <select
-                value={amcSort}
-                onChange={(e) => setAmcSort(e.target.value as any)}
-                className="border rounded-lg px-3 py-2 text-sm bg-white"
-              >
-                <option value="date">Sort: Next Service Date</option>
-                <option value="customer">Sort: Customer</option>
-                <option value="product">Sort: Product</option>
-              </select>
-            </div>
-            <div className="mb-4">
-              <DateRangeFilter
-                from={amcDates.from}
-                to={amcDates.to}
-                onChange={(from, to) => setAmcDates({ from, to })}
-                onReset={() => setAmcDates(defaultDateRange())}
-              />
-              <p className="text-xs text-gray-400 mt-1">Pending or not-yet-scheduled AMCs always show, regardless of this range.</p>
-            </div>
-
-            {allWarranties.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-40 text-gray-400 gap-2">
-                <Wrench className="h-10 w-10 opacity-40" />
-                <p>No AMCs yet</p>
-              </div>
-            ) : visibleAmcs.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-40 text-gray-400 gap-2">
-                <Search className="h-10 w-10 opacity-40" />
-                <p>No AMCs match your search/filter</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {visibleAmcs.map((w) => {
-                  const serial = w.invoiceItem?.serialUnits?.[0]?.serialNumber;
-                  return (
-                    <div key={w.id} className="bg-white rounded-xl border p-4 flex items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="font-semibold text-gray-900">
-                          {w.product.name}
-                          {serial && <span className="ml-2 text-xs font-mono text-gray-400">S/N {serial}</span>}
-                        </p>
-                        <p className="text-sm text-gray-500">
-                          {w.customer.cardNo && <span className="mr-1 font-mono text-xs font-semibold text-blue-700">#{w.customer.cardNo}</span>}
-                          <Link href={`/customers/${w.customer.id}`} className="hover:underline">{w.customer.name}</Link> · {w.customer.phone}
-                        </p>
-                        <div className="flex items-center gap-2 mt-1 flex-wrap">
-                          <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${AMC_STATUS_STYLE[w.status]}`}>
-                            {w.status.replace('_', ' ')}
-                          </span>
-                          {w.status === 'ACTIVE' && (
-                            <span className="text-xs text-gray-400">
-                              {w.warrantyPeriodMonths} mo · {w.serviceFrequency?.replace('_', ' ').toLowerCase()}
-                            </span>
-                          )}
+            <section>
+              <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">AMC claims from sales ({pending.length})</h2>
+              {pending.length === 0 ? (
+                <p className="rounded-xl border bg-white p-4 text-sm text-gray-400">No AMC claims waiting for approval</p>
+              ) : (
+                <div className="space-y-3">
+                  {pending.map((w) => {
+                    const serial = w.invoiceItem?.serialUnits?.[0]?.serialNumber;
+                    return (
+                      <div key={w.id} className="bg-white rounded-xl border p-4 flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-semibold text-gray-900">
+                            {w.product.name}
+                            {serial && <span className="ml-2 text-xs font-mono text-gray-400">S/N {serial}</span>}
+                          </p>
+                          <p className="text-sm text-gray-500">
+                            {w.customer.cardNo && <span className="mr-1 font-mono text-xs font-semibold text-blue-700">#{w.customer.cardNo}</span>}
+                            <Link href={`/customers/${w.customer.id}`} className="hover:underline">{w.customer.name}</Link> · {w.customer.phone}
+                          </p>
+                          <ContactLinks customer={w.customer} />
+                          <p className="text-xs text-gray-400 mt-1">Sold {dateText(w.startDate)}</p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button onClick={() => setRejecting(w)} className="flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm font-medium text-gray-500 hover:bg-gray-50">
+                            <XCircle className="h-4 w-4" /> <span className="hidden sm:inline">Reject</span>
+                          </button>
+                          <button onClick={() => setApproving(w)} className="px-4 py-2 bg-red-700 text-white rounded-lg text-sm font-medium hover:bg-red-800">Approve</button>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <button
-                          onClick={() => setCardFor(w.id)}
-                          className="flex items-center gap-1.5 px-3 py-2 border border-blue-200 rounded-lg text-sm font-medium text-blue-700 hover:bg-blue-50"
-                        >
-                          <ShieldCheck className="h-4 w-4" /> <span className="hidden sm:inline">Card</span>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+          </div>
+        ) : (
+          <>
+            <div className="mb-4 space-y-2">
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <div className="relative flex-1">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <input
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Search customer, phone, card no, product or technician…"
+                    className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-red-500"
+                  />
+                </div>
+                <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as any)} className="border rounded-lg px-3 py-2 text-sm bg-white">
+                  <option value="OPEN">Upcoming visits</option>
+                  <option value="OVERDUE">Overdue</option>
+                  <option value="UNASSIGNED">Needs a technician</option>
+                  <option value="ALL">All AMCs</option>
+                  <option value="CANCELLED">Cancelled AMCs</option>
+                </select>
+                <select value={techFilter} onChange={(e) => setTechFilter(e.target.value)} className="border rounded-lg px-3 py-2 text-sm bg-white">
+                  <option value="ALL">All technicians</option>
+                  <option value="NONE">Not assigned</option>
+                  {staff.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                </select>
+              </div>
+              {statusFilter === 'OPEN' && (
+                <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                  Next visit between
+                  <DateRangeFilter from={dates.from} to={dates.to} onChange={(from, to) => setDates({ from, to })} onReset={() => setDates(defaultDateRange())} />
+                  <span>(overdue always shown)</span>
+                </div>
+              )}
+            </div>
+
+            {visible.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-40 text-gray-400 gap-2">
+                <Search className="h-10 w-10 opacity-40" />
+                <p>{amcs.length === 0 ? 'No AMCs yet — use Register AMC' : 'Nothing matches these filters'}</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {visible.map((a) => {
+                  const next = nextVisit(a);
+                  const open = !!expanded[a.id];
+                  const warrantyEnd = a.warrantyPeriodMonths
+                    ? new Date(new Date(a.startDate).setMonth(new Date(a.startDate).getMonth() + a.warrantyPeriodMonths))
+                    : null;
+                  const visits = [...a.serviceJobs].sort((x, y) => new Date(y.dueDate).getTime() - new Date(x.dueDate).getTime());
+                  const title = `${a.product.name} — ${a.customer.name}`;
+                  return (
+                    <div key={a.id} className={`bg-white rounded-xl border ${next && jobOverdue(next) ? 'border-red-200' : ''}`}>
+                      <div className="flex flex-wrap items-start justify-between gap-3 p-4">
+                        <button onClick={() => setExpanded((e) => ({ ...e, [a.id]: !open }))} className="min-w-0 flex-1 text-left">
+                          <p className="text-sm text-gray-500">
+                            {a.customer.cardNo && <span className="mr-1 font-mono text-xs font-semibold text-blue-700">#{a.customer.cardNo}</span>}
+                            <span className="font-semibold text-gray-900">{a.customer.name}</span> · {a.customer.phone}
+                          </p>
+                          <p className="font-medium text-gray-800">{a.product.name}</p>
+                          <p className="mt-0.5 text-xs text-gray-500">
+                            <span className={`mr-1.5 rounded-full px-1.5 py-0.5 font-medium ${AMC_STATUS_STYLE[a.status]}`}>{a.status.replace('_', ' ')}</span>
+                            {frequencyLabel(a.serviceFrequency, a.frequencyMonths)}
+                            {warrantyEnd && ` · warranty till ${dateText(warrantyEnd.toISOString())}`}
+                            {a.amcTo && ` · AMC till ${dateText(a.amcTo)}`}
+                          </p>
+                          {a.notes && <p className="mt-0.5 text-xs text-amber-700">{a.notes}</p>}
                         </button>
-                        {w.status === 'ACTIVE' && (
-                          <>
-                            <button
-                              onClick={() => setEditingAmc(w)}
-                              className="flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
-                            >
-                              <Pencil className="h-4 w-4" /> <span className="hidden sm:inline">Edit</span>
-                            </button>
-                            <button
-                              onClick={() => setCancellingAmc(w)}
-                              className="flex items-center gap-1.5 px-3 py-2 border border-red-200 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50"
-                            >
-                              <XCircle className="h-4 w-4" /> <span className="hidden sm:inline">Cancel</span>
-                            </button>
-                          </>
-                        )}
-                        {w.status === 'CANCELLED' && (
+                        <div className="text-right">
+                          {next ? (
+                            <>
+                              <p className={`text-sm font-semibold ${jobOverdue(next) ? 'text-red-600' : 'text-gray-800'}`}>
+                                Next visit {dateText(next.dueDate)}{jobOverdue(next) ? ' · overdue' : ''}
+                              </p>
+                              <p className="text-xs text-gray-500">{next.assignedTo ? next.assignedTo.name : 'No technician yet'}</p>
+                            </>
+                          ) : (
+                            <p className="text-sm text-gray-400">No visit scheduled</p>
+                          )}
                           <button
-                            onClick={() => setReactivatingAmc(w)}
-                            className="flex items-center gap-1.5 px-3 py-2 border border-green-200 rounded-lg text-sm font-medium text-green-700 hover:bg-green-50"
+                            onClick={() => setExpanded((e) => ({ ...e, [a.id]: !open }))}
+                            className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-red-700"
                           >
-                            <RotateCcw className="h-4 w-4" /> <span className="hidden sm:inline">Reactivate</span>
+                            {open ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />} {a.serviceJobs.length} visit{a.serviceJobs.length === 1 ? '' : 's'}
                           </button>
-                        )}
+                        </div>
                       </div>
+
+                      <div className="flex flex-wrap gap-2 border-t px-4 py-2">
+                        <button onClick={() => setCardFor(a.id)} className="flex items-center gap-1 rounded-lg border border-blue-200 px-2.5 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50"><ShieldCheck className="h-3.5 w-3.5" /> Card</button>
+                        <button onClick={() => setEditingAmc(a)} className="flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"><Pencil className="h-3.5 w-3.5" /> Edit AMC</button>
+                        {a.status === 'ACTIVE' && (
+                          <button onClick={() => setAddingVisit(a)} className="flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"><Plus className="h-3.5 w-3.5" /> Add visit</button>
+                        )}
+                        {a.status === 'ACTIVE' ? (
+                          <button onClick={() => setCancellingAmc(a)} className="flex items-center gap-1 rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50"><XCircle className="h-3.5 w-3.5" /> Cancel AMC</button>
+                        ) : a.status === 'CANCELLED' ? (
+                          <button onClick={() => setReactivatingAmc(a)} className="flex items-center gap-1 rounded-lg border border-green-200 px-2.5 py-1.5 text-xs font-medium text-green-700 hover:bg-green-50"><RotateCcw className="h-3.5 w-3.5" /> Reactivate</button>
+                        ) : null}
+                        <Link href={`/customers/${a.customer.id}`} className="ml-auto self-center text-xs text-gray-500 underline">Customer page</Link>
+                      </div>
+
+                      {open && (
+                        <div className="border-t bg-gray-50 px-4 py-3">
+                          <p className="mb-2 text-xs text-gray-500">The next regular visit is created automatically when the current one is closed.</p>
+                          {visits.length === 0 ? (
+                            <p className="text-sm text-gray-400">No visits yet</p>
+                          ) : (
+                            <div className="space-y-2">
+                              {visits.map((j) => {
+                                const full = withWarranty(a, j);
+                                const closedJob = j.status === 'COMPLETED' || j.status === 'CANCELLED';
+                                return (
+                                  <div key={j.id} className="rounded-lg border bg-white p-3 text-sm">
+                                    <div className="flex flex-wrap items-start justify-between gap-2">
+                                      <div className="min-w-0">
+                                        <p className="font-medium">
+                                          {dateText(j.dueDate)}
+                                          <span className={`ml-2 rounded-full px-1.5 py-0.5 text-xs font-medium ${jobOverdue(j) ? 'bg-red-100 text-red-600' : JOB_STATUS_STYLE[j.status]}`}>
+                                            {jobOverdue(j) ? 'OVERDUE' : j.status.replace('_', ' ')}
+                                          </span>
+                                          {j.isExtra && <span className="ml-1 rounded-full bg-purple-100 px-1.5 py-0.5 text-xs text-purple-700">extra</span>}
+                                        </p>
+                                        <p className="text-xs text-gray-500">
+                                          {j.assignedTo ? j.assignedTo.name : 'Not assigned'}
+                                          {j.visitDate && ` · visited ${dateText(j.visitDate)}`}
+                                          {j.parts?.length > 0 && ` · parts: ${j.parts.map((p) => `${p.sku.product.name} × ${parseFloat(p.quantity)}`).join(', ')}`}
+                                        </p>
+                                        {j.customerFeedback && <p className="text-xs text-gray-600">&ldquo;{j.customerFeedback}&rdquo;</p>}
+                                        {j.invoice && (
+                                          <button onClick={() => handleViewInvoice(j.invoice!.id)} disabled={viewingInvoiceId === j.invoice.id} className="mt-0.5 inline-flex items-center gap-1 text-xs text-green-700 underline">
+                                            <Receipt className="h-3 w-3" /> {j.invoice.billNo ? `Bill No. ${j.invoice.billNo}` : j.invoice.invoiceNumber} · ₹{parseFloat(j.invoice.totalAmount).toLocaleString('en-IN')}
+                                          </button>
+                                        )}
+                                      </div>
+                                      <div className="flex flex-wrap gap-1.5">
+                                        {!closedJob && (
+                                          <>
+                                            <button onClick={() => setAssigning(full)} className="rounded-lg border px-2 py-1 text-xs hover:bg-gray-50">{j.assignedTo ? 'Reassign' : 'Assign'}</button>
+                                            <button onClick={() => setRescheduling(full)} className="rounded-lg border px-2 py-1 text-xs hover:bg-gray-50">Reschedule</button>
+                                          </>
+                                        )}
+                                        {!j.invoice && j.status !== 'CANCELLED' && (
+                                          <button onClick={() => router.push(`/billing/service-bill?jobId=${j.id}`)} className="rounded-lg border border-green-200 px-2 py-1 text-xs text-green-700 hover:bg-green-50">Bill</button>
+                                        )}
+                                        <button onClick={() => setEditingVisit({ job: j, title })} className="rounded-lg border px-2 py-1 text-xs hover:bg-gray-50"><Pencil className="inline h-3 w-3" /> Edit</button>
+                                        {!closedJob && !j.invoice && (
+                                          <button onClick={() => setCancellingJob(full)} className="rounded-lg border border-red-200 px-2 py-1 text-xs text-red-600 hover:bg-red-50">Cancel</button>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -658,78 +575,19 @@ export default function ServiceAdminPage() {
         )}
       </div>
 
-      {approving && (
-        <ApproveModal
-          warranty={approving}
-          onClose={() => setApproving(null)}
-          onSaved={() => { setApproving(null); load(); }}
-        />
-      )}
-      {assigning && (
-        <AssignModal
-          job={assigning}
-          staff={staff}
-          onClose={() => setAssigning(null)}
-          onSaved={() => { setAssigning(null); load(); }}
-        />
-      )}
-      {rescheduling && (
-        <RescheduleModal
-          job={rescheduling}
-          onClose={() => setRescheduling(null)}
-          onSaved={() => { setRescheduling(null); load(); }}
-        />
-      )}
-      {showCreateJob && (
-        <CreateJobModal
-          onClose={() => setShowCreateJob(false)}
-          onSaved={() => { setShowCreateJob(false); load(); }}
-        />
-      )}
-      {showAmcOnboard && (
-        <AmcOnboardModal
-          onClose={() => setShowAmcOnboard(false)}
-          onSaved={() => { setShowAmcOnboard(false); load(); }}
-        />
-      )}
-      {rejecting && (
-        <RejectModal
-          warranty={rejecting}
-          onClose={() => setRejecting(null)}
-          onSaved={() => { setRejecting(null); load(); }}
-        />
-      )}
-      {cancellingJob && (
-        <CancelJobModal
-          job={cancellingJob}
-          onClose={() => setCancellingJob(null)}
-          onSaved={() => { setCancellingJob(null); load(); }}
-        />
-      )}
-      {cardFor && (
-        <WarrantyCardModal warrantyId={cardFor} onClose={() => setCardFor(null)} onSaved={load} />
-      )}
-      {editingAmc && (
-        <EditAmcModal
-          warranty={editingAmc}
-          onClose={() => setEditingAmc(null)}
-          onSaved={() => { setEditingAmc(null); load(); }}
-        />
-      )}
-      {reactivatingAmc && (
-        <ReactivateAmcModal
-          warranty={reactivatingAmc}
-          onClose={() => setReactivatingAmc(null)}
-          onSaved={() => { setReactivatingAmc(null); load(); }}
-        />
-      )}
-      {cancellingAmc && (
-        <CancelAmcModal
-          warranty={cancellingAmc}
-          onClose={() => setCancellingAmc(null)}
-          onSaved={() => { setCancellingAmc(null); load(); }}
-        />
-      )}
+      {approving && <ApproveModal warranty={approving} onClose={() => setApproving(null)} onSaved={() => { setApproving(null); load(); }} />}
+      {rejecting && <RejectModal warranty={rejecting} onClose={() => setRejecting(null)} onSaved={() => { setRejecting(null); load(); }} />}
+      {approvingReq && <ApproveRequestModal request={approvingReq} staff={staff} onClose={() => setApprovingReq(null)} onSaved={() => { setApprovingReq(null); load(); }} />}
+      {assigning && <AssignModal job={assigning} staff={staff} onClose={() => setAssigning(null)} onSaved={() => { setAssigning(null); load(); }} />}
+      {rescheduling && <RescheduleModal job={rescheduling} onClose={() => setRescheduling(null)} onSaved={() => { setRescheduling(null); load(); }} />}
+      {cancellingJob && <CancelJobModal job={cancellingJob} onClose={() => setCancellingJob(null)} onSaved={() => { setCancellingJob(null); load(); }} />}
+      {editingVisit && <VisitEditModal visit={editingVisit.job} staff={staff} title={editingVisit.title} onClose={() => setEditingVisit(null)} onSaved={() => { setEditingVisit(null); load(); }} />}
+      {editingAmc && <AmcEditModal amc={editingAmc} onClose={() => setEditingAmc(null)} onSaved={() => { setEditingAmc(null); load(); }} />}
+      {addingVisit && <AddVisitModal amc={addingVisit} staff={staff} onClose={() => setAddingVisit(null)} onSaved={() => { setAddingVisit(null); load(); }} />}
+      {showAmcOnboard && <AmcOnboardModal onClose={() => setShowAmcOnboard(false)} onSaved={() => { setShowAmcOnboard(false); load(); }} />}
+      {cardFor && <WarrantyCardModal warrantyId={cardFor} onClose={() => setCardFor(null)} onSaved={load} />}
+      {reactivatingAmc && <ReactivateAmcModal warranty={reactivatingAmc} onClose={() => setReactivatingAmc(null)} onSaved={() => { setReactivatingAmc(null); load(); }} />}
+      {cancellingAmc && <CancelAmcModal warranty={cancellingAmc} onClose={() => setCancellingAmc(null)} onSaved={() => { setCancellingAmc(null); load(); }} />}
     </div>
   );
 }
@@ -776,60 +634,6 @@ function CancelAmcModal({ warranty, onClose, onSaved }: { warranty: Warranty; on
   );
 }
 
-function EditAmcModal({ warranty, onClose, onSaved }: { warranty: Warranty; onClose: () => void; onSaved: () => void }) {
-  const [months, setMonths] = useState(String(warranty.warrantyPeriodMonths ?? '12'));
-  const [frequency, setFrequency] = useState(warranty.serviceFrequency ?? 'QUARTERLY');
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-
-  const handleSave = async () => {
-    setError('');
-    setSaving(true);
-    try {
-      await api.patch(`/warranty/${warranty.id}`, { warrantyPeriodMonths: +months, serviceFrequency: frequency });
-      onSaved();
-    } catch (e: any) {
-      setError(e.response?.data?.message || 'Failed to update AMC');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
-        <div className="flex items-center justify-between p-6 border-b">
-          <h2 className="text-lg font-bold">Edit AMC</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-2xl">&times;</button>
-        </div>
-        <div className="p-6 space-y-3">
-          {error && <p className="text-sm text-red-600 bg-red-50 p-2 rounded">{error}</p>}
-          <p className="text-sm text-gray-600">{warranty.product.name} — {warranty.customer.name}</p>
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">AMC Period (months)</label>
-            <input type="number" min={1} value={months} onChange={(e) => setMonths(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" />
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Service Frequency</label>
-            <select value={frequency} onChange={(e) => setFrequency(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm">
-              <option value="MONTHLY">Monthly</option>
-              <option value="QUARTERLY">Every 3 months</option>
-              <option value="HALF_YEARLY">Every 6 months</option>
-              <option value="YEARLY">Yearly</option>
-            </select>
-          </div>
-          <p className="text-xs text-gray-400">Changes apply going forward — a visit already scheduled keeps its current due date.</p>
-        </div>
-        <div className="flex gap-3 p-6 border-t">
-          <button onClick={onClose} className="flex-1 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
-          <button onClick={handleSave} disabled={saving} className="flex-1 py-2 bg-red-700 text-white rounded-lg text-sm font-medium hover:bg-red-800 disabled:opacity-50">
-            {saving ? 'Saving…' : 'Save Changes'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function ReactivateAmcModal({ warranty, onClose, onSaved }: { warranty: Warranty; onClose: () => void; onSaved: () => void }) {
   const [saving, setSaving] = useState(false);
@@ -966,6 +770,7 @@ function RejectModal({ warranty, onClose, onSaved }: { warranty: Warranty; onClo
 function ApproveModal({ warranty, onClose, onSaved }: { warranty: Warranty; onClose: () => void; onSaved: () => void }) {
   const [months, setMonths] = useState('12');
   const [frequency, setFrequency] = useState('QUARTERLY');
+  const [freqMonths, setFreqMonths] = useState('3');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -973,7 +778,11 @@ function ApproveModal({ warranty, onClose, onSaved }: { warranty: Warranty; onCl
     setError('');
     setSaving(true);
     try {
-      await api.patch(`/warranty/${warranty.id}/approve`, { warrantyPeriodMonths: +months, serviceFrequency: frequency });
+      await api.patch(`/warranty/${warranty.id}/approve`, {
+        warrantyPeriodMonths: +months,
+        serviceFrequency: frequency,
+        ...(frequency === 'CUSTOM' ? { frequencyMonths: +freqMonths } : {}),
+      });
       onSaved();
     } catch (e: any) {
       setError(e.response?.data?.message || 'Failed to approve');
@@ -998,12 +807,7 @@ function ApproveModal({ warranty, onClose, onSaved }: { warranty: Warranty; onCl
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">Service Frequency</label>
-            <select value={frequency} onChange={(e) => setFrequency(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm">
-              <option value="MONTHLY">Monthly</option>
-              <option value="QUARTERLY">Every 3 months</option>
-              <option value="HALF_YEARLY">Every 6 months</option>
-              <option value="YEARLY">Yearly</option>
-            </select>
+            <FrequencyPicker value={frequency} months={freqMonths} onChange={(v, mo) => { setFrequency(v); setFreqMonths(mo); }} />
           </div>
           <p className="text-xs text-gray-400">Service visits keep recurring on this frequency for as long as the AMC stays active — visits within the AMC period are typically free, later ones billable.</p>
         </div>
@@ -1111,115 +915,3 @@ function RescheduleModal({ job, onClose, onSaved }: { job: ServiceJob; onClose: 
   );
 }
 
-function CreateJobModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
-  const [activeWarranties, setActiveWarranties] = useState<Warranty[]>([]);
-  const [loadingWarranties, setLoadingWarranties] = useState(true);
-  const [query, setQuery] = useState('');
-  const [selected, setSelected] = useState<Warranty | null>(null);
-  const [dueDate, setDueDate] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    api.get('/warranty', { params: { status: 'ACTIVE' } })
-      .then(({ data }) => setActiveWarranties(data))
-      .finally(() => setLoadingWarranties(false));
-  }, []);
-
-  const matches = activeWarranties.filter((w) => {
-    if (!query.trim()) return true;
-    const q = query.trim().toLowerCase();
-    return (
-      w.customer.name.toLowerCase().includes(q) ||
-      w.customer.phone.includes(q) ||
-      (w.customer.cardNo || '').toLowerCase() === q ||
-      w.product.name.toLowerCase().includes(q)
-    );
-  });
-
-  const handleSave = async () => {
-    if (!selected) { setError('Pick a customer / product under AMC.'); return; }
-    if (!dueDate) { setError('Pick a due date.'); return; }
-    setError('');
-    setSaving(true);
-    try {
-      await api.post('/warranty/service-jobs', { warrantyId: selected.id, dueDate });
-      onSaved();
-    } catch (e: any) {
-      setError(e.response?.data?.message || 'Failed to create service job');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4 overflow-auto">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md my-8">
-        <div className="flex items-center justify-between p-6 border-b">
-          <h2 className="text-lg font-bold">New Service Job</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-2xl">&times;</button>
-        </div>
-        <div className="p-6 space-y-3">
-          {error && <p className="text-sm text-red-600 bg-red-50 p-2 rounded">{error}</p>}
-
-          {selected ? (
-            <div className="flex items-center justify-between bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-              <div>
-                <p className="text-sm font-semibold text-red-900">{selected.product.name}</p>
-                <p className="text-xs text-red-600">{selected.customer.name} · {selected.customer.phone}</p>
-              </div>
-              <button onClick={() => setSelected(null)} className="text-red-400 hover:text-red-700 text-xl leading-none">&times;</button>
-            </div>
-          ) : (
-            <>
-              <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <input
-                  type="text"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search by customer name, phone, card no, or product…"
-                  className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
-                />
-              </div>
-              <div className="border rounded-lg divide-y max-h-52 overflow-auto">
-                {loadingWarranties ? (
-                  <p className="px-3 py-2 text-sm text-gray-400">Loading…</p>
-                ) : matches.length === 0 ? (
-                  <p className="px-3 py-2 text-sm text-gray-400">
-                    {activeWarranties.length === 0
-                      ? 'No active AMCs yet — approve one from Pending Approval, or Register AMC, first.'
-                      : 'No matches.'}
-                  </p>
-                ) : (
-                  matches.map((w) => (
-                    <button
-                      key={w.id}
-                      onClick={() => setSelected(w)}
-                      className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm"
-                    >
-                      <p className="font-medium text-gray-900">{w.product.name}</p>
-                      <p className="text-xs text-gray-500">{w.customer.name} · {w.customer.phone}</p>
-                      <p className="text-xs text-gray-400">Purchased {new Date(w.startDate).toLocaleDateString('en-IN', { dateStyle: 'medium' })}</p>
-                    </button>
-                  ))
-                )}
-              </div>
-            </>
-          )}
-
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Due Date</label>
-            <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" />
-          </div>
-        </div>
-        <div className="flex gap-3 p-6 border-t">
-          <button onClick={onClose} className="flex-1 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
-          <button onClick={handleSave} disabled={saving} className="flex-1 py-2 bg-red-700 text-white rounded-lg text-sm font-medium hover:bg-red-800 disabled:opacity-50">
-            {saving ? 'Saving…' : 'Create Job'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}

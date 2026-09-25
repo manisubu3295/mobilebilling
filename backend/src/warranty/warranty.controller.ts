@@ -5,7 +5,9 @@ import { ApproveWarrantyDto } from './dto/approve-warranty.dto';
 import { UpdateWarrantyDto } from './dto/update-warranty.dto';
 import { AssignServiceJobDto } from './dto/assign-service-job.dto';
 import { UpdateServiceJobDto } from './dto/update-service-job.dto';
-import { CreateServiceJobDto } from './dto/create-service-job.dto';
+import {
+  AdminCreateServiceJobDto, AdminUpdateServiceJobDto, ApproveServiceRequestDto, CreateServiceRequestDto, RejectServiceRequestDto,
+} from './dto/service-admin.dto';
 import { RescheduleServiceJobDto } from './dto/reschedule-service-job.dto';
 import { BillServiceJobDto } from './dto/bill-service-job.dto';
 import { AddServiceJobPartDto } from './dto/add-service-job-part.dto';
@@ -31,8 +33,67 @@ export class WarrantyController {
 
   @Get()
   @Roles(...ADMIN_ROLES)
-  listWarranties(@CurrentUser('storeId') storeId: string, @Query('status') status?: WarrantyStatus) {
-    return this.warrantyService.listWarranties(storeId, status);
+  listWarranties(
+    @CurrentUser('storeId') storeId: string,
+    @Query('status') status?: WarrantyStatus,
+    @Query('withJobs') withJobs?: string,
+  ) {
+    return this.warrantyService.listWarranties(storeId, status, withJobs === '1' || withJobs === 'true');
+  }
+
+  // A customer's active AMCs — the "eligible services" list when a technician
+  // schedules a visit for that customer.
+  @Get('customer/:customerId/active')
+  @Roles(Role.SERVICE_STAFF, ...ADMIN_ROLES)
+  customerActiveWarranties(@Param('customerId') customerId: string, @CurrentUser('storeId') storeId: string) {
+    return this.warrantyService.customerActiveWarranties(storeId, customerId);
+  }
+
+  @Post('service-requests')
+  @Roles(Role.SERVICE_STAFF, ...ADMIN_ROLES)
+  createServiceRequest(@Body() dto: CreateServiceRequestDto, @CurrentUser() user: any) {
+    return this.warrantyService.createServiceRequest(user.storeId, user.id, dto);
+  }
+
+  @Get('service-requests/my')
+  @Roles(Role.SERVICE_STAFF, ...ADMIN_ROLES)
+  myServiceRequests(@CurrentUser() user: any) {
+    return this.warrantyService.myServiceRequests(user.storeId, user.id);
+  }
+
+  @Patch('service-requests/:id/approve')
+  @Roles(...ADMIN_ROLES)
+  approveServiceRequest(@Param('id') id: string, @Body() dto: ApproveServiceRequestDto, @CurrentUser('storeId') storeId: string) {
+    return this.warrantyService.approveServiceRequest(id, storeId, dto);
+  }
+
+  @Patch('service-requests/:id/reject')
+  @Roles(...ADMIN_ROLES)
+  rejectServiceRequest(@Param('id') id: string, @Body() dto: RejectServiceRequestDto, @CurrentUser('storeId') storeId: string) {
+    return this.warrantyService.rejectServiceRequest(id, storeId, dto);
+  }
+
+  @Patch('service-jobs/:id/admin')
+  @Roles(...ADMIN_ROLES)
+  adminUpdateServiceJob(@Param('id') id: string, @Body() dto: AdminUpdateServiceJobDto, @CurrentUser('storeId') storeId: string) {
+    return this.warrantyService.adminUpdateServiceJob(id, storeId, dto);
+  }
+
+  @Delete('service-jobs/:id')
+  @Roles(...ADMIN_ROLES)
+  deleteServiceJob(@Param('id') id: string, @CurrentUser('storeId') storeId: string) {
+    return this.warrantyService.deleteServiceJob(id, storeId);
+  }
+
+  @Get('reports/staff')
+  @Roles(...ADMIN_ROLES)
+  staffReport(@CurrentUser('storeId') storeId: string, @Query('from') from?: string, @Query('to') to?: string) {
+    const today = new Date().toLocaleDateString('en-CA');
+    return this.warrantyService.staffReport(
+      storeId,
+      new Date((from || today) + 'T00:00:00+05:30'),
+      new Date((to || today) + 'T23:59:59+05:30'),
+    );
   }
 
   @Post()
@@ -122,7 +183,7 @@ export class WarrantyController {
 
   @Post('service-jobs')
   @Roles(...ADMIN_ROLES)
-  createServiceJob(@Body() dto: CreateServiceJobDto, @CurrentUser('storeId') storeId: string) {
+  createServiceJob(@Body() dto: AdminCreateServiceJobDto, @CurrentUser('storeId') storeId: string) {
     return this.warrantyService.createServiceJob(storeId, dto);
   }
 
@@ -241,7 +302,9 @@ export class WarrantyController {
     @CurrentUser('id') userId: string,
     @CurrentUser('role') role: Role,
     @Query('days') days?: string,
+    @Query('from') from?: string,
+    @Query('until') until?: string,
   ) {
-    return this.warrantyService.nearingDue(storeId, role, userId, days !== undefined ? +days : undefined);
+    return this.warrantyService.nearingDue(storeId, role, userId, days !== undefined ? +days : undefined, { from, until });
   }
 }

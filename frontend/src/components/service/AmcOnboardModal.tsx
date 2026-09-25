@@ -6,6 +6,7 @@ import Papa from 'papaparse';
 import api from '@/lib/api';
 import { CustomerSearch } from '@/components/billing/CustomerSearch';
 import { localDateString } from '@/lib/local-date';
+import { FrequencyPicker } from './ServiceAdminModals';
 
 interface Props {
   onClose: () => void;
@@ -13,13 +14,6 @@ interface Props {
 }
 
 type Tab = 'single' | 'bulk';
-
-const FREQUENCIES = [
-  { value: 'MONTHLY', label: 'Monthly' },
-  { value: 'QUARTERLY', label: 'Every 3 months' },
-  { value: 'HALF_YEARLY', label: 'Every 6 months' },
-  { value: 'YEARLY', label: 'Yearly' },
-];
 
 export function AmcOnboardModal({ onClose, onSaved }: Props) {
   const [tab, setTab] = useState<Tab>('single');
@@ -64,6 +58,7 @@ function SingleEntry({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
   const [startDate, setStartDate] = useState(localDateString());
   const [warrantyMonths, setWarrantyMonths] = useState('12');
   const [frequency, setFrequency] = useState('QUARTERLY');
+  const [freqMonths, setFreqMonths] = useState('3');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [justSaved, setJustSaved] = useState(false);
@@ -89,6 +84,7 @@ function SingleEntry({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
         startDate,
         warrantyPeriodMonths: +warrantyMonths,
         serviceFrequency: frequency,
+        ...(frequency === 'CUSTOM' ? { frequencyMonths: +freqMonths } : {}),
       });
       setRegisteredCount((n) => n + 1);
       setJustSaved(true);
@@ -174,9 +170,7 @@ function SingleEntry({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
         </div>
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1">Service Frequency</label>
-          <select value={frequency} onChange={(e) => setFrequency(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm">
-            {FREQUENCIES.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
-          </select>
+          <FrequencyPicker value={frequency} months={freqMonths} onChange={(v, mo) => { setFrequency(v); setFreqMonths(mo); }} />
         </div>
       </div>
 

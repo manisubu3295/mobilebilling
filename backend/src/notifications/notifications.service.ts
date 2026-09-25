@@ -1,41 +1,54 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { NotificationStatus, NotificationType } from '@prisma/client';
+import { NotificationStatus, NotificationType, Role } from '@prisma/client';
+
+export interface NotificationViewer {
+  storeId: string;
+  id: string;
+  role: Role;
+}
+
+// Admins (owner / manager) share the store-wide notifications (recipient
+// null); a technician only ever sees the ones addressed to them.
+function scopeFor(viewer: NotificationViewer) {
+  return viewer.role === Role.SERVICE_STAFF
+    ? { storeId: viewer.storeId, recipientUserId: viewer.id }
+    : { storeId: viewer.storeId, recipientUserId: null };
+}
+
+const OPEN = [NotificationStatus.UNREAD, NotificationStatus.ACTION_NOTED];
 
 @Injectable()
 export class NotificationsService {
   constructor(private prisma: PrismaService) {}
 
-  listNotifications(storeId: string, status?: NotificationStatus[]) {
+  listNotifications(viewer: NotificationViewer, status?: NotificationStatus[]) {
     return this.prisma.notification.findMany({
-      where: { storeId, ...(status && status.length > 0 ? { status: { in: status } } : {}) },
+      where: { ...scopeFor(viewer), ...(status && status.length > 0 ? { status: { in: status } } : {}) },
       orderBy: { createdAt: 'desc' },
+      take: 200,
     });
   }
 
-  unreadCount(storeId: string, type?: NotificationType) {
+  unreadCount(viewer: NotificationViewer, type?: NotificationType) {
     return this.prisma.notification.count({
-      where: {
-        storeId,
-        ...(type ? { type } : {}),
-        status: { in: [NotificationStatus.UNREAD, NotificationStatus.ACTION_NOTED] },
-      },
+      where: { ...scopeFor(viewer), ...(type ? { type } : {}), status: { in: OPEN } },
     });
   }
 
   // Bulk mark-as-read for a whole notification type — used by list pages
   // (e.g. Website Leads) where simply viewing the list counts as "read",
   // rather than requiring the admin to acknowledge each entry one by one.
-  async markTypeRead(storeId: string, type: NotificationType) {
+  async markTypeRead(viewer: NotificationViewer, type: NotificationType) {
     await this.prisma.notification.updateMany({
-      where: { storeId, type, status: { in: [NotificationStatus.UNREAD, NotificationStatus.ACTION_NOTED] } },
+      where: { ...scopeFor(viewer), type, status: { in: OPEN } },
       data: { status: NotificationStatus.ACKNOWLEDGED },
     });
     return { marked: true };
   }
 
-  private async _findOpen(id: string, storeId: string) {
-    const notification = await this.prisma.notification.findFirst({ where: { id, storeId } });
+  private async _findOpen(id: string, viewer: NotificationViewer) {
+    const notification = await this.prisma.notification.findFirst({ where: { id, ...scopeFor(viewer) } });
     if (!notification) throw new NotFoundException('Notification not found');
     if (notification.status === NotificationStatus.RESOLVED) {
       throw new BadRequestException('This notification is already resolved');
@@ -43,13 +56,13 @@ export class NotificationsService {
     return notification;
   }
 
-  async acknowledge(id: string, storeId: string) {
-    await this._findOpen(id, storeId);
+  async acknowledge(id: string, viewer: NotificationViewer) {
+    await this._findOpen(id, viewer);
     return this.prisma.notification.update({ where: { id }, data: { status: NotificationStatus.ACKNOWLEDGED } });
   }
 
-  async addActionNote(id: string, storeId: string, note: string) {
-    await this._findOpen(id, storeId);
+  async addActionNote(id: string, viewer: NotificationViewer, note: string) {
+    await this._findOpen(id, viewer);
     if (!note?.trim()) throw new BadRequestException('Action note cannot be empty');
     return this.prisma.notification.update({
       where: { id },
@@ -57,11 +70,11 @@ export class NotificationsService {
     });
   }
 
-  async resolve(id: string, storeId: string, userId: string) {
-    await this._findOpen(id, storeId);
+  async resolve(id: string, viewer: NotificationViewer) {
+    await this._findOpen(id, viewer);
     return this.prisma.notification.update({
       where: { id },
-      data: { status: NotificationStatus.RESOLVED, resolvedAt: new Date(), resolvedById: userId },
+      data: { status: NotificationStatus.RESOLVED, resolvedAt: new Date(), resolvedById: viewer.id },
     });
   }
 }

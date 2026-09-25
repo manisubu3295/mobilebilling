@@ -50,47 +50,48 @@ export function warrantyEndDate(startDate: string, months?: number | null): stri
   return end.toISOString();
 }
 
+// Print-safe: colour from text and borders; the logo comes from Settings.
 const CSS = `
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: Arial, Helvetica, sans-serif; color: #111; background: #fff; padding: 8mm; font-size: 10.5pt; }
-  @page { size: A5; margin: 6mm; }
+  body { font-family: 'Segoe UI', Roboto, Arial, Helvetica, sans-serif; color: #1f2937; background: #fff; padding: 8mm; font-size: 10pt; }
+  @page { size: A5; margin: 7mm; }
   @media print { body { padding: 0; } }
-  .card { max-width: 148mm; margin: 0 auto; }
-  .blue { color: #1d4ed8; }
-  .top { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; }
-  .shop h1 { font-size: 18pt; color: #1e3a8a; }
-  .shop div { font-size: 8.5pt; line-height: 1.3; }
-  .logo img { max-height: 22mm; max-width: 30mm; object-fit: contain; }
-  .rec { border: 1.5px solid #1d4ed8; min-width: 42mm; text-align: center; }
-  .rec .t { background: #1d4ed8; color: #fff; font-weight: 800; padding: 3px 6px; font-size: 12pt; }
-  .rec .l { color: #1d4ed8; font-size: 9pt; padding-top: 2px; }
-  .rec .v { font-size: 15pt; font-weight: 800; color: #b91c1c; padding: 2px 0 4px; min-height: 22px; }
-  .band { background: #1d4ed8; color: #fff; font-weight: 700; padding: 2px 6px; margin-top: 6px; font-size: 9.5pt; display: inline-block; min-width: 60%; }
-  .grid2 { display: flex; gap: 10px; }
-  .grid2 > div { flex: 1; }
-  .f { display: flex; gap: 4px; margin-top: 5px; align-items: flex-end; }
-  .f span.k { white-space: nowrap; font-size: 9.5pt; }
-  .f span.v { flex: 1; border-bottom: 1px dotted #555; min-height: 15px; color: #b91c1c; font-weight: 600; padding-left: 3px; }
-  .test { border: 1.5px solid #1d4ed8; padding: 4px 6px; }
-  .periods { display: flex; gap: 8px; margin-top: 8px; }
-  .period { flex: 1; display: flex; border: 1.5px solid #1d4ed8; }
-  .period .h { background: #1d4ed8; color: #fff; font-weight: 800; display: flex; align-items: center; padding: 0 6px; font-size: 10pt; }
-  .period .rows { flex: 1; }
-  .period .rows div { display: flex; border-bottom: 1px solid #1d4ed8; padding: 2px 4px; font-size: 9.5pt; }
-  .period .rows div:last-child { border-bottom: none; }
-  .period .rows b { width: 44px; font-weight: 600; }
-  .period .rows span { color: #b91c1c; font-weight: 600; }
-  .terms { margin-top: 8px; font-size: 8.5pt; line-height: 1.45; white-space: pre-line; }
-  .terms .h { font-weight: 700; font-size: 9.5pt; }
-  .sign { display: flex; justify-content: space-between; margin-top: 18px; font-size: 9.5pt; }
-  .foot { margin-top: 8px; border-top: 1.5px solid #1d4ed8; padding-top: 4px; text-align: center; font-size: 9pt; }
-  .care { background: #1d4ed8; color: #fff; font-weight: 800; text-align: center; padding: 4px; margin-top: 4px; font-size: 11pt; }
+  .card { max-width: 136mm; margin: 0 auto; border: 1.5px solid #1d4ed8; border-radius: 10px; overflow: hidden; }
+  .head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border-bottom: 3px solid #1d4ed8; }
+  .brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .brand img { max-height: 18mm; max-width: 26mm; object-fit: contain; }
+  .shop-name { font-size: 15pt; font-weight: 800; color: #1e3a8a; line-height: 1.1; }
+  .shop-line { font-size: 8pt; color: #4b5563; line-height: 1.4; }
+  .badge { text-align: center; border: 1.5px solid #1d4ed8; border-radius: 8px; padding: 4px 10px; flex-shrink: 0; }
+  .badge .t { font-size: 7.5pt; font-weight: 800; letter-spacing: 1.2px; color: #1d4ed8; text-transform: uppercase; }
+  .badge .l { font-size: 7pt; color: #6b7280; }
+  .badge .v { font-size: 18pt; font-weight: 800; color: #b91c1c; line-height: 1.1; min-height: 20px; }
+  .body { padding: 10px 12px; }
+  .sec { margin-bottom: 9px; }
+  .sec-title { font-size: 7.5pt; font-weight: 800; letter-spacing: 1.2px; text-transform: uppercase; color: #1d4ed8; border-bottom: 1px solid #dbeafe; padding-bottom: 2px; margin-bottom: 5px; }
+  .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 3px 14px; }
+  .grid.three { grid-template-columns: repeat(3, 1fr); }
+  .f { display: flex; flex-direction: column; min-width: 0; }
+  .f .k { font-size: 7pt; color: #6b7280; text-transform: uppercase; letter-spacing: 0.4px; }
+  .f .v { font-size: 9.5pt; font-weight: 600; color: #111827; border-bottom: 1px dotted #cbd5e1; min-height: 15px; padding-bottom: 1px; word-break: break-word; }
+  .f.wide { grid-column: 1 / -1; }
+  .periods { display: flex; gap: 8px; }
+  .period { flex: 1; border: 1px solid #bfdbfe; border-radius: 8px; padding: 6px 8px; }
+  .period .h { font-size: 7.5pt; font-weight: 800; letter-spacing: 1px; color: #1d4ed8; }
+  .period .d { font-size: 9.5pt; font-weight: 600; color: #111827; }
+  .terms { font-size: 8pt; line-height: 1.5; color: #374151; white-space: pre-line; background: #f8fafc; border-radius: 6px; padding: 6px 8px; }
+  .terms .h { font-weight: 700; color: #111827; margin-bottom: 2px; }
+  .sign { display: flex; justify-content: space-between; margin-top: 16px; }
+  .sign div { width: 45%; border-top: 1px solid #9ca3af; padding-top: 3px; font-size: 8pt; color: #4b5563; text-align: center; }
+  .care { border-top: 1.5px solid #1d4ed8; text-align: center; padding: 6px; font-size: 9.5pt; font-weight: 800; color: #1d4ed8; letter-spacing: 0.3px; }
 `;
 
 export function buildWarrantyCardHtml(c: WarrantyCardData): string {
-  const f = (k: string, v?: string | null) => `<div class="f"><span class="k">${k}</span><span class="v">${esc(v)}</span></div>`;
+  const f = (k: string, v?: string | null, cls = '') =>
+    `<div class="f ${cls}"><span class="k">${k}</span><span class="v">${esc(v) || '&nbsp;'}</span></div>`;
   const warrantyTo = warrantyEndDate(c.startDate, c.warrantyPeriodMonths);
   const terms = c.store.warrantyCardTerms?.trim();
+  const address = [c.customer.address, c.customer.city].filter(Boolean).join(', ');
 
   return `<!DOCTYPE html>
 <html lang="en"><head>
@@ -98,80 +99,71 @@ export function buildWarrantyCardHtml(c: WarrantyCardData): string {
 <title>Warranty Card ${esc(c.customer.cardNo)}</title>
 <style>${CSS}</style>
 </head><body><div class="card">
-  <div class="top">
-    <div class="shop">
-      <h1>${esc(c.store.name)}</h1>
-      ${c.store.address ? `<div>${esc(c.store.address).replace(/\n/g, '<br>')}</div>` : ''}
+  <div class="head">
+    <div class="brand">
+      ${c.store.logoUrl ? `<img src="${esc(c.store.logoUrl)}" alt="" />` : ''}
+      <div>
+        <div class="shop-name">${esc(c.store.name)}</div>
+        ${c.store.address ? `<div class="shop-line">${esc(c.store.address).replace(/\n/g, '<br>')}</div>` : ''}
+      </div>
     </div>
-    ${c.store.logoUrl ? `<div class="logo"><img src="${esc(c.store.logoUrl)}" alt="" /></div>` : ''}
-    <div class="rec">
+    <div class="badge">
       <div class="t">Service Record</div>
       <div class="l">Customer ID</div>
       <div class="v">${esc(c.customer.cardNo)}</div>
     </div>
   </div>
 
-  <div class="band">CUSTOMER DETAILS</div>
-  <div class="grid2">
-    <div>
-      ${f('Name', c.customer.name)}
-      ${f('Address', c.customer.address)}
-      ${f('City', c.customer.city)}
-      ${f('Land Mark', c.customer.landmark)}
-      ${f('Contact No.', c.customer.phone)}
+  <div class="body">
+    <div class="sec">
+      <div class="sec-title">Customer</div>
+      <div class="grid">
+        ${f('Name', c.customer.name)}
+        ${f('Date', d(c.cardDate || c.startDate))}
+        ${f('Address', address, 'wide')}
+        ${f('Land mark', c.customer.landmark)}
+        ${f('Contact no.', c.customer.phone)}
+      </div>
     </div>
-    <div style="flex:0 0 42%">
-      ${f('Date:', d(c.cardDate || c.startDate))}
-      <div class="test" style="margin-top:5px">
+
+    <div class="sec">
+      <div class="sec-title">Water test</div>
+      <div class="grid three">
         ${f('TDS', c.tds)}
         ${f('Hardness', c.hardness)}
         ${f('Iron', c.iron)}
-        ${f('Other impurities', c.otherImpurities)}
+        ${f('Other impurities', c.otherImpurities, 'wide')}
       </div>
     </div>
-  </div>
 
-  <div class="band">PRODUCT DETAILS</div>
-  <div class="grid2">
-    <div>
-      ${f('Brand', c.brand || c.product.brand)}
-      ${f('Pump', c.pump)}
-      ${f('Vessel', c.vessel)}
-      ${f('Sold by', c.soldBy || c.store.name)}
-    </div>
-    <div>
-      ${f('Model', c.model || c.product.name)}
-      <div class="grid2">
-        <div>${f('Membrane', c.membrane)}</div>
-        <div>${f('Power', c.power)}</div>
+    <div class="sec">
+      <div class="sec-title">Product</div>
+      <div class="grid three">
+        ${f('Brand', c.brand || c.product.brand)}
+        ${f('Model', c.model || c.product.name)}
+        ${f('Pump', c.pump)}
+        ${f('Membrane', c.membrane)}
+        ${f('Power', c.power)}
+        ${f('Vessel', c.vessel)}
+        ${f('Valve', c.valve)}
+        ${f('Media', c.media)}
+        ${f('Sold by', c.soldBy || c.store.name)}
+        ${f('Installed by', c.installedBy)}
       </div>
-      <div class="grid2">
-        <div>${f('Valve', c.valve)}</div>
-        <div>${f('Media', c.media)}</div>
-      </div>
-      ${f('Installed by', c.installedBy)}
+    </div>
+
+    <div class="sec periods">
+      <div class="period"><div class="h">WARRANTY</div><div class="d">${d(c.startDate)} &rarr; ${d(warrantyTo) || '—'}</div></div>
+      <div class="period"><div class="h">AMC</div><div class="d">${c.amcFrom ? `${d(c.amcFrom)} &rarr; ${d(c.amcTo) || '—'}` : '&nbsp;'}</div></div>
+    </div>
+
+    ${terms ? `<div class="terms"><div class="h">வாடிக்கையாளர் கவனத்திற்கு</div>${esc(terms)}</div>` : ''}
+
+    <div class="sign">
+      <div>வாடிக்கையாளர் கையொப்பம் / Customer</div>
+      <div>For ${esc(c.store.name)}</div>
     </div>
   </div>
-
-  <div class="periods">
-    <div class="period"><div class="h">WARRANTY</div><div class="rows">
-      <div><b>From</b><span>${d(c.startDate)}</span></div>
-      <div><b>To</b><span>${d(warrantyTo)}</span></div>
-    </div></div>
-    <div class="period"><div class="h">AMC</div><div class="rows">
-      <div><b>From</b><span>${d(c.amcFrom)}</span></div>
-      <div><b>To</b><span>${d(c.amcTo)}</span></div>
-    </div></div>
-  </div>
-
-  ${terms ? `<div class="terms"><div class="h">வாடிக்கையாளர் கவனத்திற்கு:</div>${esc(terms)}</div>` : ''}
-
-  <div class="sign">
-    <span>வாடிக்கையாளர் கையொப்பம்</span>
-    <span>For ${esc(c.store.name)}</span>
-  </div>
-
-  ${c.store.address ? `<div class="foot">&#9733; ${esc(c.store.address.split('\n').join(', ').replace(/,\s*,/g, ','))}</div>` : ''}
   ${c.store.phone ? `<div class="care">CUSTOMER CARE : ${esc(c.store.phone)}</div>` : ''}
 </div></body></html>`;
 }

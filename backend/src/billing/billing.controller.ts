@@ -107,8 +107,8 @@ export class BillingController {
   // Unified part lookup: tries barcode → part number → serial number
   @Get('lookup/search')
   @Roles(Role.SUPER_ADMIN, Role.STORE_MANAGER, Role.BILLING_CLERK, Role.SERVICE_STAFF)
-  lookupPart(@Query('q') query: string, @CurrentUser('storeId') storeId: string) {
-    return this.billingService.lookupPart(query, storeId);
+  lookupPart(@Query('q') query: string, @CurrentUser('storeId') storeId: string, @Query('browse') browse?: string) {
+    return this.billingService.lookupPart(query, storeId, browse === '1');
   }
 
   @Get('collections')

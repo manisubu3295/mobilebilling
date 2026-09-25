@@ -1,4 +1,4 @@
-import { IsEnum, IsInt, Min } from 'class-validator';
+import { IsEnum, IsInt, IsOptional, Min } from 'class-validator';
 import { ServiceFrequency } from '@prisma/client';
 
 export class ApproveWarrantyDto {
@@ -8,4 +8,10 @@ export class ApproveWarrantyDto {
 
   @IsEnum(ServiceFrequency)
   serviceFrequency: ServiceFrequency;
+
+  // Months between visits when serviceFrequency is CUSTOM.
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  frequencyMonths?: number;
 }

@@ -1,11 +1,12 @@
 'use client';
 
-import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { CalendarCheck, Plus, Printer, Search, Trash2, Wrench } from 'lucide-react';
+import { CalendarCheck, Plus, Printer, Trash2, Wrench } from 'lucide-react';
 import api from '@/lib/api';
 import { CustomerSearch } from '@/components/billing/CustomerSearch';
 import { RecentBills } from '@/components/billing/RecentBills';
+import { SparePicker } from '@/components/service/SparePicker';
 import { printReceipt } from '@/lib/print-receipt';
 import { useAuthStore } from '@/store/auth.store';
 
@@ -438,7 +439,7 @@ function ServiceBillInner() {
                 <Plus className="h-4 w-4" /> Typed line
               </button>
             </div>
-            <PartSearch onPick={addPart} />
+            <SparePicker onPick={addPart} />
 
             {job && (job.parts.length > 0 || visitCharge > 0) && (
               <div className="mt-3 divide-y rounded-lg border bg-gray-50">
@@ -605,62 +606,3 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
-function PartSearch({ onPick }: { onPick: (p: PartResult) => void }) {
-  const [q, setQ] = useState('');
-  const [results, setResults] = useState<PartResult[]>([]);
-  const [loading, setLoading] = useState(false);
-  const reqId = useRef(0);
-
-  useEffect(() => {
-    const term = q.trim();
-    if (term.length < 2) { setResults([]); return; }
-    const id = ++reqId.current;
-    const t = setTimeout(async () => {
-      setLoading(true);
-      try {
-        const { data } = await api.get<PartResult[]>(`/billing/lookup/search?q=${encodeURIComponent(term)}`);
-        if (id === reqId.current) setResults(data.filter((r) => r.type !== 'serial'));
-      } catch {
-        if (id === reqId.current) setResults([]);
-      } finally {
-        if (id === reqId.current) setLoading(false);
-      }
-    }, 250);
-    return () => clearTimeout(t);
-  }, [q]);
-
-  return (
-    <div className="relative">
-      <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
-      <input
-        value={q}
-        onChange={(e) => setQ(e.target.value)}
-        placeholder="Search spare by name or code…"
-        className="input pl-8"
-        style={{ paddingLeft: '2rem' }}
-      />
-      {(results.length > 0 || loading) && (
-        <div className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-lg border bg-white shadow-lg">
-          {loading && <div className="p-2 text-xs text-gray-400">Searching…</div>}
-          {results.map((r) => (
-            <button
-              key={r.skuId}
-              onClick={() => { onPick(r); setQ(''); setResults([]); }}
-              className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-gray-50"
-            >
-              <span>
-                <span className="font-medium">{r.productName}</span>
-                {r.variantName !== 'Standard' && <span className="text-gray-500"> · {r.variantName}</span>}
-                {r.partNumber && <span className="ml-1 font-mono text-xs text-red-700">{r.partNumber}</span>}
-              </span>
-              <span className="shrink-0 text-xs text-gray-500">
-                ₹{parseFloat(r.sellingPrice).toLocaleString('en-IN')}
-                {r.type === 'bulk' && ` · ${r.stockQty} in stock`}
-              </span>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}

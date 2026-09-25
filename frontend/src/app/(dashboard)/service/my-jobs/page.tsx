@@ -2,9 +2,11 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Wrench, MapPin, MessageSquare, IndianRupee, CheckCircle2, Phone, MessageCircle, Receipt, Package, Search, X } from 'lucide-react';
+import { Wrench, MapPin, MessageSquare, IndianRupee, CheckCircle2, Phone, MessageCircle, Receipt, Package, Search, X, CalendarPlus } from 'lucide-react';
 import api from '@/lib/api';
 import { localDateString } from '@/lib/local-date';
+import { SparePicker, SpareResult } from '@/components/service/SparePicker';
+import { ScheduleServiceModal } from '@/components/service/ScheduleServiceModal';
 
 interface ServiceJobPart {
   id: string;
@@ -70,17 +72,44 @@ const STATUS_STYLE: Record<string, string> = {
   CANCELLED: 'bg-red-100 text-red-600',
 };
 
+type DateFilter = 'TODAY' | 'WEEK' | 'ALL' | 'CUSTOM';
+
+interface ServiceRequest {
+  id: string;
+  dueDate: string;
+  status: string;
+  requestNote: string | null;
+  reviewNote: string | null;
+  createdAt: string;
+  warranty: { customer: { name: string; cardNo?: string | null }; product: { name: string } };
+}
+
+const REQUEST_LABEL: Record<string, { text: string; tone: string }> = {
+  REQUESTED: { text: 'Waiting for approval', tone: 'bg-amber-100 text-amber-700' },
+  CANCELLED: { text: 'Not approved', tone: 'bg-red-100 text-red-600' },
+};
+
 export default function MyServiceJobsPage() {
   const [jobs, setJobs] = useState<ServiceJob[]>([]);
+  const [requests, setRequests] = useState<ServiceRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState<ServiceJob | null>(null);
   const [query, setQuery] = useState('');
+  const [dateFilter, setDateFilter] = useState<DateFilter>('ALL');
+  const [from, setFrom] = useState(localDateString());
+  const [to, setTo] = useState(localDateString());
+  const [scheduling, setScheduling] = useState(false);
+  const [sentMsg, setSentMsg] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await api.get('/warranty/service-jobs/my');
+      const [{ data }, reqs] = await Promise.all([
+        api.get('/warranty/service-jobs/my'),
+        api.get('/warranty/service-requests/my').catch(() => ({ data: [] })),
+      ]);
       setJobs(data);
+      setRequests(reqs.data);
     } finally {
       setLoading(false);
     }
@@ -95,35 +124,98 @@ export default function MyServiceJobsPage() {
     j.warranty.customer.phone.includes(q) ||
     (j.warranty.customer.cardNo || '').toLowerCase() === q ||
     j.warranty.product.name.toLowerCase().includes(q);
-  const shown = jobs.filter(matches);
-  const active = shown.filter((j) => j.status !== 'COMPLETED' && j.status !== 'CANCELLED');
-  const history = shown.filter((j) => j.status === 'COMPLETED' || j.status === 'CANCELLED');
+
+  // Date filter: open visits by due date (overdue always shown for Today /
+  // This week), finished ones by the visit / close date.
+  const today = localDateString();
+  const weekEnd = localDateString(new Date(Date.now() + 6 * 86400000));
+  const inRange = (j: ServiceJob, isOpen: boolean) => {
+    if (dateFilter === 'ALL') return true;
+    const d = localDateString(new Date(isOpen ? j.dueDate : j.visitDate || j.closedAt || j.dueDate));
+    if (dateFilter === 'TODAY') return isOpen ? d <= today : d === today;
+    if (dateFilter === 'WEEK') return isOpen ? d <= weekEnd : d >= localDateString(new Date(Date.now() - 6 * 86400000)) && d <= today;
+    return d >= from && d <= to;
+  };
+  const isClosed = (j: ServiceJob) => j.status === 'COMPLETED' || j.status === 'CANCELLED';
+  const active = jobs.filter((j) => !isClosed(j) && matches(j) && inRange(j, true));
+  const history = jobs.filter((j) => isClosed(j) && matches(j) && inRange(j, false));
+  const openRequests = requests.filter((r) => r.status === 'REQUESTED' || (r.status === 'CANCELLED' && r.reviewNote));
 
   return (
     <div className="h-full flex flex-col bg-gray-50">
-      <div className="bg-white border-b px-4 py-4">
-        <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2"><Wrench className="h-5 w-5 text-red-700" /> My Service Jobs</h1>
-        <p className="text-sm text-gray-500 mt-0.5">{active.length} active</p>
-        <div className="relative mt-3">
+      <div className="bg-white border-b px-4 py-4 space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2"><Wrench className="h-5 w-5 text-red-700" /> My Service Jobs</h1>
+            <p className="text-sm text-gray-500 mt-0.5">{active.length} to do</p>
+          </div>
+          <button
+            onClick={() => setScheduling(true)}
+            className="flex items-center gap-1.5 rounded-lg bg-red-700 px-3 py-2 text-sm font-semibold text-white hover:bg-red-800"
+          >
+            <CalendarPlus className="h-4 w-4" /> Schedule a service
+          </button>
+        </div>
+        <div className="relative">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search name, phone or card no…"
+            placeholder="Search name, phone, card no or product…"
             className="w-full border rounded-lg pl-8 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
           />
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {([['TODAY', 'Today'], ['WEEK', 'This week'], ['ALL', 'All'], ['CUSTOM', 'Custom']] as [DateFilter, string][]).map(([k, l]) => (
+            <button
+              key={k}
+              onClick={() => setDateFilter(k)}
+              className={`rounded-full px-3 py-1.5 text-xs font-semibold ${dateFilter === k ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700'}`}
+            >
+              {l}
+            </button>
+          ))}
+          {dateFilter === 'CUSTOM' && (
+            <span className="flex items-center gap-1 text-xs">
+              <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="rounded border px-1.5 py-1" />
+              to
+              <input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="rounded border px-1.5 py-1" />
+            </span>
+          )}
         </div>
       </div>
 
       <div className="flex-1 overflow-auto p-4 space-y-3">
+        {sentMsg && <p className="rounded-lg border border-green-200 bg-green-50 p-2 text-sm text-green-800">{sentMsg}</p>}
         {loading ? (
           <div className="flex justify-center items-center h-40 text-gray-400">Loading…</div>
         ) : (
           <>
+            {openRequests.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">My requests</p>
+                {openRequests.map((r) => (
+                  <div key={r.id} className="rounded-xl border bg-white p-3 text-sm">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-medium">{r.warranty.product.name}</p>
+                        <p className="text-gray-500">
+                          {r.warranty.customer.cardNo && <span className="mr-1 font-mono text-xs text-blue-700">#{r.warranty.customer.cardNo}</span>}
+                          {r.warranty.customer.name} · {new Date(r.dueDate).toLocaleDateString('en-IN', { dateStyle: 'medium' })}
+                        </p>
+                        {r.reviewNote && <p className="text-xs text-red-600">Admin: {r.reviewNote}</p>}
+                      </div>
+                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${REQUEST_LABEL[r.status]?.tone}`}>{REQUEST_LABEL[r.status]?.text}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
             {active.length === 0 && history.length === 0 && (
               <div className="flex flex-col items-center justify-center h-40 text-gray-400 gap-2">
                 <Wrench className="h-10 w-10 opacity-40" />
-                <p>No service jobs assigned to you</p>
+                <p>{q || dateFilter !== 'ALL' ? 'No jobs match these filters' : 'No service jobs assigned to you'}</p>
               </div>
             )}
             {active.map((j) => (
@@ -146,6 +238,12 @@ export default function MyServiceJobsPage() {
           job={open}
           onClose={() => setOpen(null)}
           onSaved={() => { setOpen(null); load(); }}
+        />
+      )}
+      {scheduling && (
+        <ScheduleServiceModal
+          onClose={() => setScheduling(false)}
+          onSent={() => { setScheduling(false); setSentMsg('Request sent — you\'ll see it here once the admin approves it.'); load(); }}
         />
       )}
     </div>
@@ -201,9 +299,6 @@ function JobDetailSheet({ job, onClose, onSaved }: { job: ServiceJob; onClose: (
   const router = useRouter();
 
   const [parts, setParts] = useState<ServiceJobPart[]>(job.parts || []);
-  const [partQuery, setPartQuery] = useState('');
-  const [partResults, setPartResults] = useState<any[]>([]);
-  const [partSearching, setPartSearching] = useState(false);
   const [partQty, setPartQty] = useState('1');
   const [addingPart, setAddingPart] = useState(false);
 
@@ -215,18 +310,7 @@ function JobDetailSheet({ job, onClose, onSaved }: { job: ServiceJob; onClose: (
   }, 0);
   const billTotal = savedChargeAmount + partsTotal;
 
-  useEffect(() => {
-    if (partQuery.trim().length < 2) { setPartResults([]); return; }
-    setPartSearching(true);
-    const t = setTimeout(() => {
-      api.get('/billing/lookup/search', { params: { q: partQuery } })
-        .then(({ data }) => setPartResults(data))
-        .finally(() => setPartSearching(false));
-    }, 300);
-    return () => clearTimeout(t);
-  }, [partQuery]);
-
-  const handleAddPart = async (r: any) => {
+  const handleAddPart = async (r: SpareResult) => {
     if (!r.found || r.type === 'serial') return; // serialized parts aren't supported yet
     setError('');
     setAddingPart(true);
@@ -236,8 +320,6 @@ function JobDetailSheet({ job, onClose, onSaved }: { job: ServiceJob; onClose: (
         quantity: parseFloat(partQty) || 1,
       });
       setParts((p) => [...p, data]);
-      setPartQuery('');
-      setPartResults([]);
       setPartQty('1');
     } catch (e: any) {
       setError(e.response?.data?.message || 'Failed to add part');
@@ -356,50 +438,21 @@ function JobDetailSheet({ job, onClose, onSaved }: { job: ServiceJob; onClose: (
               </div>
             )}
             {!closed && (
-              <div className="relative">
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <input
-                      type="text"
-                      value={partQuery}
-                      onChange={(e) => setPartQuery(e.target.value)}
-                      placeholder="Search part to add…"
-                      className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
-                    />
-                  </div>
+              <div className="flex items-start gap-2">
+                <div className="flex-1">
+                  <SparePicker onPick={handleAddPart} disabled={addingPart} />
+                </div>
+                <label className="w-16 shrink-0">
                   <input
                     type="number"
                     min={0.001}
                     step="0.001"
                     value={partQty}
                     onChange={(e) => setPartQty(e.target.value)}
-                    className="w-16 border rounded-lg px-2 py-2 text-sm text-center"
+                    className="w-full border rounded-lg px-2 py-2 text-sm text-center"
+                    aria-label="Quantity"
                   />
-                </div>
-                {partQuery.trim().length >= 2 && (
-                  <div className="absolute z-10 left-0 right-0 mt-1 bg-white border rounded-lg shadow-lg max-h-40 overflow-auto">
-                    {partSearching && <p className="px-3 py-2 text-sm text-gray-400">Searching…</p>}
-                    {!partSearching && partResults.length === 0 && <p className="px-3 py-2 text-sm text-gray-400">No matches</p>}
-                    {partResults.map((r, i) => {
-                      const disabled = !r.found || r.type === 'serial' || addingPart;
-                      return (
-                        <button
-                          key={i}
-                          onClick={() => handleAddPart(r)}
-                          disabled={disabled}
-                          className={`w-full flex items-center justify-between px-3 py-2 text-left hover:bg-gray-50 text-sm ${disabled ? 'opacity-50' : ''}`}
-                        >
-                          <span>
-                            {r.productName} <span className="text-gray-400">· {r.variantName}</span>
-                            {r.type === 'serial' && <span className="text-gray-400"> (serial-tracked — not supported here)</span>}
-                          </span>
-                          <span className="font-semibold text-red-700 shrink-0">₹{parseFloat(r.sellingPrice).toFixed(0)}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
+                </label>
               </div>
             )}
           </div>

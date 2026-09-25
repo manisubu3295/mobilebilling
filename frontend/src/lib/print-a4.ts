@@ -53,46 +53,54 @@ const SERVICE_CATEGORY_LABELS: Array<[string, string]> = [
   ['AMC', 'AMC'],
 ];
 
+// Print-safe design: colour comes from text and borders (printers often skip
+// background colours), light tints only as extras.
 const A4_CSS = `
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: Arial, Helvetica, sans-serif; font-size: 11pt; color: #111; background: #fff; padding: 10mm; }
-  @page { size: A4; margin: 10mm; }
+  body { font-family: 'Segoe UI', Roboto, Arial, Helvetica, sans-serif; font-size: 10.5pt; color: #1f2937; background: #fff; padding: 12mm; }
+  @page { size: A4; margin: 12mm; }
   @media print { body { padding: 0; } }
-  .sheet { border: 2px solid #111; max-width: 190mm; margin: 0 auto; }
-  .row { display: flex; }
-  .cell { padding: 4px 8px; }
-  .b-b { border-bottom: 1.5px solid #111; }
-  .b-r { border-right: 1.5px solid #111; }
-  .head-left { flex: 1 1 62%; }
-  .head-right { flex: 1 1 38%; display: flex; align-items: center; justify-content: center; padding: 6px; }
-  .head-right img { max-width: 100%; max-height: 32mm; object-fit: contain; }
-  .doc-title { text-align: center; font-weight: 800; color: #1d4ed8; font-size: 13pt; letter-spacing: 1px; }
-  .shop-name { text-align: center; font-weight: 800; color: #b91c1c; font-size: 22pt; }
-  .shop-addr { text-align: center; color: #b91c1c; font-size: 11pt; line-height: 1.35; }
-  .shop-meta { text-align: center; color: #1d4ed8; font-weight: 700; font-size: 11pt; line-height: 1.35; }
-  .lbl { color: #b91c1c; font-weight: 700; white-space: nowrap; }
-  .party { flex: 1 1 62%; }
-  .party-grid { display: grid; grid-template-columns: max-content 1fr; column-gap: 8px; row-gap: 3px; }
-  .meta { flex: 1 1 38%; }
-  .meta .party-grid { grid-template-columns: max-content 1fr; }
+  .page { max-width: 186mm; margin: 0 auto; }
+  .accent { color: #b91c1c; }
+  .head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding-bottom: 10px; border-bottom: 3px solid #b91c1c; }
+  .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .brand img { max-height: 24mm; max-width: 34mm; object-fit: contain; }
+  .shop-name { font-size: 20pt; font-weight: 800; color: #111827; letter-spacing: 0.3px; line-height: 1.1; }
+  .shop-line { font-size: 9pt; color: #4b5563; line-height: 1.45; }
+  .shop-gst { font-size: 9pt; font-weight: 700; color: #111827; margin-top: 2px; }
+  .doc { text-align: right; flex-shrink: 0; }
+  .doc-title { display: inline-block; border: 2px solid #b91c1c; color: #b91c1c; font-weight: 800; letter-spacing: 1.5px; font-size: 11pt; padding: 4px 12px; border-radius: 6px; }
+  .doc-meta { margin-top: 8px; font-size: 9.5pt; line-height: 1.6; }
+  .doc-meta b { color: #111827; }
+  .cards { display: flex; gap: 10px; margin: 12px 0; }
+  .card { flex: 1; border: 1px solid #e5e7eb; border-radius: 8px; padding: 9px 11px; }
+  .label { font-size: 7.5pt; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #9ca3af; margin-bottom: 3px; }
+  .cust-name { font-size: 11.5pt; font-weight: 700; color: #111827; }
+  .card-line { font-size: 9.5pt; color: #374151; line-height: 1.45; }
+  .kv { display: grid; grid-template-columns: max-content 1fr; column-gap: 10px; row-gap: 2px; font-size: 9.5pt; }
+  .kv span:nth-child(odd) { color: #6b7280; }
+  .kv span:nth-child(even) { font-weight: 600; color: #111827; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: -2px 0 12px; }
+  .chip { border: 1px solid #d1d5db; border-radius: 999px; padding: 2px 10px; font-size: 8.5pt; color: #6b7280; }
+  .chip.on { border-color: #b91c1c; color: #b91c1c; font-weight: 700; }
   table.items { width: 100%; border-collapse: collapse; }
-  table.items th { color: #b91c1c; font-size: 10.5pt; padding: 5px 6px; border-bottom: 1.5px solid #111; border-right: 1.5px solid #111; }
-  table.items td { padding: 5px 6px; border-right: 1.5px solid #111; vertical-align: top; font-size: 10.5pt; }
-  table.items th:last-child, table.items td:last-child { border-right: none; }
-  table.items tr.filler td { height: 100%; }
+  table.items th { font-size: 8pt; letter-spacing: 0.6px; text-transform: uppercase; color: #6b7280; text-align: left; padding: 7px 8px; border-bottom: 2px solid #111827; }
+  table.items td { padding: 8px; border-bottom: 1px solid #eef0f3; vertical-align: top; font-size: 10pt; }
+  table.items tr:nth-child(even) td { background: #fafafa; }
   .num { text-align: right; white-space: nowrap; }
   .ctr { text-align: center; }
-  .desc-main { font-weight: 700; }
-  .desc-sub { font-size: 9pt; color: #555; }
-  .totals td { border-top: 1.5px solid #111; font-weight: 700; }
-  .grand td { font-size: 12pt; }
-  .grand .lbl-cell { color: #b91c1c; }
-  .words { font-style: italic; font-size: 10pt; }
-  .checks { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 10.5pt; }
-  .box { display: inline-block; width: 11px; height: 11px; border: 1.3px solid #111; margin-right: 4px; vertical-align: -1px; text-align: center; line-height: 9px; font-size: 10px; font-weight: 800; }
-  .sign { display: flex; justify-content: space-between; padding: 8px 10px 0; min-height: 26mm; }
-  .sign div { color: #b91c1c; font-weight: 700; align-self: flex-end; }
-  .terms { font-size: 9.5pt; color: #333; }
+  .desc-main { font-weight: 600; color: #111827; }
+  .desc-sub { font-size: 8.5pt; color: #6b7280; }
+  .bottom { display: flex; gap: 16px; margin-top: 12px; align-items: flex-start; }
+  .words { flex: 1; font-size: 9pt; color: #374151; }
+  .words .label { margin-bottom: 2px; }
+  .totals { width: 44%; border: 1px solid #e5e7eb; border-radius: 8px; padding: 8px 12px; }
+  .trow { display: flex; justify-content: space-between; font-size: 10pt; padding: 3px 0; color: #374151; }
+  .trow.grand { border-top: 2px solid #111827; margin-top: 4px; padding-top: 7px; font-size: 13pt; font-weight: 800; color: #b91c1c; }
+  .trow.due { color: #b91c1c; font-weight: 700; }
+  .sign { display: flex; justify-content: space-between; margin-top: 26mm; }
+  .sign div { width: 42%; border-top: 1px solid #9ca3af; padding-top: 5px; font-size: 9pt; color: #4b5563; text-align: center; }
+  .foot { margin-top: 10px; text-align: center; font-size: 8.5pt; color: #9ca3af; }
 `;
 
 interface Line {
@@ -146,9 +154,10 @@ export function buildA4InvoiceHtml(invoice: PrintInvoice): string {
   const date = new Date(invoice.createdAt);
   const title = isService ? 'SERVICE BILL' : gst ? 'TAX INVOICE' : 'BILL';
   const billNo = invoice.billNo || invoice.invoiceNumber;
-  const cols = gst ? 6 : 5;
+  const store = invoice.store;
+  const customer = invoice.customer;
 
-  const igst = isInterState(invoice.store.gstNumber, invoice.customer?.gstin);
+  const igst = isInterState(store.gstNumber, customer?.gstin);
   // Tax lines per GST rate: IGST in full, or CGST/SGST half each.
   const byRate = new Map<number, { taxable: number; tax: number }>();
   if (gst) {
@@ -160,11 +169,18 @@ export function buildA4InvoiceHtml(invoice: PrintInvoice): string {
       byRate.set(l.taxRate, e);
     }
   }
-  const taxable = lines.reduce((s, l) => s + l.amount, 0);
+  const subtotal = lines.reduce((s, l) => s + l.amount, 0);
   const discount = parseFloat(invoice.discountAmount || '0');
   const total = parseFloat(invoice.totalAmount);
   const paid = parseFloat(invoice.paidAmount || '0');
   const balance = total - paid;
+
+  const trow = (label: string, value: string, cls = '') => `<div class="trow ${cls}"><span>${label}</span><span>${value}</span></div>`;
+  const taxRows = Array.from(byRate.entries()).sort((a, b) => a[0] - b[0]).map(([rate, e]) => {
+    if (igst) return trow(`IGST @ ${rate}%`, money(e.tax));
+    const half = e.tax / 2;
+    return trow(`CGST @ ${rate / 2}%`, money(half)) + trow(`SGST @ ${rate / 2}%`, money(half));
+  }).join('');
 
   const itemRows = lines.map((l, i) => `
     <tr>
@@ -176,35 +192,14 @@ export function buildA4InvoiceHtml(invoice: PrintInvoice): string {
       <td class="num">${money(l.amount)}</td>
     </tr>`).join('');
 
-  const span = cols - 1;
-  const totalRow = (label: string, value: string, cls = '') =>
-    `<tr class="totals ${cls}"><td colspan="${span}" class="num lbl-cell">${label}</td><td class="num">${value}</td></tr>`;
-
-  const taxRows = Array.from(byRate.entries()).sort((a, b) => a[0] - b[0]).map(([rate, e]) => {
-    if (igst) return totalRow(`IGST @ ${rate}%`, money(e.tax));
-    const half = e.tax / 2;
-    const r = (rate / 2).toString();
-    return totalRow(`CGST @ ${r}%`, money(half)) + totalRow(`SGST @ ${r}%`, money(half));
-  }).join('');
-
-  const customer = invoice.customer;
   const customerAddress = [customer?.address, customer?.city].filter(Boolean).join(', ');
-
-  const serviceBlock = isService ? `
-    <div class="row b-b">
-      <div class="cell b-r" style="flex:1 1 62%">
-        <div class="checks">
-          ${SERVICE_CATEGORY_LABELS.map(([key, label]) =>
-            `<span><span class="box">${invoice.serviceCategory === key ? '&#10003;' : ''}</span>${label}</span>`).join('')}
-        </div>
-      </div>
-      <div class="cell" style="flex:1 1 38%">
-        <div class="party-grid">
-          <span class="lbl">TDS RW :</span><span>${esc(invoice.tdsRaw) || '&nbsp;'}</span>
-          <span class="lbl">TDS TW :</span><span>${esc(invoice.tdsTreated) || '&nbsp;'}</span>
-        </div>
-      </div>
-    </div>` : '';
+  const details: Array<[string, string]> = [];
+  if (customer?.cardNo) details.push(['Card No', customer.cardNo]);
+  if (isService && invoice.technician?.name) details.push(['Technician', invoice.technician.name]);
+  if (isService && invoice.tdsRaw) details.push(['TDS raw water', invoice.tdsRaw]);
+  if (isService && invoice.tdsTreated) details.push(['TDS treated', invoice.tdsTreated]);
+  if (gst && customer?.gstin) details.push(['Customer GSTIN', customer.gstin]);
+  if (igst) details.push(['Supply', 'Inter-state (IGST)']);
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -215,74 +210,79 @@ export function buildA4InvoiceHtml(invoice: PrintInvoice): string {
   <style>${A4_CSS}</style>
 </head>
 <body>
-<div class="sheet">
-  <div class="row b-b">
-    <div class="head-left b-r">
-      <div class="cell b-b doc-title">${title}</div>
-      <div class="cell b-b shop-name">${esc(invoice.store.name)}</div>
-      <div class="cell">
-        ${invoice.store.address ? `<div class="shop-addr">${esc(invoice.store.address).replace(/\n/g, '<br>')}</div>` : ''}
-        ${invoice.store.phone ? `<div class="shop-meta">Cell: ${esc(invoice.store.phone)}</div>` : ''}
-        ${invoice.store.gstNumber ? `<div class="shop-meta">GSTIN: ${esc(invoice.store.gstNumber)}</div>` : ''}
+<div class="page">
+  <div class="head">
+    <div class="brand">
+      ${store.logoUrl ? `<img src="${esc(store.logoUrl)}" alt="" />` : ''}
+      <div>
+        <div class="shop-name">${esc(store.name)}</div>
+        ${store.address ? `<div class="shop-line">${esc(store.address).replace(/\n/g, '<br>')}</div>` : ''}
+        ${store.phone ? `<div class="shop-line">Ph: ${esc(store.phone)}</div>` : ''}
+        ${store.gstNumber ? `<div class="shop-gst">GSTIN: ${esc(store.gstNumber)}</div>` : ''}
       </div>
     </div>
-    <div class="head-right">
-      ${invoice.store.logoUrl ? `<img src="${esc(invoice.store.logoUrl)}" alt="" />` : ''}
-    </div>
-  </div>
-
-  <div class="row b-b">
-    <div class="party cell b-r">
-      <div class="party-grid">
-        <span class="lbl">NAME :</span><span>${esc(customer?.name || 'Walk-in Customer')}</span>
-        <span class="lbl">ADDRESS :</span><span>${esc(customerAddress) || '&nbsp;'}</span>
-        ${customer?.landmark ? `<span class="lbl">LANDMARK :</span><span>${esc(customer.landmark)}</span>` : ''}
-        <span class="lbl">MOBILE :</span><span>${esc(customer?.phone) || '&nbsp;'}</span>
-      </div>
-    </div>
-    <div class="meta cell">
-      <div class="party-grid">
-        ${gst ? `<span class="lbl">GSTIN :</span><span>${esc(customer?.gstin) || '&nbsp;'}</span>` : ''}
-        <span class="lbl">B.NO :</span><span><strong>${esc(billNo)}</strong></span>
-        <span class="lbl">DATE :</span><span><strong>${date.toLocaleDateString('en-GB')}</strong></span>
-        ${customer?.cardNo ? `<span class="lbl">CARD NO :</span><span>${esc(customer.cardNo)}</span>` : ''}
-        ${isService && invoice.technician?.name ? `<span class="lbl">TECH :</span><span>${esc(invoice.technician.name)}</span>` : ''}
+    <div class="doc">
+      <div class="doc-title">${title}</div>
+      <div class="doc-meta">
+        <div>${isService ? 'Bill' : 'Invoice'} No: <b>${esc(billNo)}</b></div>
+        <div>Date: <b>${date.toLocaleDateString('en-GB')}</b></div>
       </div>
     </div>
   </div>
 
-  ${serviceBlock}
+  <div class="cards">
+    <div class="card">
+      <div class="label">Bill to</div>
+      <div class="cust-name">${esc(customer?.name || 'Walk-in Customer')}</div>
+      ${customerAddress ? `<div class="card-line">${esc(customerAddress)}</div>` : ''}
+      ${customer?.landmark ? `<div class="card-line">Landmark: ${esc(customer.landmark)}</div>` : ''}
+      ${customer?.phone ? `<div class="card-line">Ph: ${esc(customer.phone)}</div>` : ''}
+    </div>
+    ${details.length ? `
+    <div class="card">
+      <div class="label">Details</div>
+      <div class="kv">${details.map(([k, v]) => `<span>${k}</span><span>${esc(v)}</span>`).join('')}</div>
+    </div>` : ''}
+  </div>
+
+  ${isService ? `<div class="chips">${SERVICE_CATEGORY_LABELS.map(([key, label]) =>
+    `<span class="chip ${invoice.serviceCategory === key ? 'on' : ''}">${invoice.serviceCategory === key ? '&#10003; ' : ''}${label}</span>`).join('')}</div>` : ''}
 
   <table class="items">
     <thead>
       <tr>
-        <th style="width:9%">S.NO</th>
-        <th>${isService ? 'SPARE / SERVICE DESCRIPTION' : 'DESCRIPTION'}</th>
-        ${gst ? '<th style="width:11%">HSN CODE</th>' : ''}
-        <th style="width:9%">QTY</th>
-        <th style="width:13%">RATE</th>
-        <th style="width:15%">AMOUNT</th>
+        <th class="ctr" style="width:7%">#</th>
+        <th>${isService ? 'Spares / work done' : 'Description'}</th>
+        ${gst ? '<th class="ctr" style="width:11%">HSN</th>' : ''}
+        <th class="ctr" style="width:9%">Qty</th>
+        <th class="num" style="width:14%">Rate</th>
+        <th class="num" style="width:16%">Amount</th>
       </tr>
     </thead>
-    <tbody>
-      ${itemRows}
-      <tr><td style="height:${Math.max(20, 110 - lines.length * 9)}mm"></td><td></td>${gst ? '<td></td>' : ''}<td></td><td></td><td></td></tr>
-      ${discount > 0
-        ? totalRow('SUB TOTAL', money(taxable)) + totalRow('DISCOUNT', '&minus; ' + money(discount))
-          + (gst ? totalRow('TAXABLE VALUE', money(taxable - discount)) : '')
-        : totalRow(gst ? 'TAXABLE VALUE' : 'SUB TOTAL', money(taxable))}
-      ${taxRows}
-      ${totalRow('TOTAL', money(total), 'grand')}
-      ${paid > 0 && Math.abs(balance) > 0.005 ? totalRow('PAID', money(paid)) + totalRow(balance > 0 ? 'BALANCE DUE' : 'CHANGE', money(Math.abs(balance))) : ''}
-    </tbody>
+    <tbody>${itemRows}</tbody>
   </table>
 
-  <div class="cell b-b" style="border-top:1.5px solid #111"><span class="words">${amountInWords(total)}</span></div>
-  ${!isService && !gst ? '' : `<div class="cell b-b terms">${isService ? 'Customer Signature confirms the service was completed to satisfaction.' : 'Certified that the particulars given above are true and correct.'}</div>`}
-  <div class="sign">
-    <div>For ${esc(invoice.store.name)}</div>
-    <div>Customer Signature</div>
+  <div class="bottom">
+    <div class="words">
+      <div class="label">Amount in words</div>
+      <div>${amountInWords(total)}</div>
+    </div>
+    <div class="totals">
+      ${trow('Sub total', money(subtotal))}
+      ${discount > 0 ? trow('Discount', '&minus; ' + money(discount)) : ''}
+      ${gst && discount > 0 ? trow('Taxable value', money(subtotal - discount)) : ''}
+      ${taxRows}
+      ${trow('Total', '&#8377; ' + money(total), 'grand')}
+      ${paid > 0 && Math.abs(balance) > 0.005 ? trow('Paid', money(paid)) : ''}
+      ${balance > 0.005 ? trow('Balance due', money(balance), 'due') : ''}
+    </div>
   </div>
+
+  <div class="sign">
+    <div>Customer signature</div>
+    <div>For ${esc(store.name)}</div>
+  </div>
+  <div class="foot">${isService ? 'Service carried out as per the details above.' : gst ? 'Certified that the particulars given above are true and correct.' : ''} Thank you for your business!</div>
 </div>
 </body>
 </html>`;

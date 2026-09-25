@@ -215,7 +215,7 @@ export class CustomersService {
       },
       warranties: warranties.map((w) => ({
         id: w.id, product: w.product.name, status: w.status, startDate: w.startDate,
-        warrantyPeriodMonths: w.warrantyPeriodMonths, serviceFrequency: w.serviceFrequency,
+        warrantyPeriodMonths: w.warrantyPeriodMonths, serviceFrequency: w.serviceFrequency, frequencyMonths: w.frequencyMonths,
         amcFrom: w.amcFrom, amcTo: w.amcTo, nextServiceDueAt: w.nextServiceDueAt,
       })),
       timeline,

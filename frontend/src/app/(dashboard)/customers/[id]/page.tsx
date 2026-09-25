@@ -11,6 +11,7 @@ import api from '@/lib/api';
 import { printReceipt } from '@/lib/print-receipt';
 import { useBillingStore } from '@/store/billing.store';
 import { WarrantyCardModal } from '@/components/service/WarrantyCardModal';
+import { frequencyLabel } from '@/components/service/ServiceAdminModals';
 
 interface History {
   customer: {
@@ -25,7 +26,7 @@ interface History {
   nextJob: { id: string; dueDate: string; status: string; product: string; technician: string | null } | null;
   warranties: Array<{
     id: string; product: string; status: string; startDate: string; warrantyPeriodMonths: number | null;
-    serviceFrequency: string | null; amcFrom: string | null; amcTo: string | null; nextServiceDueAt: string | null;
+    serviceFrequency: string | null; frequencyMonths?: number | null; amcFrom: string | null; amcTo: string | null; nextServiceDueAt: string | null;
   }>;
   timeline: Array<{
     kind: 'SALES_BILL' | 'SERVICE_BILL' | 'QUOTATION' | 'SERVICE_VISIT' | 'AMC';
@@ -219,7 +220,7 @@ export default function CustomerHistoryPage() {
                       <p className="text-xs text-gray-500">
                         Warranty {dateOf(w.startDate)}{until ? ` → ${dateOf(until.toISOString())}` : ''}
                         {w.amcFrom && ` · AMC ${dateOf(w.amcFrom)}${w.amcTo ? ` → ${dateOf(w.amcTo)}` : ''}`}
-                        {w.serviceFrequency && ` · ${w.serviceFrequency.replace('_', ' ').toLowerCase()} service`}
+                        {w.serviceFrequency && ` · service ${frequencyLabel(w.serviceFrequency, w.frequencyMonths).toLowerCase()}`}
                       </p>
                     </div>
                     <button

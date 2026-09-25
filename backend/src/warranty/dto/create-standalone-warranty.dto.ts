@@ -26,4 +26,10 @@ export class CreateStandaloneWarrantyDto {
   @IsOptional()
   @IsEnum(ServiceFrequency)
   serviceFrequency?: ServiceFrequency;
+
+  // Months between visits when serviceFrequency is CUSTOM.
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  frequencyMonths?: number;
 }

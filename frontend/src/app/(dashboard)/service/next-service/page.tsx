@@ -55,20 +55,27 @@ export default function NextServicePage() {
   const [items, setItems] = useState<DueJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [days, setDays] = useState<number | null>(null);
+  // Window: a number of days ahead, "until" a date, or a custom from–to range.
+  const [mode, setMode] = useState<'DAYS' | 'UNTIL' | 'RANGE'>('DAYS');
+  const [untilDate, setUntilDate] = useState(localDateString(new Date(Date.now() + 30 * 86400000)));
+  const [rangeFrom, setRangeFrom] = useState(localDateString());
+  const [rangeTo, setRangeTo] = useState(localDateString(new Date(Date.now() + 30 * 86400000)));
+  const [techFilter, setTechFilter] = useState('ALL');
   const [bucket, setBucket] = useState<Bucket>('OVERDUE');
   const [query, setQuery] = useState('');
   const [staff, setStaff] = useState<{ id: string; name: string }[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  const load = useCallback(async (d: number | null) => {
+  const load = useCallback(async (d: number | null, range?: { from?: string; until?: string }) => {
     setLoading(true);
     try {
-      const { data } = await api.get('/warranty/nearing-due', { params: d != null ? { days: d } : {} });
+      const params = range ? range : d != null ? { days: d } : {};
+      const { data } = await api.get('/warranty/nearing-due', { params });
       setItems(data.items);
       setDays((cur) => cur ?? data.daysAhead);
       // Open on the first bucket that has something in it.
       const first = BUCKETS.find(([b]) => data.items.some((j: DueJob) => bucketOf(j) === b));
-      if (first && d == null) setBucket(first[0]);
+      if (first && d == null && !range) setBucket(first[0]);
     } finally {
       setLoading(false);
     }
@@ -82,11 +89,13 @@ export default function NextServicePage() {
 
   const q = query.trim().toLowerCase();
   const matching = useMemo(() => items.filter((j) =>
+    (techFilter === 'ALL' || (techFilter === 'NONE' ? !j.assignedTo : j.assignedTo?.id === techFilter)) && (
     !q ||
     j.warranty.customer.name.toLowerCase().includes(q) ||
     j.warranty.customer.phone.includes(q) ||
     (j.warranty.customer.cardNo || '').toLowerCase() === q ||
-    j.warranty.product.name.toLowerCase().includes(q)), [items, q]);
+    j.warranty.product.name.toLowerCase().includes(q))), [items, q, techFilter]);
+  const unassigned = items.filter((j) => !j.assignedTo).length;
   const counts = useMemo(() => {
     const c: Record<Bucket, number> = { OVERDUE: 0, TODAY: 0, WEEK: 0, LATER: 0 };
     for (const j of matching) c[bucketOf(j)]++;
@@ -115,14 +124,53 @@ export default function NextServicePage() {
             <CalendarClock className="h-5 w-5 text-red-700" /> Next Service
           </h1>
           <select
-            value={days ?? ''}
-            onChange={(e) => { const d = +e.target.value; setDays(d); load(d); }}
+            value={mode === 'DAYS' ? String(days ?? '') : mode}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (v === 'UNTIL') { setMode('UNTIL'); load(null, { until: untilDate }); return; }
+              if (v === 'RANGE') { setMode('RANGE'); load(null, { from: rangeFrom, until: rangeTo }); return; }
+              const d = +v; setMode('DAYS'); setDays(d); load(d);
+            }}
             className="border rounded-lg px-2 py-1.5 text-sm bg-white"
           >
             {[7, 14, 30, 60, 90].map((d) => <option key={d} value={d}>Next {d} days</option>)}
             {days !== null && ![7, 14, 30, 60, 90].includes(days) && <option value={days}>Next {days} days</option>}
+            <option value="UNTIL">Until date…</option>
+            <option value="RANGE">Custom range…</option>
           </select>
         </div>
+        {mode === 'UNTIL' && (
+          <label className="flex items-center gap-2 text-sm text-gray-600">
+            Everything due up to
+            <input type="date" value={untilDate} onChange={(e) => { setUntilDate(e.target.value); if (e.target.value) load(null, { until: e.target.value }); }} className="rounded-lg border px-2 py-1 text-sm" />
+            <span className="text-xs text-gray-400">(overdue included)</span>
+          </label>
+        )}
+        {mode === 'RANGE' && (
+          <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
+            Due from
+            <input type="date" value={rangeFrom} onChange={(e) => { setRangeFrom(e.target.value); if (e.target.value) load(null, { from: e.target.value, until: rangeTo }); }} className="rounded-lg border px-2 py-1 text-sm" />
+            to
+            <input type="date" value={rangeTo} onChange={(e) => { setRangeTo(e.target.value); if (e.target.value) load(null, { from: rangeFrom, until: e.target.value }); }} className="rounded-lg border px-2 py-1 text-sm" />
+          </div>
+        )}
+        {isAdmin && (
+          <div className="flex flex-wrap items-center gap-2">
+            <select value={techFilter} onChange={(e) => setTechFilter(e.target.value)} className="rounded-lg border bg-white px-2 py-1.5 text-sm">
+              <option value="ALL">All technicians</option>
+              <option value="NONE">Not assigned</option>
+              {staff.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+            </select>
+            {unassigned > 0 && (
+              <button
+                onClick={() => setTechFilter(techFilter === 'NONE' ? 'ALL' : 'NONE')}
+                className={`rounded-full px-3 py-1.5 text-xs font-semibold ${techFilter === 'NONE' ? 'bg-amber-600 text-white' : 'bg-amber-100 text-amber-800'}`}
+              >
+                {unassigned} need a technician
+              </button>
+            )}
+          </div>
+        )}
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <input

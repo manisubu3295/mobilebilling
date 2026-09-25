@@ -708,9 +708,9 @@ export class BillingService {
   }
 
   // Unified part search — returns array of matches so frontend can show a picker
-  async lookupPart(query: string, storeId: string) {
-    const q = query.trim();
-    if (!q) return [];
+  async lookupPart(query: string, storeId: string, browse = false) {
+    const q = (query ?? '').trim();
+    if (!q) return browse ? this._browseParts(storeId) : [];
 
     // 1. Exact barcode on SKU — highest priority, return immediately as single result
     const skuByBarcode = await this.prisma.sKU.findFirst({
@@ -772,6 +772,18 @@ export class BillingService {
     }
 
     return results;
+  }
+
+  // Tapping an empty spare-part picker: the stocked physical items, A–Z, so
+  // technicians can pick without typing.
+  private async _browseParts(storeId: string) {
+    const skus = await this.prisma.sKU.findMany({
+      where: { storeId, product: { isActive: true, type: ProductType.PHYSICAL }, OR: [{ isSerialized: true }, { stockQty: { gt: 0 } }] },
+      include: { product: true },
+      orderBy: { product: { name: 'asc' } },
+      take: 30,
+    });
+    return Promise.all(skus.map((sku) => this._buildSkuResult(sku, storeId)));
   }
 
   private async _buildSkuResult(sku: any, storeId: string) {
