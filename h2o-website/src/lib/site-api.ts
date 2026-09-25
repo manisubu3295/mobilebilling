@@ -9,6 +9,8 @@ export interface WebsiteProduct {
   categoryId?: string | null;
   subCategoryId?: string | null;
   brand?: string | null;
+  categoryRef?: { name: string } | null;
+  subCategory?: { name: string } | null;
   name: string;
   shortDescription: string | null;
   description: string | null;
@@ -24,6 +26,16 @@ export async function fetchProducts(): Promise<WebsiteProduct[]> {
   const res = await fetch(`${BASE}/products`, { cache: 'no-store' });
   if (!res.ok) return [];
   return res.json();
+}
+
+export async function fetchProduct(id: string): Promise<WebsiteProduct | null> {
+  try {
+    const res = await fetch(`${BASE}/products/${encodeURIComponent(id)}`, { cache: 'no-store' });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
 }
 
 export interface CatalogCategory {

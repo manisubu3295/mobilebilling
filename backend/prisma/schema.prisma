@@ -205,7 +205,8 @@ model User {
   technicianInvoices Invoice[] @relation("InvoiceTechnician")
   auditLogs     AuditLog[]
   approvedWarranties  Warranty[]
-  assignedServiceJobs ServiceJob[]
+  assignedServiceJobs ServiceJob[] @relation("ServiceJobAssignee")
+  remindedServiceJobs ServiceJob[] @relation("ServiceJobReminder")
   quotations          Quotation[]
 
   @@index([email])
@@ -473,6 +474,9 @@ model InvoiceItem {
   // Free-typed line text (service bills: "IRF media changed", "Service
   // charges") — printed instead of the product name when set.
   description  String?
+  // Item cost at the moment of sale, for profit reports. Null on bills made
+  // before this was recorded — those fall back to the item's current cost.
+  costPrice    Decimal? @map("cost_price") @db.Decimal(10, 2)
 
   serialUnits SerialInventory[]
   warranty    Warranty?
@@ -576,7 +580,7 @@ model ServiceJob {
   store                Store            @relation(fields: [storeId], references: [id], onDelete: Cascade)
   dueDate              DateTime         @map("due_date")
   assignedToId         String?          @map("assigned_to_id")
-  assignedTo           User?            @relation(fields: [assignedToId], references: [id])
+  assignedTo           User?            @relation("ServiceJobAssignee", fields: [assignedToId], references: [id])
   assignedAt           DateTime?        @map("assigned_at")
   status               ServiceJobStatus @default(SCHEDULED)
   visitDate            DateTime?        @map("visit_date")
@@ -591,6 +595,10 @@ model ServiceJob {
   invoiceId            String?          @unique @map("invoice_id")
   invoice              Invoice?         @relation(fields: [invoiceId], references: [id])
   closedAt             DateTime?        @map("closed_at")
+  // Next Service screen: customer was called/messaged about this visit.
+  remindedAt           DateTime?        @map("reminded_at")
+  remindedById         String?          @map("reminded_by_id")
+  remindedBy           User?            @relation("ServiceJobReminder", fields: [remindedById], references: [id])
   createdAt            DateTime         @default(now()) @map("created_at")
   updatedAt            DateTime         @updatedAt @map("updated_at")
 

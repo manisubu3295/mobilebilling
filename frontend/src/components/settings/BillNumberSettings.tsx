@@ -11,7 +11,7 @@ const LABELS: Record<SeqKey, { title: string; hint: (fy: string) => string }> = 
   GST_SALES: { title: 'GST tax invoice', hint: (fy) => `Restarts every 1 April · FY ${fy}` },
   SALES:     { title: 'Sales bill (no GST)', hint: () => 'Runs continuously' },
   SERVICE:   { title: 'Service bill', hint: () => 'Runs continuously' },
-  CARD:      { title: 'Warranty card / Customer ID', hint: () => 'Suggested for new cards' },
+  CARD:      { title: 'Customer card no (Customer ID)', hint: () => 'Next number for new customers' },
 };
 
 // "Next number" for each printed series — lets the owner carry on from the
@@ -29,7 +29,22 @@ export function BillNumberSettings({ canEdit, showService }: { canEdit: boolean;
     }).catch(() => setRows([]));
   }, []);
 
-  const visible = rows.filter((r) => showService || (r.key !== 'SERVICE' && r.key !== 'CARD'));
+  // Card numbers apply to every customer; the service series only with the service module.
+  const visible = rows.filter((r) => showService || r.key !== 'SERVICE');
+  const [assigning, setAssigning] = useState(false);
+
+  const assignCards = async () => {
+    setAssigning(true);
+    setMessage(null);
+    try {
+      const { data } = await api.post<{ assigned: number }>('/customers/assign-card-numbers');
+      setMessage({ ok: true, text: data.assigned ? `Card numbers given to ${data.assigned} customer(s)` : 'Every customer already has a card number' });
+    } catch (e: any) {
+      setMessage({ ok: false, text: e?.response?.data?.message || 'Could not assign card numbers' });
+    } finally {
+      setAssigning(false);
+    }
+  };
 
   const save = async () => {
     setSaving(true);
@@ -80,10 +95,17 @@ export function BillNumberSettings({ canEdit, showService }: { canEdit: boolean;
       </div>
       {message && <p className={`text-sm ${message.ok ? 'text-green-700' : 'text-red-600'}`}>{message.text}</p>}
       {canEdit && (
-        <button onClick={save} disabled={saving}
-          className="flex items-center gap-2 px-4 py-2 bg-red-700 text-white rounded-lg text-sm font-medium hover:bg-red-800 disabled:opacity-50">
-          <Save className="h-4 w-4" /> {saving ? 'Saving…' : 'Save Bill Numbers'}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button onClick={save} disabled={saving}
+            className="flex items-center gap-2 px-4 py-2 bg-red-700 text-white rounded-lg text-sm font-medium hover:bg-red-800 disabled:opacity-50">
+            <Save className="h-4 w-4" /> {saving ? 'Saving…' : 'Save Bill Numbers'}
+          </button>
+          <button onClick={assignCards} disabled={assigning}
+            className="px-4 py-2 border rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            title="Gives the next card number to every customer who doesn't have one (in the order they joined)">
+            {assigning ? 'Assigning…' : 'Assign card numbers to customers without one'}
+          </button>
+        </div>
       )}
     </div>
   );

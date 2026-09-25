@@ -23,7 +23,7 @@ interface InvoiceRow {
   totalAmount: string;
   paidAmount: string;
   createdAt: string;
-  customer: { name: string; phone: string } | null;
+  customer: { id?: string; name: string; phone: string; cardNo?: string | null } | null;
   createdBy: { name: string };
 }
 
@@ -402,7 +402,7 @@ export default function InvoicesPage() {
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-gray-700 font-medium">{inv.customer?.name || <span className="italic text-gray-400">Walk-in</span>}</span>
+                    <span className="text-gray-700 font-medium">{inv.customer?.cardNo && <span className="mr-1 font-mono text-xs text-blue-700">#{inv.customer.cardNo}</span>}{inv.customer?.name || <span className="italic text-gray-400">Walk-in</span>}</span>
                     <span className="font-bold text-gray-900">{fmt(inv.totalAmount)}</span>
                   </div>
                   {inv.customer?.phone && <p className="text-xs text-gray-400">{inv.customer.phone}</p>}
@@ -443,7 +443,10 @@ export default function InvoicesPage() {
                       <td className="px-4 py-3">
                         {inv.customer ? (
                           <div>
-                            <p className="font-medium text-gray-900">{inv.customer.name}</p>
+                            <p className="font-medium text-gray-900">
+                              {inv.customer.cardNo && <span className="mr-1 font-mono text-xs text-blue-700">#{inv.customer.cardNo}</span>}
+                              {inv.customer.name}
+                            </p>
                             <p className="text-xs text-gray-400">{inv.customer.phone}</p>
                           </div>
                         ) : (

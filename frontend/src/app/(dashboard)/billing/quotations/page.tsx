@@ -12,7 +12,7 @@ interface Quotation {
   quotationNumber: string;
   status: 'OPEN' | 'CONVERTED' | 'EXPIRED' | 'CANCELLED';
   store: { name: string; address?: string | null; phone?: string | null; gstNumber?: string | null };
-  customer: { id: string; name: string; phone: string } | null;
+  customer: { id: string; name: string; phone: string; cardNo?: string | null } | null;
   subtotal: string;
   taxAmount: string;
   discountAmount: string;
@@ -46,6 +46,7 @@ export default function QuotationsPage() {
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [selected, setSelected] = useState<Quotation | null>(null);
+  const [search, setSearch] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -58,6 +59,13 @@ export default function QuotationsPage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  const term = search.trim().toLowerCase();
+  const shown = !term ? quotations : quotations.filter((q) =>
+    q.quotationNumber.toLowerCase().includes(term) ||
+    (q.customer?.name || '').toLowerCase().includes(term) ||
+    (q.customer?.phone || '').includes(term) ||
+    (q.customer?.cardNo || '').toLowerCase() === term);
 
   return (
     <div className="h-full flex flex-col bg-gray-50">
@@ -74,19 +82,28 @@ export default function QuotationsPage() {
         </button>
       </div>
 
+      <div className="px-4 sm:px-6 py-3 bg-white border-b">
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search quotation no, customer, mobile or card no…"
+          className="w-full max-w-md border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+        />
+      </div>
+
       <div className="flex-1 overflow-auto p-4 sm:p-6">
         {loading ? (
           <div className="flex justify-center items-center h-40 text-gray-400">Loading…</div>
-        ) : quotations.length === 0 ? (
+        ) : shown.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-40 text-gray-400 gap-2">
             <ClipboardList className="h-10 w-10 opacity-40" />
-            <p>No quotations yet</p>
+            <p>{term ? 'No quotations match your search' : 'No quotations yet'}</p>
           </div>
         ) : (
           <>
             {/* Mobile cards */}
             <div className="sm:hidden space-y-3">
-              {quotations.map((q) => (
+              {shown.map((q) => (
                 <button
                   key={q.id}
                   onClick={() => setSelected(q)}
@@ -95,7 +112,7 @@ export default function QuotationsPage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-mono text-sm font-semibold text-red-700">{q.quotationNumber}</p>
-                      <p className="text-sm text-gray-700 mt-0.5">{q.customer?.name || 'No customer'}</p>
+                      <p className="text-sm text-gray-700 mt-0.5">{q.customer?.cardNo && <span className="mr-1 font-mono text-xs text-blue-700">#{q.customer.cardNo}</span>}{q.customer?.name || 'No customer'}</p>
                     </div>
                     <div className="text-right">
                       <p className="font-semibold">₹{parseFloat(q.totalAmount).toLocaleString('en-IN')}</p>
@@ -120,10 +137,10 @@ export default function QuotationsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {quotations.map((q) => (
+                  {shown.map((q) => (
                     <tr key={q.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setSelected(q)}>
                       <td className="px-4 py-3 font-mono text-red-700 font-medium">{q.quotationNumber}</td>
-                      <td className="px-4 py-3 text-gray-700">{q.customer?.name || '—'}</td>
+                      <td className="px-4 py-3 text-gray-700">{q.customer?.cardNo && <span className="mr-1 font-mono text-xs text-blue-700">#{q.customer.cardNo}</span>}{q.customer?.name || '—'}</td>
                       <td className="px-4 py-3 font-semibold">₹{parseFloat(q.totalAmount).toLocaleString('en-IN')}</td>
                       <td className="px-4 py-3">
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_STYLE[q.status]}`}>{q.status}</span>

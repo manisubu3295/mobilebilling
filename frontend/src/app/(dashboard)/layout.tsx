@@ -33,7 +33,7 @@ const NAV_SECTIONS: { label: string | null; items: NavItem[] }[] = [
     items: [
       { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['SUPER_ADMIN', 'STORE_MANAGER'] },
       { href: '/billing/checkout', label: 'Sales Bill', icon: ShoppingCart, roles: ['SUPER_ADMIN', 'STORE_MANAGER', 'BILLING_CLERK'] },
-      { href: '/billing/service-bill', label: 'Service Bill', icon: ReceiptText, roles: ['SUPER_ADMIN', 'STORE_MANAGER', 'BILLING_CLERK'], serviceModule: true },
+      { href: '/billing/service-bill', label: 'Service Bill', icon: ReceiptText, roles: ['SUPER_ADMIN', 'STORE_MANAGER', 'BILLING_CLERK', 'SERVICE_STAFF'], serviceModule: true },
       { href: '/billing/invoices', label: 'Invoices', icon: FileText, roles: ['SUPER_ADMIN', 'STORE_MANAGER', 'BILLING_CLERK'] },
       { href: '/billing/quotations', label: 'Quotations', icon: ClipboardList, roles: ['SUPER_ADMIN', 'STORE_MANAGER', 'BILLING_CLERK'], serviceModule: true },
       { href: '/accounts', label: 'Accounts', icon: Landmark, roles: ['SUPER_ADMIN', 'STORE_MANAGER'] },

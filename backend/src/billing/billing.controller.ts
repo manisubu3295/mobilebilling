@@ -26,7 +26,7 @@ export class BillingController {
   constructor(private billingService: BillingService) {}
 
   @Post('invoices')
-  @Roles(Role.SUPER_ADMIN, Role.STORE_MANAGER, Role.BILLING_CLERK)
+  @Roles(Role.SUPER_ADMIN, Role.STORE_MANAGER, Role.BILLING_CLERK, Role.SERVICE_STAFF)
   createInvoice(
     @Body() dto: CreateInvoiceDto,
     @CurrentUser() user: any,
@@ -36,9 +36,9 @@ export class BillingController {
   }
 
   @Get('invoices')
-  @Roles(Role.SUPER_ADMIN, Role.STORE_MANAGER, Role.BILLING_CLERK)
+  @Roles(Role.SUPER_ADMIN, Role.STORE_MANAGER, Role.BILLING_CLERK, Role.SERVICE_STAFF)
   listInvoices(
-    @CurrentUser('storeId') storeId: string,
+    @CurrentUser() user: any,
     @Query('page') page = 1,
     @Query('limit') limit = 20,
     @Query('search') search?: string,
@@ -47,7 +47,7 @@ export class BillingController {
     @Query('status') status?: string,
     @Query('type') type?: string,
   ) {
-    return this.billingService.listInvoices(storeId, +page, +limit, search, from, to, status, type);
+    return this.billingService.listInvoices(user.storeId, +page, +limit, search, from, to, status, type, this._staffScope(user));
   }
 
   @Get('invoices/export')
@@ -68,9 +68,14 @@ export class BillingController {
   }
 
   @Get('invoices/:id')
-  @Roles(Role.SUPER_ADMIN, Role.STORE_MANAGER, Role.BILLING_CLERK)
-  getInvoice(@Param('id') id: string, @CurrentUser('storeId') storeId: string) {
-    return this.billingService.getInvoice(id, storeId);
+  @Roles(Role.SUPER_ADMIN, Role.STORE_MANAGER, Role.BILLING_CLERK, Role.SERVICE_STAFF)
+  getInvoice(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.billingService.getInvoice(id, user.storeId, this._staffScope(user));
+  }
+
+  // Technicians only ever see service bills they raised or were the technician on.
+  private _staffScope(user: any): string | undefined {
+    return user.role === Role.SERVICE_STAFF ? user.id : undefined;
   }
 
   @Patch('invoices/:id/cancel')
@@ -101,7 +106,7 @@ export class BillingController {
 
   // Unified part lookup: tries barcode → part number → serial number
   @Get('lookup/search')
-  @Roles(Role.SUPER_ADMIN, Role.STORE_MANAGER, Role.BILLING_CLERK)
+  @Roles(Role.SUPER_ADMIN, Role.STORE_MANAGER, Role.BILLING_CLERK, Role.SERVICE_STAFF)
   lookupPart(@Query('q') query: string, @CurrentUser('storeId') storeId: string) {
     return this.billingService.lookupPart(query, storeId);
   }

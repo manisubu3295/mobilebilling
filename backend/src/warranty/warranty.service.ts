@@ -11,6 +11,8 @@ import { CreateStandaloneWarrantyDto } from './dto/create-standalone-warranty.dt
 import { UpdateWarrantyCardDto } from './dto/warranty-card.dto';
 import { Role, ServiceFrequency, ServiceJobStatus, WarrantyStatus, AuditAction, InvoiceStatus, ProductType, NotificationType, BillType, BillSeries, ServiceCategory } from '@prisma/client';
 import { assignBillNo, nextInvoiceNumber } from '../billing/bill-numbers';
+import { assignMissingCardNumbers } from '../customers/card-numbers';
+import { PrismaClient } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 
 const ADMIN_ROLES: Role[] = [Role.SUPER_ADMIN, Role.STORE_MANAGER];
@@ -44,6 +46,7 @@ const warrantyInclude = {
 const serviceJobInclude = {
   warranty: { include: warrantyInclude },
   assignedTo: { select: { id: true, name: true } },
+  remindedBy: { select: { id: true, name: true } },
   invoice: { select: { id: true, invoiceNumber: true, billNo: true, totalAmount: true } },
   parts: {
     include: { sku: { include: { product: { select: { name: true } } } } },
@@ -361,6 +364,8 @@ export class WarrantyService {
       }
     }
 
+    // Imported customers get card numbers like any other new customer.
+    if (created.length > 0) await assignMissingCardNumbers(this.prisma as unknown as PrismaClient, storeId);
     return { created: created.length, errors };
   }
 
@@ -423,7 +428,24 @@ export class WarrantyService {
     });
   }
 
-  async billServiceJob(jobId: string, storeId: string, userId: string, dto: BillServiceJobDto) {
+  // Next Service screen: record that the customer was called / messaged
+  // about this visit (or undo it), so two people don't call the same customer.
+  async setReminded(jobId: string, storeId: string, userId: string, role: Role, reminded: boolean) {
+    await this._assertJobAccess(jobId, storeId, userId, role);
+    return this.prisma.serviceJob.update({
+      where: { id: jobId },
+      data: reminded ? { remindedAt: new Date(), remindedById: userId } : { remindedAt: null, remindedById: null },
+      include: serviceJobInclude,
+    });
+  }
+
+  async getServiceJob(jobId: string, storeId: string, userId: string, role: Role) {
+    await this._assertJobAccess(jobId, storeId, userId, role);
+    return this.prisma.serviceJob.findFirst({ where: { id: jobId, storeId }, include: serviceJobInclude });
+  }
+
+  async billServiceJob(jobId: string, storeId: string, userId: string, dto: BillServiceJobDto, role?: Role) {
+    if (role) await this._assertJobAccess(jobId, storeId, userId, role);
     const job = await this.prisma.serviceJob.findFirst({
       where: { id: jobId, storeId },
       include: { warranty: true, parts: { include: { sku: { include: { product: { select: { hsnCode: true } } } } } } },
@@ -432,11 +454,12 @@ export class WarrantyService {
     if (job.invoiceId) throw new BadRequestException('This job has already been billed');
 
     const laborTotal = job.customerChargeAmount ?? new Decimal(0);
-    if (laborTotal.lessThanOrEqualTo(0) && job.parts.length === 0) {
-      throw new BadRequestException('Nothing to bill — log parts used or set a charge amount first');
+    const extraLines = dto.extraLines ?? [];
+    if (laborTotal.lessThanOrEqualTo(0) && job.parts.length === 0 && extraLines.length === 0) {
+      throw new BadRequestException('Nothing to bill — log parts used, set a charge amount or add a line first');
     }
+    // A zero payment is allowed (customer pays later) — the bill then shows a balance due.
     const paidTotal = dto.payments.reduce((s, p) => s + p.amount, 0);
-    if (paidTotal <= 0) throw new BadRequestException('Add at least one payment');
 
     // One line per part used — price/tax were already snapshotted when the
     // technician logged it, so this always reflects what was actually
@@ -446,6 +469,7 @@ export class WarrantyService {
     type LineItem = {
       skuId: string; quantity: Decimal; unitPrice: Decimal; taxRate: Decimal;
       taxAmount: Decimal; lineTotal: Decimal; hsnCode: string | null; description?: string | null;
+      costPrice: Decimal;
     };
     const lineItems: LineItem[] = job.parts.map((p) => {
       const lineSubtotal = p.unitPrice.mul(p.quantity);
@@ -458,6 +482,7 @@ export class WarrantyService {
         taxAmount,
         lineTotal: lineSubtotal.add(taxAmount),
         hsnCode: p.sku.product.hsnCode ?? null,
+        costPrice: p.sku.costPrice,
       };
     });
 
@@ -475,7 +500,37 @@ export class WarrantyService {
         lineTotal: laborTotal,
         hsnCode: null,
         description: job.customerChargeNotes?.trim() || 'Service charges',
+        costPrice: new Decimal(0),
       });
+    }
+
+    if (extraLines.length > 0) {
+      const chargeSku = await this.billingService.getOrCreateServiceChargeSku(storeId);
+      for (const l of extraLines) {
+        const unitPrice = new Decimal(l.unitPrice);
+        const quantity = new Decimal(l.quantity);
+        const taxRate = l.taxRate !== undefined ? new Decimal(l.taxRate) : chargeSku.taxRate;
+        const taxAmount = unitPrice.mul(quantity).mul(taxRate).div(100).toDecimalPlaces(2);
+        lineItems.push({
+          skuId: chargeSku.id,
+          quantity,
+          unitPrice,
+          taxRate,
+          taxAmount,
+          lineTotal: unitPrice.mul(quantity).add(taxAmount),
+          hsnCode: null,
+          description: l.description.trim(),
+          costPrice: new Decimal(0),
+        });
+      }
+    }
+
+    // GST switched off on the Service Bill page → bill every line without tax.
+    if (dto.gstApplied === false) {
+      for (const item of lineItems) {
+        item.lineTotal = item.lineTotal.sub(item.taxAmount);
+        item.taxAmount = new Decimal(0);
+      }
     }
 
     const subtotal = lineItems.reduce((s, i) => s.add(i.unitPrice.mul(i.quantity)), new Decimal(0));
@@ -496,12 +551,14 @@ export class WarrantyService {
           ...bill,
           serviceCategory: dto.serviceCategory ?? ServiceCategory.WARRANTY,
           technicianId: job.assignedToId,
+          tdsRaw: dto.tdsRaw?.trim() || null,
+          tdsTreated: dto.tdsTreated?.trim() || null,
           storeId,
           customerId: job.warranty.customerId,
           createdById: userId,
           status: paidDecimal.gte(total) ? InvoiceStatus.PAID : InvoiceStatus.PARTIALLY_PAID,
           subtotal,
-          gstApplied: taxTotal.greaterThan(0),
+          gstApplied: dto.gstApplied ?? taxTotal.greaterThan(0),
           taxAmount: taxTotal,
           totalAmount: total,
           paidAmount: paidDecimal,
@@ -521,11 +578,12 @@ export class WarrantyService {
             lineTotal: item.lineTotal,
             hsnCode: item.hsnCode,
             description: item.description ?? null,
+            costPrice: item.costPrice,
           },
         });
       }
 
-      await tx.payment.createMany({
+      if (dto.payments.length > 0) await tx.payment.createMany({
         data: dto.payments.map((p) => ({
           invoiceId: newInvoice.id,
           mode: p.mode,

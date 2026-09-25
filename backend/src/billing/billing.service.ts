@@ -42,6 +42,9 @@ export class BillingService {
 
     const billType = dto.billType ?? BillType.SALES;
     const isServiceBill = billType === BillType.SERVICE;
+    if (userRole === Role.SERVICE_STAFF && !isServiceBill) {
+      throw new ForbiddenException('Technicians can only create service bills');
+    }
 
     if (dto.technicianId) {
       const tech = await this.prisma.user.findFirst({ where: { id: dto.technicianId, storeId }, select: { id: true } });
@@ -120,6 +123,7 @@ export class BillingService {
         lineTotal: Decimal;
         hsnCode: string | null;
         description: string | null;
+        costPrice: Decimal;
         serialUnitIds: string[];
         isSerialized: boolean;
         requiresService: boolean;
@@ -153,6 +157,7 @@ export class BillingService {
           lineTotal: lineSubtotal.add(itemTax),
           hsnCode: sku.product.hsnCode ?? null,
           description: item.description?.trim() || null,
+          costPrice: sku.costPrice,
           serialUnitIds,
           isSerialized: sku.isSerialized,
           requiresService: sku.product.requiresService,
@@ -232,7 +237,8 @@ export class BillingService {
           billType,
           ...bill,
           serviceCategory: dto.serviceCategory ?? null,
-          technicianId: dto.technicianId || null,
+          // A technician raising their own bill is the technician on it.
+          technicianId: dto.technicianId || (userRole === Role.SERVICE_STAFF ? userId : null),
           tdsRaw: dto.tdsRaw?.trim() || null,
           tdsTreated: dto.tdsTreated?.trim() || null,
         },
@@ -251,6 +257,7 @@ export class BillingService {
             lineTotal: rec.lineTotal,
             hsnCode: rec.hsnCode,
             description: rec.description,
+            costPrice: rec.costPrice,
           },
         });
 
@@ -375,9 +382,9 @@ export class BillingService {
     return { serialUnitIds: units.map((u) => u.id) };
   }
 
-  async getInvoice(id: string, storeId: string) {
+  async getInvoice(id: string, storeId: string, staffUserId?: string) {
     const invoice = await this.prisma.invoice.findFirst({
-      where: { id, storeId },
+      where: { id, storeId, ...this._staffFilter(staffUserId) },
       include: {
         items: {
           include: {
@@ -422,10 +429,11 @@ export class BillingService {
     to?: string,
     status?: string,
     type?: string,
+    staffUserId?: string,
   ) {
     const skip = (page - 1) * limit;
 
-    const where: any = { storeId, ...this._typeFilter(type) };
+    const where: any = { storeId, ...this._typeFilter(type), ...this._staffFilter(staffUserId) };
 
     if (search?.trim()) {
       const q = search.trim();
@@ -461,6 +469,12 @@ export class BillingService {
       this.prisma.invoice.count({ where }),
     ]);
     return { data, total, page, limit };
+  }
+
+  // A technician sees only service bills they raised or were the technician on.
+  private _staffFilter(staffUserId?: string): Record<string, unknown> {
+    if (!staffUserId) return {};
+    return { billType: BillType.SERVICE, AND: [{ OR: [{ createdById: staffUserId }, { technicianId: staffUserId }] }] };
   }
 
   // SALES / SERVICE = bill type; GST = the GST tax invoices only (the

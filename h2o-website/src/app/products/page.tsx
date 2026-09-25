@@ -28,7 +28,7 @@ function ProductCard({ product }: { product: WebsiteProduct }) {
           top-anchored crop is the one ratio that keeps the unit itself in
           frame across both without stretching or overriding the ratio via a
           flex min-height quirk (hence min-h-0 below). */}
-      <div className="aspect-square relative min-h-0 shrink-0" style={{ background: 'var(--bg-soft)' }}>
+      <Link href={`/products/${product.id}`} className="block aspect-square relative min-h-0 shrink-0" style={{ background: 'var(--bg-soft)' }}>
         {image ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={image} alt={product.name} className="w-full h-full object-cover object-top" />
@@ -45,12 +45,12 @@ function ProductCard({ product }: { product: WebsiteProduct }) {
             Real install &middot; Kumbakonam
           </div>
         )}
-      </div>
+      </Link>
 
       <div className="p-4 flex flex-col gap-2 flex-1">
         <div className="flex items-start justify-between gap-2">
           <h3 className="font-semibold leading-snug" style={{ fontFamily: 'var(--font-sora), sans-serif', color: 'var(--ink)' }}>
-            {product.name}
+            <Link href={`/products/${product.id}`} className="hover:underline">{product.name}</Link>
           </h3>
           {product.capacityLph && (
             <span

@@ -1,10 +1,13 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Plus, Printer, Search, Trash2, Wrench } from 'lucide-react';
+import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { CalendarCheck, Plus, Printer, Search, Trash2, Wrench } from 'lucide-react';
 import api from '@/lib/api';
 import { CustomerSearch } from '@/components/billing/CustomerSearch';
+import { RecentBills } from '@/components/billing/RecentBills';
 import { printReceipt } from '@/lib/print-receipt';
+import { useAuthStore } from '@/store/auth.store';
 
 // Mirrors the technician's paper service bill: bill no (typed in for an
 // existing paper bill, or the next number), technician, service type tick
@@ -55,15 +58,51 @@ interface PartResult {
 
 interface Staff { id: string; name: string; role: string }
 
+// A service visit being billed from My Service Jobs (?jobId=…). Its parts
+// were already taken out of stock when the technician logged them, so they
+// are listed here and billed through the job, not re-added as new lines.
+interface JobPart { id: string; quantity: string; unitPrice: string; taxRate: string; sku: { product: { name: string } } }
+interface Job {
+  id: string;
+  status: string;
+  customerChargeAmount: string | null;
+  customerChargeNotes: string | null;
+  assignedTo: { id: string; name: string } | null;
+  invoice: { id: string; billNo?: string | null } | null;
+  parts: JobPart[];
+  warranty: {
+    customer: { id: string; name: string; phone: string; address: string | null; cardNo?: string | null };
+    product: { name: string };
+  };
+}
+
 let lineSeq = 0;
 const newKey = () => `l${++lineSeq}`;
 
 export default function ServiceBillPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-sm text-gray-400">Loading…</div>}>
+      <ServiceBillInner />
+    </Suspense>
+  );
+}
+
+function ServiceBillInner() {
+  const router = useRouter();
+  const params = useSearchParams();
+  const jobId = params.get('jobId');
+  const { user } = useAuthStore();
+  const isStaff = user?.role === 'SERVICE_STAFF';
+  const [job, setJob] = useState<Job | null>(null);
+  const [jobError, setJobError] = useState<string | null>(null);
+  const [closing, setClosing] = useState(false);
+  const [closed, setClosed] = useState(false);
   const [billNo, setBillNo] = useState('');
   const [technicianId, setTechnicianId] = useState('');
   const [staff, setStaff] = useState<Staff[]>([]);
   const [category, setCategory] = useState<ServiceCategory>('OUT_OF_WARRANTY');
-  const [customerId, setCustomerId] = useState<string | null>(null);
+  // "New service bill" from a customer's page arrives with ?customerId=…
+  const [customerId, setCustomerId] = useState<string | null>(params.get('customerId'));
   const [tdsRaw, setTdsRaw] = useState('');
   const [tdsTreated, setTdsTreated] = useState('');
   const [lines, setLines] = useState<Line[]>([]);
@@ -83,6 +122,22 @@ export default function ServiceBillPage() {
       .catch(() => setStaff([]));
   }, []);
 
+  const loadJob = useCallback(async () => {
+    if (!jobId) return;
+    try {
+      const { data } = await api.get<Job>(`/warranty/service-jobs/${jobId}`);
+      setJob(data);
+      setJobError(null);
+    } catch (e: any) {
+      setJobError(e.response?.data?.message || 'Could not load this service job');
+    }
+  }, [jobId]);
+
+  useEffect(() => {
+    loadJob();
+    if (jobId) setCategory('WARRANTY');
+  }, [jobId, loadJob]);
+
   const chargeLines = useMemo(() => {
     const out: Line[] = [];
     const r = parseFloat(reinstallCharge);
@@ -93,14 +148,30 @@ export default function ServiceBillPage() {
   }, [reinstallCharge, serviceCharge]);
 
   const allLines = [...lines, ...chargeLines];
-  const subtotal = allLines.reduce((s, l) => s + l.unitPrice * l.quantity, 0);
-  const tax = gstApplied ? allLines.reduce((s, l) => s + (l.unitPrice * l.quantity * l.taxRate) / 100, 0) : 0;
+  // Job mode: the job's logged parts + its visit charge are billed as well.
+  const jobPartsBase = (job?.parts || []).reduce((s, p) => s + parseFloat(p.unitPrice) * parseFloat(p.quantity), 0);
+  const jobPartsTax = gstApplied
+    ? (job?.parts || []).reduce((s, p) => s + (parseFloat(p.unitPrice) * parseFloat(p.quantity) * parseFloat(p.taxRate)) / 100, 0)
+    : 0;
+  const visitCharge = job ? parseFloat(job.customerChargeAmount || '0') : 0;
+  const subtotal = allLines.reduce((s, l) => s + l.unitPrice * l.quantity, 0) + jobPartsBase + visitCharge;
+  const tax = (gstApplied ? allLines.reduce((s, l) => s + (l.unitPrice * l.quantity * l.taxRate) / 100, 0) : 0) + jobPartsTax;
   const total = subtotal + tax;
 
   const updateLine = (key: string, patch: Partial<Line>) =>
     setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...patch } : l)));
 
-  const addPart = (p: PartResult) => {
+  const addPart = async (p: PartResult) => {
+    if (job) {
+      // Logged against the visit (takes it out of stock now, like the job sheet does).
+      try {
+        await api.post(`/warranty/service-jobs/${job.id}/parts`, { skuId: p.skuId, quantity: 1 });
+        await loadJob();
+      } catch (e: any) {
+        setError(e.response?.data?.message || 'Could not add this part');
+      }
+      return;
+    }
     setLines((ls) => [...ls, {
       key: newKey(),
       skuId: p.skuId,
@@ -121,8 +192,32 @@ export default function ServiceBillPage() {
     setNotes(''); setError(null); setCreated(null);
   };
 
+  const removeJobPart = async (partId: string) => {
+    if (!job) return;
+    try {
+      await api.delete(`/warranty/service-jobs/${job.id}/parts/${partId}`);
+      await loadJob();
+    } catch (e: any) {
+      setError(e.response?.data?.message || 'Could not remove this part');
+    }
+  };
+
+  const closeVisit = async () => {
+    if (!job) return;
+    setClosing(true);
+    try {
+      await api.patch(`/warranty/service-jobs/${job.id}/close`, {});
+      setClosed(true);
+    } catch (e: any) {
+      setError(e.response?.data?.message || 'Could not close the visit');
+    } finally {
+      setClosing(false);
+    }
+  };
+
   const save = async () => {
     setError(null);
+    if (job) return saveJobBill();
     if (!customerId) return setError('Select or add the customer first.');
     if (allLines.length === 0) return setError('Add a spare, a typed line or a charge.');
     const blank = lines.find((l) => !l.skuId && !l.description.trim());
@@ -157,6 +252,54 @@ export default function ServiceBillPage() {
     }
   };
 
+  async function saveJobBill() {
+    if (!job) return;
+    if (allLines.length === 0 && job.parts.length === 0 && visitCharge <= 0) {
+      return setError('Add a spare, a typed line or a charge.');
+    }
+    if (lines.find((l) => !l.skuId && !l.description.trim())) return setError('Every typed line needs a description.');
+    const paid = received.trim() === '' ? total : parseFloat(received);
+    if (Number.isNaN(paid) || paid < 0) return setError('Enter a valid amount received.');
+    setSaving(true);
+    try {
+      const { data } = await api.patch(`/warranty/service-jobs/${job.id}/bill`, {
+        billNo: billNo.trim() || undefined,
+        serviceCategory: category,
+        tdsRaw: tdsRaw.trim() || undefined,
+        tdsTreated: tdsTreated.trim() || undefined,
+        gstApplied,
+        extraLines: allLines.map((l) => ({ description: l.description.trim(), quantity: l.quantity, unitPrice: l.unitPrice, taxRate: l.taxRate })),
+        payments: paid > 0 ? [{ mode: payMode, amount: Math.round(paid * 100) / 100 }] : [],
+      });
+      setCreated(data);
+    } catch (e: any) {
+      const msg = e.response?.data?.message;
+      setError(Array.isArray(msg) ? msg.join(', ') : msg || 'Could not save the service bill');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (jobId && !job) {
+    return (
+      <div className="p-6 text-center text-sm text-gray-500">
+        {jobError || 'Loading service job…'}
+        {jobError && (
+          <button onClick={() => router.push('/service/my-jobs')} className="ml-2 text-red-700 underline">Back</button>
+        )}
+      </div>
+    );
+  }
+
+  if (job?.invoice && !created) {
+    return (
+      <div className="p-6 text-center text-sm text-gray-600">
+        This visit is already billed{job.invoice.billNo ? ` (Bill No. ${job.invoice.billNo})` : ''}.
+        <button onClick={() => router.push(isStaff ? '/service/my-jobs' : '/service')} className="ml-2 text-red-700 underline">Back to jobs</button>
+      </div>
+    );
+  }
+
   if (created) {
     return (
       <div className="h-full overflow-auto bg-gray-50 p-4">
@@ -174,10 +317,33 @@ export default function ServiceBillPage() {
             >
               <Printer className="h-4 w-4" /> Print
             </button>
-            <button onClick={reset} className="flex-1 rounded-lg bg-gray-200 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-300">
-              New Service Bill
-            </button>
+            {job ? (
+              <button
+                onClick={() => router.push(isStaff ? '/service/my-jobs' : '/service')}
+                className="flex-1 rounded-lg bg-gray-200 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-300"
+              >
+                Back to jobs
+              </button>
+            ) : (
+              <button onClick={reset} className="flex-1 rounded-lg bg-gray-200 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-300">
+                New Service Bill
+              </button>
+            )}
           </div>
+          {job && job.status !== 'COMPLETED' && job.status !== 'CANCELLED' && (
+            closed ? (
+              <p className="mt-4 rounded-lg bg-green-50 p-2 text-sm text-green-800">Visit closed — the next service visit has been scheduled.</p>
+            ) : (
+              <button
+                onClick={closeVisit}
+                disabled={closing}
+                className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg border border-green-600 py-2.5 text-sm font-semibold text-green-700 hover:bg-green-50 disabled:opacity-50"
+              >
+                <CalendarCheck className="h-4 w-4" /> {closing ? 'Closing…' : 'Close visit & schedule next'}
+              </button>
+            )
+          )}
+          {error && <p className="mt-3 rounded-lg bg-red-50 p-2 text-sm text-red-700">{error}</p>}
         </div>
       </div>
     );
@@ -188,7 +354,11 @@ export default function ServiceBillPage() {
   return (
     <div className="h-full overflow-auto bg-gray-50">
       <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-white px-4 py-3">
-        <h1 className="font-bold text-gray-900">Service Bill</h1>
+        <h1 className="font-bold text-gray-900">
+          Service Bill
+          {job && <span className="ml-2 text-sm font-normal text-gray-500">for {job.warranty.product.name} visit</span>}
+        </h1>
+        <RecentBills type="SERVICE" />
       </div>
 
       <div className="mx-auto grid max-w-5xl gap-4 p-4 lg:grid-cols-3">
@@ -206,10 +376,14 @@ export default function ServiceBillPage() {
                 <p className="mt-1 text-[11px] text-gray-500">Type the paper bill number when entering an existing bill.</p>
               </Field>
               <Field label="Technician">
-                <select value={technicianId} onChange={(e) => setTechnicianId(e.target.value)} className="input">
-                  <option value="">—</option>
-                  {staff.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
-                </select>
+                {job || isStaff ? (
+                  <div className="input bg-gray-50">{job?.assignedTo?.name || user?.name || '—'}</div>
+                ) : (
+                  <select value={technicianId} onChange={(e) => setTechnicianId(e.target.value)} className="input">
+                    <option value="">—</option>
+                    {staff.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                  </select>
+                )}
               </Field>
             </div>
             <div className="mt-3">
@@ -232,8 +406,20 @@ export default function ServiceBillPage() {
 
           {/* Customer */}
           <section className="rounded-xl border bg-white p-4">
-            <span className="mb-1 block text-xs font-medium text-gray-600">Customer (search name, phone or card no)</span>
-            <CustomerSearch selectedId={customerId} onSelect={setCustomerId} />
+            {job ? (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2">
+                <p className="text-sm font-semibold text-red-900">
+                  {job.warranty.customer.name}
+                  {job.warranty.customer.cardNo && <span className="ml-1 font-mono text-xs text-blue-700">#{job.warranty.customer.cardNo}</span>}
+                </p>
+                <p className="text-xs text-red-700">{job.warranty.customer.phone}{job.warranty.customer.address ? ` · ${job.warranty.customer.address}` : ''}</p>
+              </div>
+            ) : (
+              <>
+                <span className="mb-1 block text-xs font-medium text-gray-600">Customer (search name, phone or card no)</span>
+                <CustomerSearch selectedId={customerId} onSelect={setCustomerId} />
+              </>
+            )}
             <div className="mt-3 grid grid-cols-2 gap-3">
               <Field label="TDS — raw water">
                 <input value={tdsRaw} onChange={(e) => setTdsRaw(e.target.value)} className="input" inputMode="numeric" />
@@ -254,8 +440,29 @@ export default function ServiceBillPage() {
             </div>
             <PartSearch onPick={addPart} />
 
+            {job && (job.parts.length > 0 || visitCharge > 0) && (
+              <div className="mt-3 divide-y rounded-lg border bg-gray-50">
+                {job.parts.map((p) => (
+                  <div key={p.id} className="flex items-center gap-2 p-2.5 text-sm">
+                    <span className="flex-1">{p.sku.product.name} <span className="text-gray-500">× {parseFloat(p.quantity)}</span></span>
+                    <span className="font-semibold">₹{fmt(parseFloat(p.unitPrice) * parseFloat(p.quantity))}</span>
+                    <button onClick={() => removeJobPart(p.id)} className="text-gray-400 hover:text-red-600" aria-label="Remove part">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+                {visitCharge > 0 && (
+                  <div className="flex items-center gap-2 p-2.5 text-sm">
+                    <span className="flex-1">{job.customerChargeNotes || 'Visit charge'} <span className="text-xs text-gray-500">(from the visit)</span></span>
+                    <span className="font-semibold">₹{fmt(visitCharge)}</span>
+                    <span className="w-4" />
+                  </div>
+                )}
+              </div>
+            )}
+
             {lines.length === 0 ? (
-              <p className="mt-3 text-center text-sm text-gray-400">No spares added yet</p>
+              job ? null : <p className="mt-3 text-center text-sm text-gray-400">No spares added yet</p>
             ) : (
               <div className="mt-3 divide-y rounded-lg border">
                 {lines.map((l, i) => (

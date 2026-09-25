@@ -10,6 +10,7 @@ import { InvoiceSummary } from '@/components/billing/InvoiceSummary';
 import { PaymentQr } from '@/components/billing/PaymentQr';
 import { ThermalReceipt } from '@/components/billing/ThermalReceipt';
 import { CustomerSearch } from '@/components/billing/CustomerSearch';
+import { RecentBills } from '@/components/billing/RecentBills';
 import { saveDraftInvoice } from '@/lib/offline-db';
 import { printReceipt } from '@/lib/print-receipt';
 import api from '@/lib/api';
@@ -117,11 +118,14 @@ export default function CheckoutPage() {
       {/* Header bar */}
       <div className="bg-white border-b px-4 py-3 flex items-center justify-between no-print shrink-0">
         <h1 className="font-bold text-gray-900">Sales Bill</h1>
-        {!isOnline && (
-          <span className="px-2 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-medium">
-            Offline
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {!isOnline && (
+            <span className="px-2 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-medium">
+              Offline
+            </span>
+          )}
+          <RecentBills type="SALES" />
+        </div>
       </div>
 
       {/* Desktop: side-by-side | Mobile: stacked + sticky checkout */}

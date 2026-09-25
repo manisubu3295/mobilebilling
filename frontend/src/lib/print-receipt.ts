@@ -65,29 +65,32 @@ function esc(s?: string | null): string {
 }
 
 interface PartyStore { name: string; address?: string | null; phone?: string | null; gstNumber?: string | null }
-interface PartyCustomer { name?: string | null; phone?: string | null; email?: string | null; address?: string | null; gstin?: string | null }
+interface PartyCustomer { name?: string | null; phone?: string | null; email?: string | null; address?: string | null; gstin?: string | null; cardNo?: string | null }
 
-// Shop and customer side by side at the top of every printout — the client
-// needs both addresses in the header (their GST bills are filed with it).
-function partiesHtml(store: PartyStore, customer: PartyCustomer | null | undefined, customerTitle: string): string {
-  const shop = `
-    <div class="party">
-      <div class="section-title">From</div>
-      <div class="party-name">${esc(store.name)}</div>
-      ${store.address ? `<div>${esc(store.address)}</div>` : ''}
-      ${store.phone ? `<div>Ph: ${esc(store.phone)}</div>` : ''}
-      ${store.gstNumber ? `<div>GSTIN: ${esc(store.gstNumber)}</div>` : ''}
-    </div>`;
-  const cust = customer ? `
-    <div class="party">
-      <div class="section-title">${customerTitle}</div>
-      <div class="party-name">${esc(customer.name || 'Walk-in Customer')}</div>
-      ${customer.address ? `<div>${esc(customer.address)}</div>` : ''}
-      ${customer.phone ? `<div>Ph: ${esc(customer.phone)}</div>` : ''}
-      ${customer.email ? `<div>${esc(customer.email)}</div>` : ''}
-      ${customer.gstin ? `<div>GSTIN: ${esc(customer.gstin)}</div>` : ''}
-    </div>` : '';
-  return `<div class="parties">${shop}${cust}</div>`;
+// Store name + address always print at the top in dark text — the name used
+// to be white on a coloured band, which vanishes when the printer skips
+// background colours. The customer block follows underneath.
+function storeHeaderHtml(store: PartyStore): string {
+  return `
+  <div class="store-head">
+    <div class="store-name">${esc(store.name)}</div>
+    ${store.address ? `<div class="store-line">${esc(store.address).replace(/\n/g, '<br>')}</div>` : ''}
+    ${store.phone ? `<div class="store-line">Ph: ${esc(store.phone)}</div>` : ''}
+    ${store.gstNumber ? `<div class="store-line">GSTIN: ${esc(store.gstNumber)}</div>` : ''}
+  </div>`;
+}
+
+function customerHtml(customer: PartyCustomer | null | undefined, title: string): string {
+  if (!customer) return '';
+  return `
+  <div class="parties"><div class="party">
+    <div class="section-title">${title}</div>
+    <div class="party-name">${esc(customer.name || 'Walk-in Customer')}${customer.cardNo ? ` <span class="card-chip">#${esc(customer.cardNo)}</span>` : ''}</div>
+    ${customer.address ? `<div>${esc(customer.address)}</div>` : ''}
+    ${customer.phone ? `<div>Ph: ${esc(customer.phone)}</div>` : ''}
+    ${customer.email ? `<div>${esc(customer.email)}</div>` : ''}
+    ${customer.gstin ? `<div>GSTIN: ${esc(customer.gstin)}</div>` : ''}
+  </div></div>`;
 }
 
 const RECEIPT_CSS = `
@@ -101,15 +104,10 @@ const RECEIPT_CSS = `
     margin: 0 auto;
     padding: 0;
   }
-  .brand-band {
-    background: #7f1d1d;
-    color: #fff;
-    text-align: center;
-    padding: 10px 8px 8px;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-  .store-name { font-size: 14px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; }
+  .store-head { text-align: center; padding: 8px 10px 6px; border-bottom: 2px solid #111; }
+  .store-name { font-size: 16px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; color: #111; }
+  .store-line { font-size: 9px; color: #222; line-height: 1.4; }
+  .card-chip { font-size: 9px; font-weight: 700; color: #1d4ed8; }
   .store-sub  { font-size: 8px; opacity: 0.85; margin-top: 2px; }
   .store-details {
     text-align: center;
@@ -216,7 +214,7 @@ function buildHtml(invoice: PrintInvoice): string {
   const gstApplied = invoice.gstApplied !== false;
 
   const cf = invoice.customer?.customFields;
-  const customerHtml = (cf?.vehicle_no || cf?.re_model) ? `
+  const vehicleHtml = (cf?.vehicle_no || cf?.re_model) ? `
     <div class="billed-to">
       <div class="vehicle-row">
         ${cf.vehicle_no ? `<span class="vehicle-badge">${esc(cf.vehicle_no)}</span>` : ''}
@@ -264,11 +262,9 @@ function buildHtml(invoice: PrintInvoice): string {
   <style>${RECEIPT_CSS}</style>
 </head>
 <body>
-  <div class="brand-band">
-    <div class="store-name">${esc(invoice.store.name)}</div>
-  </div>
+  ${storeHeaderHtml(invoice.store)}
 
-  ${partiesHtml(invoice.store, invoice.customer, 'Billed To')}
+  ${customerHtml(invoice.customer, 'Billed To')}
 
   <div class="meta-box">
     <div>
@@ -281,7 +277,7 @@ function buildHtml(invoice: PrintInvoice): string {
     </div>
   </div>
 
-  ${customerHtml}
+  ${vehicleHtml}
 
   <div class="items-header">
     <span class="col-item">Item</span>
@@ -383,11 +379,9 @@ function buildQuotationHtml(quotation: PrintQuotation): string {
   <style>${RECEIPT_CSS}</style>
 </head>
 <body>
-  <div class="brand-band">
-    <div class="store-name">${esc(quotation.store.name)}</div>
-  </div>
+  ${storeHeaderHtml(quotation.store)}
 
-  ${partiesHtml(quotation.store, quotation.customer, 'Quoted To')}
+  ${customerHtml(quotation.customer, 'Quoted To')}
 
   <div class="meta-box">
     <div>

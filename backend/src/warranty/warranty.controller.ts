@@ -1,4 +1,5 @@
 import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { IsBoolean } from 'class-validator';
 import { WarrantyService } from './warranty.service';
 import { ApproveWarrantyDto } from './dto/approve-warranty.dto';
 import { UpdateWarrantyDto } from './dto/update-warranty.dto';
@@ -18,6 +19,10 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Role, ServiceJobStatus, WarrantyStatus } from '@prisma/client';
 
 const ADMIN_ROLES = [Role.SUPER_ADMIN, Role.STORE_MANAGER];
+
+class SetRemindedDto {
+  @IsBoolean() reminded: boolean;
+}
 
 @Controller('warranty')
 @UseGuards(JwtAuthGuard, ServiceModuleGuard, RolesGuard)
@@ -164,10 +169,23 @@ export class WarrantyController {
   billServiceJob(
     @Param('id') id: string,
     @Body() dto: BillServiceJobDto,
-    @CurrentUser('storeId') storeId: string,
-    @CurrentUser('id') userId: string,
+    @CurrentUser() user: any,
   ) {
-    return this.warrantyService.billServiceJob(id, storeId, userId, dto);
+    return this.warrantyService.billServiceJob(id, user.storeId, user.id, dto, user.role);
+  }
+
+  @Patch('service-jobs/:id/reminded')
+  @Roles(Role.SERVICE_STAFF, ...ADMIN_ROLES)
+  setReminded(@Param('id') id: string, @Body() body: SetRemindedDto, @CurrentUser() user: any) {
+    return this.warrantyService.setReminded(id, user.storeId, user.id, user.role, body.reminded);
+  }
+
+  // One job with everything the Service Bill page needs (customer, parts,
+  // charge) — used when a technician bills a visit from My Service Jobs.
+  @Get('service-jobs/:id')
+  @Roles(Role.SERVICE_STAFF, ...ADMIN_ROLES)
+  getServiceJob(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.warrantyService.getServiceJob(id, user.storeId, user.id, user.role);
   }
 
   @Post('service-jobs/:id/parts')

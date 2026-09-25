@@ -18,7 +18,8 @@
     "prisma:migrate:master": "prisma migrate dev --schema=prisma-master/schema.prisma",
     "prisma:migrate:master:deploy": "prisma migrate deploy --schema=prisma-master/schema.prisma",
     "prisma:seed:admin": "ts-node prisma-master/seed-admin.ts",
-    "prisma:migrate:deploy:all": "npm run prisma:migrate:deploy && npm run prisma:migrate:master:deploy"
+    "prisma:migrate:deploy:all": "npm run prisma:migrate:deploy && npm run prisma:migrate:master:deploy",
+    "prisma:migrate:tenants": "ts-node scripts/migrate-all-tenants.ts"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",

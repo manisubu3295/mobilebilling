@@ -48,7 +48,7 @@ export class UsersController {
   // Name-only list for the Service Bill technician picker — open to billing
   // clerks, who can't see the full staff list above.
   @Get('technicians')
-  @Roles(Role.SUPER_ADMIN, Role.STORE_MANAGER, Role.BILLING_CLERK)
+  @Roles(Role.SUPER_ADMIN, Role.STORE_MANAGER, Role.BILLING_CLERK, Role.SERVICE_STAFF)
   listTechnicians(@CurrentUser('storeId') storeId: string) {
     return this.usersService.listTechnicians(storeId);
   }

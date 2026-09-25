@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Wrench, MapPin, MessageSquare, IndianRupee, CheckCircle2, Phone, MessageCircle, Receipt, Package, Search, X } from 'lucide-react';
 import api from '@/lib/api';
-import { printReceipt } from '@/lib/print-receipt';
 import { localDateString } from '@/lib/local-date';
 
 interface ServiceJobPart {
@@ -29,7 +29,7 @@ interface ServiceJob {
   invoice: { id: string; invoiceNumber: string; billNo?: string | null; totalAmount: string } | null;
   parts: ServiceJobPart[];
   warranty: {
-    customer: { name: string; phone: string; address: string | null };
+    customer: { name: string; phone: string; address: string | null; cardNo?: string | null };
     product: { name: string };
     invoiceItem: { serialUnits?: { serialNumber: string | null }[] } | null;
   };
@@ -74,6 +74,7 @@ export default function MyServiceJobsPage() {
   const [jobs, setJobs] = useState<ServiceJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState<ServiceJob | null>(null);
+  const [query, setQuery] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -87,14 +88,31 @@ export default function MyServiceJobsPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const active = jobs.filter((j) => j.status !== 'COMPLETED' && j.status !== 'CANCELLED');
-  const history = jobs.filter((j) => j.status === 'COMPLETED' || j.status === 'CANCELLED');
+  const q = query.trim().toLowerCase();
+  const matches = (j: ServiceJob) =>
+    !q ||
+    j.warranty.customer.name.toLowerCase().includes(q) ||
+    j.warranty.customer.phone.includes(q) ||
+    (j.warranty.customer.cardNo || '').toLowerCase() === q ||
+    j.warranty.product.name.toLowerCase().includes(q);
+  const shown = jobs.filter(matches);
+  const active = shown.filter((j) => j.status !== 'COMPLETED' && j.status !== 'CANCELLED');
+  const history = shown.filter((j) => j.status === 'COMPLETED' || j.status === 'CANCELLED');
 
   return (
     <div className="h-full flex flex-col bg-gray-50">
       <div className="bg-white border-b px-4 py-4">
         <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2"><Wrench className="h-5 w-5 text-red-700" /> My Service Jobs</h1>
         <p className="text-sm text-gray-500 mt-0.5">{active.length} active</p>
+        <div className="relative mt-3">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search name, phone or card no…"
+            className="w-full border rounded-lg pl-8 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
+          />
+        </div>
       </div>
 
       <div className="flex-1 overflow-auto p-4 space-y-3">
@@ -146,7 +164,10 @@ function JobCard({ job, onClick }: { job: ServiceJob; onClick: () => void }) {
               <span className="ml-2 text-xs font-mono text-gray-400">S/N {job.warranty.invoiceItem?.serialUnits[0].serialNumber}</span>
             )}
           </p>
-          <p className="text-sm text-gray-500">{job.warranty.customer.name} · {job.warranty.customer.phone}</p>
+          <p className="text-sm text-gray-500">
+            {job.warranty.customer.cardNo && <span className="mr-1 font-mono text-xs font-semibold text-blue-700">#{job.warranty.customer.cardNo}</span>}
+            {job.warranty.customer.name} · {job.warranty.customer.phone}
+          </p>
           <ContactRow customer={job.warranty.customer} />
           <p className={`text-xs mt-1.5 ${overdue ? 'text-red-600 font-semibold' : 'text-gray-400'}`}>
             Due {new Date(job.dueDate).toLocaleDateString('en-IN', { dateStyle: 'medium' })}{overdue ? ' · Overdue' : ''}
@@ -176,10 +197,8 @@ function JobDetailSheet({ job, onClose, onSaved }: { job: ServiceJob; onClose: (
   const [customerChargeNotes, setCustomerChargeNotes] = useState(job.customerChargeNotes || '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [billMode, setBillMode] = useState<'CASH' | 'UPI' | 'CREDIT_CARD' | 'DEBIT_CARD' | 'BANK_TRANSFER' | 'EMI'>('CASH');
   const [billing, setBilling] = useState(false);
-  const [billNo, setBillNo] = useState('');
-  const [billCategory, setBillCategory] = useState<'WARRANTY' | 'OUT_OF_WARRANTY' | 'OTHER_SERVICE' | 'IRF' | 'AMC'>('WARRANTY');
+  const router = useRouter();
 
   const [parts, setParts] = useState<ServiceJobPart[]>(job.parts || []);
   const [partQuery, setPartQuery] = useState('');
@@ -245,13 +264,9 @@ function JobDetailSheet({ job, onClose, onSaved }: { job: ServiceJob; onClose: (
       // submits payment info, so without this the technician's notes never
       // reach the server if they go straight to Bill without Save Progress.
       await api.patch(`/warranty/service-jobs/${job.id}/update`, buildPayload());
-      const { data } = await api.patch(`/warranty/service-jobs/${job.id}/bill`, {
-        payments: [{ mode: billMode, amount: billTotal }],
-        billNo: billNo.trim() || undefined,
-        serviceCategory: billCategory,
-      });
-      printReceipt(data);
-      onSaved();
+      // Billing happens on the full Service Bill page (bill no, service
+      // type, TDS, extra lines, charges, payment, print).
+      router.push(`/billing/service-bill?jobId=${job.id}`);
     } catch (e: any) {
       setError(e.response?.data?.message || 'Failed to bill this job');
     } finally {
@@ -418,45 +433,15 @@ function JobDetailSheet({ job, onClose, onSaved }: { job: ServiceJob; onClose: (
                 Billed — {job.invoice.billNo ? `Bill No. ${job.invoice.billNo}` : job.invoice.invoiceNumber} · ₹{parseFloat(job.invoice.totalAmount).toLocaleString('en-IN')}
               </span>
             </div>
-          ) : billTotal > 0 ? (
-            <div className="border rounded-lg p-3 space-y-2 bg-gray-50">
-              <p className="text-xs font-medium text-gray-600">
-                Bill {parts.length > 0 && `${parts.length} part(s)`}{parts.length > 0 && savedChargeAmount > 0 && ' + '}{savedChargeAmount > 0 && 'visit charge'} — ₹{billTotal.toLocaleString('en-IN')} total
-              </p>
-              <div className="flex gap-2">
-                <input
-                  value={billNo}
-                  onChange={(e) => setBillNo(e.target.value)}
-                  placeholder="Bill no (auto)"
-                  className="w-28 border rounded-lg px-2 py-2 text-sm bg-white"
-                />
-                <select value={billCategory} onChange={(e) => setBillCategory(e.target.value as any)} className="flex-1 border rounded-lg px-2 py-2 text-sm bg-white">
-                  <option value="WARRANTY">Warranty</option>
-                  <option value="OUT_OF_WARRANTY">Out of Warranty</option>
-                  <option value="OTHER_SERVICE">Other Service</option>
-                  <option value="IRF">IRF</option>
-                  <option value="AMC">AMC</option>
-                </select>
-              </div>
-              <div className="flex gap-2">
-                <select value={billMode} onChange={(e) => setBillMode(e.target.value as any)} className="flex-1 border rounded-lg px-2 py-2 text-sm bg-white">
-                  <option value="CASH">Cash</option>
-                  <option value="UPI">UPI</option>
-                  <option value="CREDIT_CARD">Credit Card</option>
-                  <option value="DEBIT_CARD">Debit Card</option>
-                  <option value="BANK_TRANSFER">Bank Transfer</option>
-                  <option value="EMI">EMI</option>
-                </select>
-                <button
-                  onClick={handleBill}
-                  disabled={billing}
-                  className="flex items-center gap-1.5 px-3 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50"
-                >
-                  <Receipt className="h-4 w-4" /> {billing ? 'Billing…' : 'Bill'}
-                </button>
-              </div>
-            </div>
-          ) : null}
+          ) : (
+            <button
+              onClick={handleBill}
+              disabled={billing}
+              className="w-full flex items-center justify-center gap-2 py-2.5 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 disabled:opacity-50"
+            >
+              <Receipt className="h-4 w-4" /> {billing ? 'Saving…' : `Bill customer${billTotal > 0 ? ` — ₹${billTotal.toLocaleString('en-IN')}` : ''}`}
+            </button>
+          )}
 
           {!closed ? (
             <div className="flex gap-3 pt-2">

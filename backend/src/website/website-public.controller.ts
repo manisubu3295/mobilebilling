@@ -15,6 +15,11 @@ export class WebsitePublicController {
     return this.websiteService.listPublicProducts(siteKey);
   }
 
+  @Get('products/:id')
+  getProduct(@Param('siteKey') siteKey: string, @Param('id') id: string) {
+    return this.websiteService.getPublicProduct(siteKey, id);
+  }
+
   @Get('categories')
   listCategories(@Param('siteKey') siteKey: string) {
     return this.websiteService.listPublicCategories(siteKey);

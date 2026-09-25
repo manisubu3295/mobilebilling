@@ -7,13 +7,14 @@ interface Invoice {
   billNo?: string | null;
   billType?: 'SALES' | 'SERVICE';
   createdAt: string;
-  store: { name: string; address?: string; phone?: string; gstNumber?: string };
+  store: { name: string; address?: string | null; phone?: string | null; gstNumber?: string | null };
   customer?: {
     name?: string;
     phone?: string;
     email?: string;
     address?: string | null;
     gstin?: string | null;
+    cardNo?: string | null;
     customFields?: Record<string, any>;
   } | null;
   items: Array<{
@@ -64,31 +65,29 @@ export function ThermalReceipt({ invoice }: { invoice: Invoice }) {
       {/* ── On-screen receipt preview ───────────────────────────── */}
       <div className="receipt-card font-sans">
 
-        {/* Header — red brand band */}
-        <div className="receipt-brand-band">
+        {/* Store name + address (dark text so it survives printing without backgrounds) */}
+        <div className="receipt-store-head">
           <div className="receipt-store-name">{invoice.store.name}</div>
+          {invoice.store.address && <div className="receipt-store-line" style={{ whiteSpace: 'pre-line' }}>{invoice.store.address}</div>}
+          {invoice.store.phone && <div className="receipt-store-line">Ph: {invoice.store.phone}</div>}
+          {invoice.store.gstNumber && <div className="receipt-store-line">GSTIN: {invoice.store.gstNumber}</div>}
         </div>
 
-        {/* Shop + customer — both addresses in the header */}
-        <div className="receipt-parties">
-          <div className="receipt-party">
-            <div className="receipt-section-title">FROM</div>
-            <div className="receipt-customer-name">{invoice.store.name}</div>
-            {invoice.store.address && <div className="receipt-customer-detail">{invoice.store.address}</div>}
-            {invoice.store.phone && <div className="receipt-customer-detail">Ph: {invoice.store.phone}</div>}
-            {invoice.store.gstNumber && <div className="receipt-customer-detail">GSTIN: {invoice.store.gstNumber}</div>}
-          </div>
-          {invoice.customer && (
+        {invoice.customer && (
+          <div className="receipt-parties">
             <div className="receipt-party">
               <div className="receipt-section-title">BILLED TO</div>
-              <div className="receipt-customer-name">{invoice.customer.name || 'Walk-in Customer'}</div>
+              <div className="receipt-customer-name">
+                {invoice.customer.name || 'Walk-in Customer'}
+                {invoice.customer.cardNo && <span className="receipt-card-chip"> #{invoice.customer.cardNo}</span>}
+              </div>
               {invoice.customer.address && <div className="receipt-customer-detail">{invoice.customer.address}</div>}
               {invoice.customer.phone && <div className="receipt-customer-detail">Ph: {invoice.customer.phone}</div>}
               {invoice.customer.email && <div className="receipt-customer-detail">{invoice.customer.email}</div>}
               {invoice.customer.gstin && <div className="receipt-customer-detail">GSTIN: {invoice.customer.gstin}</div>}
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Invoice meta row */}
         <div className="receipt-meta-box">
@@ -217,6 +216,20 @@ export function ThermalReceipt({ invoice }: { invoice: Invoice }) {
           max-width: 420px;
           margin: 0 auto;
         }
+        .receipt-store-head {
+          text-align: center;
+          padding: 14px 12px 10px;
+          border-bottom: 2px solid #111;
+        }
+        .receipt-store-name {
+          font-size: 18px;
+          font-weight: 800;
+          letter-spacing: 0.5px;
+          text-transform: uppercase;
+          color: #111;
+        }
+        .receipt-store-line { font-size: 11px; color: #333; line-height: 1.5; }
+        .receipt-card-chip { font-size: 11px; font-weight: 700; color: #1d4ed8; }
         .receipt-brand-band {
           background: #7f1d1d;
           color: #fff;
@@ -445,6 +458,8 @@ export function ThermalReceipt({ invoice }: { invoice: Invoice }) {
             print-color-adjust: exact;
           }
           .receipt-store-name { font-size: 13pt; }
+          .receipt-store-head { padding: 3mm 2mm 2mm; }
+          .receipt-store-line { font-size: 7pt; }
           .receipt-store-sub  { font-size: 7pt; }
           .receipt-store-details { font-size: 7pt; padding: 2mm 3mm; }
           .receipt-meta-box   { padding: 2mm 3mm; }

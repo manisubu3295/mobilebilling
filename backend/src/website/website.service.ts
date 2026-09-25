@@ -60,6 +60,19 @@ export class WebsiteService {
     });
   }
 
+  // One product for the shop's product detail page (active products only),
+  // with its category / sub-category names for the breadcrumb.
+  async getPublicProduct(siteKey: string, id: string) {
+    const account = await this.resolvePublicAccount(siteKey);
+    const tenant = await this.tenantConnections.getClientForAccount(account.id);
+    const product = await tenant.websiteProduct.findFirst({
+      where: { id, isActive: true },
+      include: { categoryRef: { select: { name: true } }, subCategory: { select: { name: true } } },
+    });
+    if (!product) throw new NotFoundException('Product not found');
+    return product;
+  }
+
   // Active category tree for the storefront menu (top level → sub-categories).
   async listPublicCategories(siteKey: string) {
     const account = await this.resolvePublicAccount(siteKey);

@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Wrench, CheckCircle, UserPlus, Plus, CalendarClock, Search, Phone, MessageCircle, MapPin, XCircle, AlertTriangle, Receipt, Pencil, RotateCcw, MessageSquare, Eye, ShieldCheck } from 'lucide-react';
 import api from '@/lib/api';
 import { printReceipt } from '@/lib/print-receipt';
@@ -157,7 +159,7 @@ export default function ServiceAdminPage() {
   const [showCreateJob, setShowCreateJob] = useState(false);
   const [showAmcOnboard, setShowAmcOnboard] = useState(false);
   const [rejecting, setRejecting] = useState<Warranty | null>(null);
-  const [billing, setBilling] = useState<ServiceJob | null>(null);
+  const router = useRouter();
   const [cancellingJob, setCancellingJob] = useState<ServiceJob | null>(null);
   const [editingAmc, setEditingAmc] = useState<Warranty | null>(null);
   const [cardFor, setCardFor] = useState<string | null>(null);
@@ -230,6 +232,7 @@ export default function ServiceAdminPage() {
       return (
         j.warranty.customer.name.toLowerCase().includes(q) ||
         j.warranty.customer.phone.includes(q) ||
+        (j.warranty.customer.cardNo || '').toLowerCase() === q ||
         j.warranty.product.name.toLowerCase().includes(q) ||
         (j.assignedTo?.name.toLowerCase().includes(q) ?? false)
       );
@@ -343,7 +346,10 @@ export default function ServiceAdminPage() {
                         {w.product.name}
                         {serial && <span className="ml-2 text-xs font-mono text-gray-400">S/N {serial}</span>}
                       </p>
-                      <p className="text-sm text-gray-500">{w.customer.name} · {w.customer.phone}</p>
+                      <p className="text-sm text-gray-500">
+                        {w.customer.cardNo && <span className="mr-1 font-mono text-xs font-semibold text-blue-700">#{w.customer.cardNo}</span>}
+                        <Link href={`/customers/${w.customer.id}`} className="hover:underline">{w.customer.name}</Link> · {w.customer.phone}
+                      </p>
                       <ContactLinks customer={w.customer} />
                       <p className="text-xs text-gray-400 mt-1">Sold {new Date(w.startDate).toLocaleDateString('en-IN', { dateStyle: 'medium' })}</p>
                     </div>
@@ -376,7 +382,7 @@ export default function ServiceAdminPage() {
                   type="text"
                   value={jobQuery}
                   onChange={(e) => setJobQuery(e.target.value)}
-                  placeholder="Search by customer, phone, product, or technician…"
+                  placeholder="Search by customer, phone, card no, product, or technician…"
                   className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-red-500"
                 />
               </div>
@@ -435,7 +441,10 @@ export default function ServiceAdminPage() {
                     {j.warranty.product.name}
                     {serial && <span className="ml-2 text-xs font-mono text-gray-400">S/N {serial}</span>}
                   </p>
-                  <p className="text-sm text-gray-500">{j.warranty.customer.name} · {j.warranty.customer.phone}</p>
+                  <p className="text-sm text-gray-500">
+                    {j.warranty.customer.cardNo && <span className="mr-1 font-mono text-xs font-semibold text-blue-700">#{j.warranty.customer.cardNo}</span>}
+                    <Link href={`/customers/${j.warranty.customer.id}`} className="hover:underline">{j.warranty.customer.name}</Link> · {j.warranty.customer.phone}
+                  </p>
                   <ContactLinks customer={j.warranty.customer} />
                   <div className="flex items-center gap-2 mt-1 flex-wrap">
                     <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${JOB_STATUS_STYLE[j.status]}`}>{j.status.replace('_', ' ')}</span>
@@ -470,7 +479,7 @@ export default function ServiceAdminPage() {
                 <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
                   {!j.invoice && jobBillTotal(j) > 0 && (
                     <button
-                      onClick={() => setBilling(j)}
+                      onClick={() => router.push(`/billing/service-bill?jobId=${j.id}`)}
                       className="flex items-center gap-1.5 px-3 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700"
                     >
                       <Receipt className="h-4 w-4" /> <span className="hidden sm:inline">Bill Customer</span>
@@ -595,7 +604,7 @@ export default function ServiceAdminPage() {
                         </p>
                         <p className="text-sm text-gray-500">
                           {w.customer.cardNo && <span className="mr-1 font-mono text-xs font-semibold text-blue-700">#{w.customer.cardNo}</span>}
-                          {w.customer.name} · {w.customer.phone}
+                          <Link href={`/customers/${w.customer.id}`} className="hover:underline">{w.customer.name}</Link> · {w.customer.phone}
                         </p>
                         <div className="flex items-center gap-2 mt-1 flex-wrap">
                           <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${AMC_STATUS_STYLE[w.status]}`}>
@@ -688,13 +697,6 @@ export default function ServiceAdminPage() {
           warranty={rejecting}
           onClose={() => setRejecting(null)}
           onSaved={() => { setRejecting(null); load(); }}
-        />
-      )}
-      {billing && (
-        <BillModal
-          job={billing}
-          onClose={() => setBilling(null)}
-          onSaved={() => { setBilling(null); load(); }}
         />
       )}
       {cancellingJob && (
@@ -916,113 +918,6 @@ function CancelJobModal({ job, onClose, onSaved }: { job: ServiceJob; onClose: (
   );
 }
 
-function BillModal({ job, onClose, onSaved }: { job: ServiceJob; onClose: () => void; onSaved: () => void }) {
-  const [mode, setMode] = useState<'CASH' | 'UPI' | 'CREDIT_CARD' | 'DEBIT_CARD' | 'BANK_TRANSFER' | 'EMI'>('CASH');
-  const [billNo, setBillNo] = useState('');
-  const [category, setCategory] = useState<'WARRANTY' | 'OUT_OF_WARRANTY' | 'OTHER_SERVICE' | 'IRF' | 'AMC'>('WARRANTY');
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-
-  const partsTotal = (job.parts || []).reduce((s, p) => {
-    const line = parseFloat(p.unitPrice) * parseFloat(p.quantity);
-    return s + line + (line * parseFloat(p.taxRate)) / 100;
-  }, 0);
-  const laborCharge = parseFloat(job.customerChargeAmount || '0');
-  const amount = partsTotal + laborCharge;
-
-  const handleBill = async () => {
-    setError('');
-    setSaving(true);
-    try {
-      const { data } = await api.patch(`/warranty/service-jobs/${job.id}/bill`, {
-        payments: [{ mode, amount }],
-        billNo: billNo.trim() || undefined,
-        serviceCategory: category,
-      });
-      printReceipt(data);
-      onSaved();
-    } catch (e: any) {
-      setError(e.response?.data?.message || 'Failed to bill this job');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
-        <div className="flex items-center justify-between p-6 border-b">
-          <h2 className="text-lg font-bold">Bill Customer</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-2xl">&times;</button>
-        </div>
-        <div className="p-6 space-y-3">
-          {error && <p className="text-sm text-red-600 bg-red-50 p-2 rounded">{error}</p>}
-          <p className="text-sm text-gray-600">{job.warranty.product.name} — {job.warranty.customer.name}</p>
-          {job.parts?.length > 0 && (
-            <div className="border rounded-lg divide-y text-sm">
-              {job.parts.map((p) => (
-                <div key={p.id} className="flex justify-between px-3 py-1.5">
-                  <span>{p.sku.product.name} × {p.quantity}</span>
-                  <span>₹{(parseFloat(p.unitPrice) * parseFloat(p.quantity)).toLocaleString('en-IN')}</span>
-                </div>
-              ))}
-              {laborCharge > 0 && (
-                <div className="flex justify-between px-3 py-1.5">
-                  <span>Visit / labor charge</span>
-                  <span>₹{laborCharge.toLocaleString('en-IN')}</span>
-                </div>
-              )}
-            </div>
-          )}
-          <div className="flex justify-between items-baseline border-t pt-3">
-            <span className="text-sm text-gray-500">Total to bill</span>
-            <span className="text-xl font-bold text-gray-900">₹{amount.toLocaleString('en-IN')}</span>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Bill No</label>
-              <input
-                value={billNo}
-                onChange={(e) => setBillNo(e.target.value)}
-                placeholder="Auto"
-                className="w-full border rounded-lg px-3 py-2 text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Service type</label>
-              <select value={category} onChange={(e) => setCategory(e.target.value as any)} className="w-full border rounded-lg px-3 py-2 text-sm">
-                <option value="WARRANTY">Warranty</option>
-                <option value="OUT_OF_WARRANTY">Out of Warranty</option>
-                <option value="OTHER_SERVICE">Other Service</option>
-                <option value="IRF">IRF</option>
-                <option value="AMC">AMC</option>
-              </select>
-            </div>
-          </div>
-          <p className="text-[11px] text-gray-400 -mt-1">Type the paper bill number if the technician already wrote one; otherwise the next number is used.</p>
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Payment Mode</label>
-            <select value={mode} onChange={(e) => setMode(e.target.value as any)} className="w-full border rounded-lg px-3 py-2 text-sm">
-              <option value="CASH">Cash</option>
-              <option value="UPI">UPI</option>
-              <option value="CREDIT_CARD">Credit Card</option>
-              <option value="DEBIT_CARD">Debit Card</option>
-              <option value="BANK_TRANSFER">Bank Transfer</option>
-              <option value="EMI">EMI</option>
-            </select>
-          </div>
-          <p className="text-xs text-gray-400">This creates a service bill and payment record for this visit, and prints it.</p>
-        </div>
-        <div className="flex gap-3 p-6 border-t">
-          <button onClick={onClose} className="flex-1 py-2 border rounded-lg text-sm text-gray-600 hover:bg-gray-50">Cancel</button>
-          <button onClick={handleBill} disabled={saving} className="flex-1 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50">
-            {saving ? 'Billing…' : 'Generate Invoice'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function RejectModal({ warranty, onClose, onSaved }: { warranty: Warranty; onClose: () => void; onSaved: () => void }) {
   const [saving, setSaving] = useState(false);
@@ -1237,6 +1132,7 @@ function CreateJobModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
     return (
       w.customer.name.toLowerCase().includes(q) ||
       w.customer.phone.includes(q) ||
+      (w.customer.cardNo || '').toLowerCase() === q ||
       w.product.name.toLowerCase().includes(q)
     );
   });
@@ -1282,7 +1178,7 @@ function CreateJobModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
                   type="text"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Search by customer name, phone, or product…"
+                  placeholder="Search by customer name, phone, card no, or product…"
                   className="w-full pl-9 pr-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
                 />
               </div>

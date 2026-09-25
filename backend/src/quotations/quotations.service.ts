@@ -177,6 +177,7 @@ export class QuotationsService {
             taxAmount: item.taxAmount,
             lineTotal: item.lineTotal,
             hsnCode: item.sku.product.hsnCode ?? null,
+            costPrice: item.sku.costPrice,
           },
         });
 
