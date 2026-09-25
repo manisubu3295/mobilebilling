@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import api from '@/lib/api';
 import { isInterState } from '@/lib/print-a4';
+import { localDateString } from '@/lib/local-date';
 import { useAuthStore } from '@/store/auth.store';
 
 /* ── Types ─────────────────────────────────────────────────────────────── */
@@ -178,7 +179,13 @@ export default function AccountsPage() {
       // GST tax invoices only — the register filed with the auditor. Non-GST
       // sales and service bills are left out on purpose.
       const { data: rows } = await api.get<GstInvoiceRow[]>('/billing/invoices/export', {
-        params: { from: from.slice(0, 10), to: to.slice(0, 10), type: 'GST' },
+        // Backend reads these as IST calendar dates — send the local date, not
+        // the UTC slice of the ISO range (a day behind before 5:30 AM IST).
+        params: {
+          from: range === 'custom' && customFrom ? customFrom : localDateString(new Date(from)),
+          to: range === 'custom' && customTo ? customTo : localDateString(new Date(to)),
+          type: 'GST',
+        },
       });
       setGstRows(rows.filter((r) => r.status !== 'CANCELLED'));
     } catch {
@@ -297,7 +304,7 @@ export default function AccountsPage() {
     }
   };
 
-  const dateTag = new Date().toISOString().slice(0, 10);
+  const dateTag = localDateString();
   const storeName = user?.store?.name || 'My Store';
 
   const rangeLabel = (() => {

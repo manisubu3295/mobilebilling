@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Wrench, MapPin, MessageSquare, IndianRupee, CheckCircle2, Phone, MessageCircle, Receipt, Package, Search, X } from 'lucide-react';
 import api from '@/lib/api';
 import { printReceipt } from '@/lib/print-receipt';
+import { localDateString } from '@/lib/local-date';
 
 interface ServiceJobPart {
   id: string;
@@ -167,7 +168,7 @@ function JobCard({ job, onClick }: { job: ServiceJob; onClick: () => void }) {
 }
 
 function JobDetailSheet({ job, onClose, onSaved }: { job: ServiceJob; onClose: () => void; onSaved: () => void }) {
-  const [visitDate, setVisitDate] = useState(job.visitDate ? job.visitDate.slice(0, 10) : new Date().toISOString().slice(0, 10));
+  const [visitDate, setVisitDate] = useState(job.visitDate ? job.visitDate.slice(0, 10) : localDateString());
   const [feedback, setFeedback] = useState(job.customerFeedback || '');
   const [staffExpense, setStaffExpense] = useState(job.staffExpenseAmount || '');
   const [staffExpenseNotes, setStaffExpenseNotes] = useState(job.staffExpenseNotes || '');

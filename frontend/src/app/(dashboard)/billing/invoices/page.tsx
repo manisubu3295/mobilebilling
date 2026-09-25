@@ -8,6 +8,7 @@ import {
 import api from '@/lib/api';
 import { printReceipt } from '@/lib/print-receipt';
 import { useAuthStore } from '@/store/auth.store';
+import { localDateString } from '@/lib/local-date';
 
 /* ── Types ───────────────────────────────────────────────────────────── */
 type InvoiceStatus = 'DRAFT' | 'PAID' | 'PARTIALLY_PAID' | 'CANCELLED' | 'RETURNED';
@@ -96,7 +97,7 @@ export default function InvoicesPage() {
 
   /* filters */
   const [search, setSearch]       = useState('');
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateString();
   const [dateFrom, setDateFrom]   = useState(today);
   const [dateTo, setDateTo]       = useState(today);
   const [statusFilter, setStatus] = useState('');

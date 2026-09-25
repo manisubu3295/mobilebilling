@@ -1,3 +1,5 @@
+import { localDateString } from './local-date';
+
 // Inventory export utilities — CSV, Excel, PDF
 
 export interface ExportRow {
@@ -212,5 +214,5 @@ export async function exportPdf(rows: ExportRow[], storeName: string) {
 }
 
 function date() {
-  return new Date().toISOString().slice(0, 10);
+  return localDateString();
 }

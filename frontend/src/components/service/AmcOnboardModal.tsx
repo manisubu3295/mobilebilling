@@ -5,6 +5,7 @@ import { Upload, Download, X, CheckCircle, AlertTriangle, Loader2 } from 'lucide
 import Papa from 'papaparse';
 import api from '@/lib/api';
 import { CustomerSearch } from '@/components/billing/CustomerSearch';
+import { localDateString } from '@/lib/local-date';
 
 interface Props {
   onClose: () => void;
@@ -60,7 +61,7 @@ function SingleEntry({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
   const [customerId, setCustomerId] = useState<string | null>(null);
   const [products, setProducts] = useState<{ id: string; name: string; brand: string | null }[]>([]);
   const [productId, setProductId] = useState('');
-  const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
+  const [startDate, setStartDate] = useState(localDateString());
   const [warrantyMonths, setWarrantyMonths] = useState('12');
   const [frequency, setFrequency] = useState('QUARTERLY');
   const [saving, setSaving] = useState(false);
@@ -102,7 +103,7 @@ function SingleEntry({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
   // with the same customer selected instead of forcing a re-search each time.
   const handleAddAnother = () => {
     setProductId('');
-    setStartDate(new Date().toISOString().slice(0, 10));
+    setStartDate(localDateString());
     setWarrantyMonths('12');
     setFrequency('QUARTERLY');
     setJustSaved(false);
