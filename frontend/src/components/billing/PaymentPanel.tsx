@@ -27,10 +27,18 @@ export function PaymentPanel() {
     setReference('');
   };
 
+  // Records the full remaining balance as a payment in one tap. It used to
+  // only fill the amount box, so a sale could be completed with nothing
+  // actually recorded as paid if "Add Payment" wasn't pressed afterwards.
   const handleExact = () => {
-    const bal = balance();
-    if (bal > 0) setAmount(bal.toFixed(2));
+    const bal = Math.round(balance() * 100) / 100;
+    if (bal <= 0) return;
+    addPayment({ mode, amount: bal, reference: reference || undefined });
+    setAmount('');
+    setReference('');
   };
+
+  const pendingAmount = parseFloat(amount) > 0;
 
   return (
     <div className="bg-white rounded-xl border p-4 space-y-3">
@@ -92,9 +100,10 @@ export function PaymentPanel() {
         <div className="flex gap-2">
           <button
             onClick={handleExact}
-            className="flex-1 py-2 border border-red-300 text-red-700 rounded-lg text-sm hover:bg-red-50"
+            disabled={balance() <= 0}
+            className="flex-1 py-2 border border-red-300 text-red-700 rounded-lg text-sm hover:bg-red-50 disabled:opacity-50"
           >
-            Exact: ₹{Math.max(0, balance()).toFixed(2)}
+            Paid in full: ₹{Math.max(0, balance()).toFixed(2)}
           </button>
           <button
             onClick={handleAdd}
@@ -105,6 +114,11 @@ export function PaymentPanel() {
             <Plus className="h-3.5 w-3.5" /> Add Payment
           </button>
         </div>
+        {pendingAmount && (
+          <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
+            ₹{parseFloat(amount).toFixed(2)} is not recorded yet — tap Add Payment.
+          </p>
+        )}
       </div>
     </div>
   );

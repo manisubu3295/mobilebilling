@@ -217,9 +217,13 @@ export class AuthService {
         secret: process.env.JWT_ACCESS_SECRET,
         expiresIn: '15m',
       }),
+      // jwtid makes every refresh token unique — without it, two logins by
+      // the same user within one second (same iat) signed identical tokens
+      // and the second hit the refresh_tokens.token unique constraint (500).
       this.jwtService.signAsync(payload, {
         secret: process.env.JWT_REFRESH_SECRET,
         expiresIn: '7d',
+        jwtid: uuidv4(),
       }),
     ]);
 
