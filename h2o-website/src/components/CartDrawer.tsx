@@ -3,8 +3,7 @@
 import { useRef, useState } from 'react';
 import { useCartStore } from '@/store/cart.store';
 import { submitLead } from '@/lib/site-api';
-
-const WHATSAPP_NUMBER = '918754816289';
+import { WHATSAPP_NUMBER } from '@/lib/site-contact';
 
 function fmt(v: number) {
   return '₹' + v.toLocaleString('en-IN');
@@ -24,14 +23,14 @@ export function CartDrawer() {
       <div className="absolute inset-0 bg-black/40" onClick={close} />
       <div className="relative w-full max-w-sm bg-white h-full shadow-2xl flex flex-col">
         <div className="flex items-center justify-between px-5 py-4 border-b">
-          <h2 className="font-bold text-lg" style={{ color: 'var(--ink)' }}>Your Cart</h2>
-          <button onClick={close} className="text-2xl leading-none text-gray-400 hover:text-gray-700">&times;</button>
+          <h2 className="font-bold text-lg" style={{ color: 'var(--ink)' }}>Your quote list</h2>
+          <button onClick={close} aria-label="Close" className="text-2xl leading-none text-gray-400 hover:text-gray-700">&times;</button>
         </div>
 
         {items.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center text-gray-400 gap-2 px-6 text-center">
-            <p>Your cart is empty.</p>
-            <p className="text-sm">Add a product to send us an enquiry.</p>
+            <p>Your quote list is empty.</p>
+            <p className="text-sm">Add the systems you're interested in and we'll send you a price.</p>
           </div>
         ) : (
           <>
@@ -48,7 +47,7 @@ export function CartDrawer() {
                     <p className="font-medium text-sm truncate" style={{ color: 'var(--ink)' }}>{item.name}</p>
                     <p className="text-xs text-gray-400">{item.category}</p>
                     <p className="text-sm font-semibold mt-1" style={{ color: 'var(--brand)' }}>
-                      {item.sellingPrice != null ? fmt(item.sellingPrice) : 'Price on enquiry'}
+                      {item.sellingPrice != null ? fmt(item.sellingPrice) : 'Price on request'}
                     </p>
                     <div className="flex items-center gap-2 mt-1.5">
                       <button
@@ -86,7 +85,7 @@ export function CartDrawer() {
                 onClick={() => setShowEnquiry(true)}
                 className="btn btn-primary w-full justify-center"
               >
-                Send Enquiry
+                Ask for a quote
               </button>
             </div>
           </>
@@ -158,17 +157,17 @@ function EnquiryModal({ onClose, onDone }: { onClose: () => void; onDone: () => 
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-3">
           {error && <p className="text-sm text-red-600 bg-red-50 p-2 rounded-lg">{error}</p>}
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" className="w-full border rounded-lg px-3 py-2 text-sm" />
-          <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Phone number" className="w-full border rounded-lg px-3 py-2 text-sm" />
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" aria-label="Your name" className="w-full border rounded-lg px-3 py-2 text-sm" />
+          <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Phone number" aria-label="Phone number" type="tel" className="w-full border rounded-lg px-3 py-2 text-sm" />
           <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email (optional)" className="w-full border rounded-lg px-3 py-2 text-sm" />
           <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Address (optional)" className="w-full border rounded-lg px-3 py-2 text-sm" />
           <textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Anything else we should know? (optional)" rows={2} className="w-full border rounded-lg px-3 py-2 text-sm" />
 
           <button type="button" onClick={handleWhatsApp} disabled={submitting} className="btn btn-primary w-full justify-center disabled:opacity-50">
-            WhatsApp Us
+            Send on WhatsApp
           </button>
           <button type="submit" disabled={submitting} className="btn btn-outline w-full justify-center disabled:opacity-50">
-            {submitting ? 'Sending…' : 'Submit Enquiry'}
+            {submitting ? 'Sending…' : 'Send quote request'}
           </button>
         </form>
       </div>

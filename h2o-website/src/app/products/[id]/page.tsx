@@ -6,8 +6,10 @@ import { useParams } from 'next/navigation';
 import { fetchProduct, fetchProducts, WebsiteProduct } from '@/lib/site-api';
 import { useCartStore } from '@/store/cart.store';
 import { CartDrawer } from '@/components/CartDrawer';
-
-const WHATSAPP = '918754816289';
+import { SiteHeader } from '@/components/SiteHeader';
+import { SiteFooter } from '@/components/SiteFooter';
+import { ShopBar } from '@/components/shop/ShopCatalog';
+import { waLink } from '@/lib/site-contact';
 
 function fmt(v: number) {
   return '₹' + v.toLocaleString('en-IN');
@@ -22,7 +24,6 @@ export default function ProductDetailPage() {
   const [added, setAdded] = useState(false);
   const add = useCartStore((s) => s.add);
   const openCart = useCartStore((s) => s.open);
-  const cartCount = useCartStore((s) => s.items.reduce((n, i) => n + i.qty, 0));
 
   useEffect(() => {
     let cancelled = false;
@@ -42,21 +43,7 @@ export default function ProductDetailPage() {
     return () => { cancelled = true; };
   }, [id]);
 
-  const header = (
-    <header className="sticky top-0 z-40 bg-white border-b" style={{ borderColor: 'var(--border)' }}>
-      <div className="wrap flex items-center justify-between py-3">
-        <Link href="/products" className="text-sm font-medium" style={{ color: 'var(--brand)' }}>← All products</Link>
-        <button onClick={openCart} className="relative flex items-center gap-2 px-4 py-2 rounded-full border text-sm font-medium" style={{ borderColor: 'var(--brand)', color: 'var(--brand)' }}>
-          Cart
-          {cartCount > 0 && (
-            <span className="absolute -top-2 -right-2 w-5 h-5 rounded-full text-white text-xs flex items-center justify-center" style={{ background: 'var(--brand)' }}>
-              {cartCount}
-            </span>
-          )}
-        </button>
-      </div>
-    </header>
-  );
+  const header = <SiteHeader />;
 
   if (state !== 'ready' || !product) {
     return (
@@ -67,6 +54,8 @@ export default function ProductDetailPage() {
             <>This product is no longer listed. <Link href="/products" className="underline">See all products</Link></>
           )}
         </div>
+        <SiteFooter />
+        <ShopBar />
       </div>
     );
   }
@@ -102,7 +91,7 @@ export default function ProductDetailPage() {
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={images[photo]} alt={product.name} className="w-full h-full object-contain" />
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-sm" style={{ color: 'var(--ink-faint)' }}>Photo coming soon</div>
+                <div className="w-full h-full flex items-center justify-center text-sm" style={{ color: 'var(--ink-faint)' }}>Photo on request</div>
               )}
             </div>
             {images.length > 1 && (
@@ -126,15 +115,16 @@ export default function ProductDetailPage() {
           {/* Details */}
           <div className="flex flex-col gap-3">
             {product.brand && (
-              <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--ink-faint)' }}>{product.brand}</span>
+              <span className="text-sm font-semibold" style={{ color: 'var(--ink-faint)' }}>{product.brand}</span>
             )}
             <h1 className="text-2xl font-bold leading-tight" style={{ fontFamily: 'var(--font-sora), sans-serif', color: 'var(--ink)' }}>
               {product.name}
             </h1>
-            {product.capacityLph && (
-              <span className="w-fit text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: 'var(--bg-soft)', color: 'var(--brand)' }}>
-                {product.capacityLph} LPH
-              </span>
+            {product.capacityLph != null && (
+              <p className="p-cap">
+                <span className="p-cap-num">{product.capacityLph}</span>
+                <span className="p-cap-unit">litres per hour</span>
+              </p>
             )}
 
             <div className="mt-1">
@@ -149,7 +139,7 @@ export default function ProductDetailPage() {
                   ) : null}
                 </div>
               ) : (
-                <span className="text-lg" style={{ color: 'var(--ink-muted)' }}>Price on enquiry</span>
+                <span className="text-lg" style={{ color: 'var(--ink-muted)' }}>Price on request</span>
               )}
             </div>
 
@@ -161,10 +151,10 @@ export default function ProductDetailPage() {
                 className="px-6 py-3 rounded-full text-sm font-semibold text-white"
                 style={{ background: 'var(--brand)' }}
               >
-                {added ? 'Added ✓' : 'Add to enquiry'}
+                {added ? 'Added to quote ✓' : 'Add to quote'}
               </button>
               <a
-                href={`https://wa.me/${WHATSAPP}?text=${encodeURIComponent(waText)}`}
+                href={waLink(waText)}
                 target="_blank" rel="noopener noreferrer"
                 className="px-6 py-3 rounded-full text-sm font-semibold border"
                 style={{ borderColor: 'var(--brand)', color: 'var(--brand)' }}
@@ -173,7 +163,7 @@ export default function ProductDetailPage() {
               </a>
             </div>
             {added && (
-              <button onClick={openCart} className="w-fit text-sm underline" style={{ color: 'var(--brand)' }}>View enquiry cart</button>
+              <button onClick={openCart} className="w-fit text-sm underline" style={{ color: 'var(--brand)' }}>View quote list</button>
             )}
 
             {product.specSheetUrl && (
@@ -212,7 +202,7 @@ export default function ProductDetailPage() {
                     </div>
                     <div className="p-3">
                       <p className="text-sm font-semibold leading-snug" style={{ color: 'var(--ink)' }}>{r.name}</p>
-                      <p className="text-sm" style={{ color: 'var(--brand)' }}>{price != null ? fmt(price) : 'Price on enquiry'}</p>
+                      <p className="text-sm" style={{ color: 'var(--brand)' }}>{price != null ? fmt(price) : 'Price on request'}</p>
                     </div>
                   </Link>
                 );
@@ -222,6 +212,8 @@ export default function ProductDetailPage() {
         )}
       </div>
 
+      <SiteFooter />
+      <ShopBar />
       <CartDrawer />
     </div>
   );
