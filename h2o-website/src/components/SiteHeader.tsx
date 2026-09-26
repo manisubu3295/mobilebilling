@@ -19,9 +19,8 @@ const SECTIONS: Array<[string, string]> = [
 ];
 
 // The one site header, used by the home page and the shop pages so they stay
-// identical. On the home page it is frosted glass over the hero and its main
-// button is WhatsApp; elsewhere it is solid navy and the button opens the
-// quote list.
+// identical: solid navy everywhere. Only the main button differs — WhatsApp on
+// the home page, the quote list on shop pages.
 export function SiteHeader({ variant = 'page' }: { variant?: 'home' | 'page' }) {
   const home = variant === 'home';
   const count = useQuoteCount();
@@ -32,7 +31,7 @@ export function SiteHeader({ variant = 'page' }: { variant?: 'home' | 'page' }) 
   ];
 
   return (
-    <header className={home ? 'site' : 'site site--solid'}>
+    <header className="site site--solid">
       <input type="checkbox" id="menu-toggle" className="menu-toggle-input" />
       <div className="wrap site-nav">
         <a href={home ? '#home' : '/'} className="logo">

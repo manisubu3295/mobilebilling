@@ -592,7 +592,7 @@ img { max-width: 100%; }
   section { scroll-margin-top: 70px; }
 
 
-  /* React pages sit on a light background, so the header is solid navy there. */
+  /* Solid navy on every page (home and shop), so the header looks the same everywhere. */
   header.site.site--solid { background: var(--brand-deep); }
 
   /* ── Shop (/products) ───────────────────────────────────────────── */
