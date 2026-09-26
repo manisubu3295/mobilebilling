@@ -775,3 +775,30 @@ img { max-width: 100%; }
   @media (prefers-reduced-motion: reduce) {
     .need, .need::after { transition: none; }
   }
+
+  /* ── Royal blue header + footer ─────────────────────────────────── */
+  /* Header, phone menu and footer share one royal blue. Text on it is full
+     white (white on #4169e1 passes WCAG AA; faded white would not), and links
+     underline on hover because cyan is too close to the blue to read. */
+  :root { --royal: #4169e1; }
+  header.site.site--solid { background: var(--royal); border-bottom-color: rgba(255, 255, 255, 0.22); }
+  header.site .mobile-nav { background: var(--royal); border-top-color: rgba(255, 255, 255, 0.22); }
+  header.site .nav-links a,
+  header.site .staff-login,
+  header.site .nav-phone,
+  header.site .mobile-nav a:not(.btn) { color: #fff; }
+  header.site .staff-login { border-right-color: rgba(255, 255, 255, 0.4); }
+  header.site .mobile-nav a:not(.btn) { border-bottom-color: rgba(255, 255, 255, 0.22); }
+  header.site .nav-links a:hover,
+  header.site .staff-login:hover,
+  header.site .nav-phone:hover { color: #fff; text-decoration: underline; text-underline-offset: 4px; }
+  header.site .menu-toggle { background: rgba(255, 255, 255, 0.14); border-color: rgba(255, 255, 255, 0.4); }
+
+  footer.site { background: var(--royal); }
+  footer.site .footer-row,
+  footer.site .footer-contact a,
+  footer.site .footer-brand a,
+  footer.site .footer-credit,
+  footer.site .footer-credit a { color: #fff; }
+  footer.site .footer-credit { border-top-color: rgba(255, 255, 255, 0.3); }
+  footer.site a:hover { color: #fff; text-decoration: underline; text-underline-offset: 3px; }
