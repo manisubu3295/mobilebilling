@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect } from 'react';
+import { SiteHeader } from '@/components/SiteHeader';
+import { SiteFooter } from '@/components/SiteFooter';
 
 // Ported from the H2O landing page artifact. The markup is static and
 // author-controlled (no user input), so dangerouslySetInnerHTML is the
@@ -24,52 +26,18 @@ export default function Home() {
     }
   }, []);
 
-  return <div dangerouslySetInnerHTML={{ __html: pageHtml }} />;
+  // Header and footer are shared with the shop pages (src/components).
+  return (
+    <>
+      <SiteHeader variant="home" />
+      <div dangerouslySetInnerHTML={{ __html: pageHtml }} />
+      <SiteFooter />
+    </>
+  );
 }
 
 const pageHtml = `
-<header class="site">
-  <input type="checkbox" id="menu-toggle" class="menu-toggle-input" />
-  <div class="wrap site-nav">
-    <a href="#home" class="logo">
-      <img class="logo-mark" src="/images/logo-mark.png" alt="" width="32" height="32" />
-      <span class="logo-word">H2O</span>
-    </a>
-    <nav>
-      <ul class="nav-links">
-        <li><a href="/products">Shop</a></li>
-        <li><a href="#about">About</a></li>
-        <li><a href="#services">Services</a></li>
-        <li><a href="#pricing">Pricing</a></li>
-        <li><a href="#why">Why Us</a></li>
-        <li><a href="#process">Process</a></li>
-        <li><a href="#faq">FAQ</a></li>
-        <li><a href="#contact">Contact</a></li>
-      </ul>
-    </nav>
-    <div class="nav-cta">
-      <a class="staff-login" href="https://billing.h2owaterpurifier.com/login" target="_blank" rel="noopener noreferrer">Staff Login</a>
-      <a class="nav-phone" href="tel:+918754816289">+91 87548 16289</a>
-      <a class="btn btn-primary" href="https://wa.me/918754816289?text=Hi%2C%20I%27d%20like%20to%20book%20a%20free%20water%20test" target="_blank" rel="noopener noreferrer">WhatsApp Us</a>
-      <label for="menu-toggle" class="menu-toggle" aria-label="Toggle menu">
-        <span></span>
-      </label>
-    </div>
-  </div>
-  <nav id="mobile-nav" class="mobile-nav" aria-label="Mobile">
-    <a href="/products">Shop</a>
-    <a href="#about">About</a>
-    <a href="#services">Services</a>
-    <a href="#pricing">Pricing</a>
-    <a href="#why">Why Us</a>
-    <a href="#process">Process</a>
-    <a href="#faq">FAQ</a>
-    <a href="#contact">Contact</a>
-    <a href="https://billing.h2owaterpurifier.com/login" target="_blank" rel="noopener noreferrer">Staff Login</a>
-    <a class="btn btn-primary" href="https://wa.me/918754816289?text=Hi%2C%20I%27d%20like%20to%20book%20a%20free%20water%20test" target="_blank" rel="noopener noreferrer">WhatsApp Us</a>
-    <a class="btn btn-outline" href="tel:+918754816289">Call +91 87548 16289</a>
-  </nav>
-</header>
+
 
 <section id="home" class="hero">
   <div class="hero-bg" aria-hidden="true">
@@ -470,26 +438,7 @@ const pageHtml = `
   </div>
 </section>
 
-<footer class="site">
-  <div class="wrap footer-row">
-    <div class="footer-brand">
-      <span style="display:flex; align-items:center; gap:8px;">
-        <img src="/images/logo-mark.png" alt="" width="22" height="22" style="display:block;" />
-        <span class="logo-word" style="font-family:'Sora',sans-serif; font-weight:800;">H2O Water Care</span>
-      </span>
-      <span>&copy; 2026 H2O Water Care</span>
-      <a href="https://billing.h2owaterpurifier.com/login" target="_blank" rel="noopener noreferrer" style="font-size:12px; text-decoration:none;">Staff Login</a>
-    </div>
-    <div class="footer-contact">
-      <span>No. 38/1077, Bakkiyanathan Street, Thanjavur Main Road, Kumbakonam, Tamil Nadu 612001</span>
-      <a href="tel:+918754816289">+91 87548 16289</a>
-      <span style="font-size:12px;">GSTIN: 33GVQPS8564A1Z2</span>
-    </div>
-  </div>
-  <div class="wrap footer-credit">
-    <span>Website crafted by <a href="https://aadhiraiinnovations.com/" target="_blank" rel="noopener noreferrer">Aadhirai Innovations</a></span>
-  </div>
-</footer>
+
 
 <div class="call-bar">
   <a href="tel:+918754816289">

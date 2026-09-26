@@ -1,51 +1,70 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { useCartStore } from '@/store/cart.store';
-import { PHONE_DISPLAY, PHONE_HREF } from '@/lib/site-contact';
+import { PHONE_DISPLAY, PHONE_HREF, waLink } from '@/lib/site-contact';
 
-const LINKS: Array<[string, string]> = [
-  ['/products', 'Shop'],
-  ['/#services', 'Services'],
-  ['/#pricing', 'Pricing'],
-  ['/#faq', 'FAQ'],
-  ['/#contact', 'Contact'],
+const STAFF_LOGIN = 'https://billing.h2owaterpurifier.com/login';
+const WHATSAPP_TEST = waLink("Hi, I'd like to book a free water test");
+
+// Home page sections; other pages link back to them.
+const SECTIONS: Array<[string, string]> = [
+  ['about', 'About'],
+  ['services', 'Services'],
+  ['pricing', 'Pricing'],
+  ['why', 'Why Us'],
+  ['process', 'Process'],
+  ['faq', 'FAQ'],
+  ['contact', 'Contact'],
 ];
 
-// The home page's header (same classes from globals.css), solid navy, for the
-// React pages, with the quote list in place of the WhatsApp button.
-export function SiteHeader() {
+// The one site header, used by the home page and the shop pages so they stay
+// identical. On the home page it is frosted glass over the hero and its main
+// button is WhatsApp; elsewhere it is solid navy and the button opens the
+// quote list.
+export function SiteHeader({ variant = 'page' }: { variant?: 'home' | 'page' }) {
+  const home = variant === 'home';
   const count = useQuoteCount();
   const openQuote = useCartStore((s) => s.open);
+  const links: Array<[string, string]> = [
+    ['/products', 'Shop'],
+    ...SECTIONS.map(([id, label]) => [home ? `#${id}` : `/#${id}`, label] as [string, string]),
+  ];
 
   return (
-    <header className="site site--solid">
+    <header className={home ? 'site' : 'site site--solid'}>
       <input type="checkbox" id="menu-toggle" className="menu-toggle-input" />
       <div className="wrap site-nav">
-        <Link href="/" className="logo">
+        <a href={home ? '#home' : '/'} className="logo">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img className="logo-mark" src="/images/logo-mark.png" alt="" width={32} height={32} />
           <span className="logo-word">H2O</span>
-        </Link>
-        <nav aria-label="Main">
+        </a>
+        <nav>
           <ul className="nav-links">
-            {LINKS.map(([href, label]) => <li key={href}><Link href={href}>{label}</Link></li>)}
+            {links.map(([href, label]) => <li key={href}><a href={href}>{label}</a></li>)}
           </ul>
         </nav>
         <div className="nav-cta">
+          <a className="staff-login" href={STAFF_LOGIN} target="_blank" rel="noopener noreferrer">Staff Login</a>
           <a className="nav-phone" href={PHONE_HREF}>{PHONE_DISPLAY}</a>
-          <button type="button" onClick={openQuote} className="quote-btn">
-            Quote list
-            {count > 0 && <span className="quote-count" aria-label={`${count} items`}>{count}</span>}
-          </button>
+          {home ? (
+            <a className="btn btn-primary" href={WHATSAPP_TEST} target="_blank" rel="noopener noreferrer">WhatsApp Us</a>
+          ) : (
+            <button type="button" className="btn btn-primary" onClick={openQuote}>
+              Quote list
+              {count > 0 && <span className="quote-count" aria-label={`${count} items`}>{count}</span>}
+            </button>
+          )}
           <label htmlFor="menu-toggle" className="menu-toggle" aria-label="Toggle menu">
             <span />
           </label>
         </div>
       </div>
       <nav id="mobile-nav" className="mobile-nav" aria-label="Mobile">
-        {LINKS.map(([href, label]) => <Link key={href} href={href}>{label}</Link>)}
+        {links.map(([href, label]) => <a key={href} href={href}>{label}</a>)}
+        <a href={STAFF_LOGIN} target="_blank" rel="noopener noreferrer">Staff Login</a>
+        <a className="btn btn-primary" href={WHATSAPP_TEST} target="_blank" rel="noopener noreferrer">WhatsApp Us</a>
         <a className="btn btn-outline" href={PHONE_HREF}>Call {PHONE_DISPLAY}</a>
       </nav>
     </header>

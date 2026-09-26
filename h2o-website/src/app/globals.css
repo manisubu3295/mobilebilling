@@ -137,6 +137,9 @@ img { max-width: 100%; }
     display: flex; align-items: center; justify-content: space-between;
     padding-block: 14px; gap: 16px;
   }
+  /* Links sit right after the logo (not centred in leftover space), so they
+     line up on every page whatever the width of the main button. */
+  .site-nav > nav { margin-right: auto; }
   .logo { display: flex; align-items: center; gap: 9px; text-decoration: none; }
   .logo-word { font-family: var(--font-sora), sans-serif; font-weight: 800; font-size: 20px; letter-spacing: -0.02em; color: var(--on-brand); }
   /* The real logo file (public/images/logo.png) is a vertical lockup — icon,
@@ -161,6 +164,11 @@ img { max-width: 100%; }
   .nav-phone { display: none; font-family: var(--font-mono), monospace; font-weight: 600; font-size: 14px; color: var(--on-brand); text-decoration: none; }
   @media (min-width: 860px) { .nav-phone { display: inline; } }
   @media (max-width: 859px) { .nav-links { display: none; } }
+  /* Laptop widths: keep every label on one line; drop the phone number, then
+     Staff Login (both stay in the menu / footer) before anything wraps. */
+  .nav-links a, .nav-phone, .staff-login, .nav-cta .btn { white-space: nowrap; }
+  @media (max-width: 1220px) { .nav-links { gap: 20px; } .nav-phone { display: none; } }
+  @media (max-width: 1060px) { .nav-links { gap: 16px; } .staff-login { display: none; } }
   .nav-cta .btn-outline {
     background: rgba(255,255,255,0.1); border-color: color-mix(in srgb, var(--on-brand) 45%, transparent); color: var(--on-brand);
   }
@@ -544,6 +552,10 @@ img { max-width: 100%; }
     font-size: 13px; color: color-mix(in srgb, var(--on-brand) 62%, transparent);
   }
   .footer-row .logo-word { font-size: 15px; color: var(--on-brand); }
+  .footer-logo { display: flex; align-items: center; gap: 8px; }
+  .footer-logo img { display: block; }
+  .footer-staff { font-size: 12px; text-decoration: none; }
+  .footer-gst { font-size: 12px; }
   .footer-brand, .footer-contact { display: grid; gap: 6px; }
   .footer-contact { text-align: right; }
   .footer-contact a { color: color-mix(in srgb, var(--on-brand) 62%, transparent); text-decoration: none; }
@@ -586,17 +598,10 @@ img { max-width: 100%; }
   /* ── Shop (/products) ───────────────────────────────────────────── */
   /* Quiet catalogue around one bold element: the need strip, where each
      tile's water line rises with the capacity it stands for. */
-  .quote-btn {
-    position: relative; display: inline-flex; align-items: center; gap: 8px;
-    padding: 9px 16px; border-radius: var(--radius-pill); cursor: pointer;
-    font: 600 14px var(--font-sora), sans-serif; color: var(--on-brand);
-    background: rgba(255,255,255,0.1); border: 1.5px solid color-mix(in srgb, var(--on-brand) 45%, transparent);
-  }
-  .quote-btn:hover { background: var(--on-brand); color: var(--brand-deep); }
   .quote-count {
     min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px;
     display: inline-flex; align-items: center; justify-content: center;
-    background: var(--fresh); color: #04212b; font-size: 12px; font-weight: 700;
+    background: var(--brand-deep); color: var(--on-brand); font-size: 12px; font-weight: 700;
   }
 
   .shop-page :focus-visible { outline: 2.5px solid var(--fresh-glow); outline-offset: 2px; }
@@ -765,7 +770,6 @@ img { max-width: 100%; }
     }
     .shop-bar-quote { border: 1.5px solid color-mix(in srgb, var(--on-brand) 45%, transparent); background: transparent; color: var(--on-brand); }
     .shop-bar-wa { background: var(--fresh); color: #04212b; }
-    .nav-cta .quote-btn { display: none; }
   }
 
   @media (prefers-reduced-motion: reduce) {
