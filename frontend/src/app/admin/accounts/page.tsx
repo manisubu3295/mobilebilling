@@ -85,93 +85,141 @@ export default function AdminAccountsPage() {
             {accounts.length === 0 ? 'No businesses have signed up yet.' : 'No accounts match your search.'}
           </div>
         ) : (
-          <div className="bg-white rounded-xl border overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-gray-500 border-b">
-                  <th className="px-4 py-3 font-medium">Business</th>
-                  <th className="px-4 py-3 font-medium">Owner</th>
-                  <th className="px-4 py-3 font-medium">Email</th>
-                  <th className="px-4 py-3 font-medium">Phone</th>
-                  <th className="px-4 py-3 font-medium">Database</th>
-                  <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 font-medium">License Expiry</th>
-                  <th className="px-4 py-3 font-medium">Service Module</th>
-                  <th className="px-4 py-3 font-medium">Website</th>
-                  <th className="px-4 py-3 font-medium">Site Key</th>
-                  <th className="px-4 py-3 font-medium">Signed Up</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((a) => (
-                  <tr key={a.id} className="border-b last:border-0">
-                    <td className="px-4 py-3">
-                      <p className="font-medium text-gray-900">{a.businessName}</p>
-                      <p className="text-xs text-gray-400 font-mono">{a.id}</p>
-                    </td>
-                    <td className="px-4 py-3 text-gray-700">{a.ownerName}</td>
-                    <td className="px-4 py-3 text-gray-700">{a.email}</td>
-                    <td className="px-4 py-3 text-gray-700">{a.phone}</td>
-                    <td className="px-4 py-3 text-gray-600 font-mono text-xs">{a.tenantDbName}</td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                          a.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-600'
-                        }`}
-                      >
-                        {a.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <input
-                        type="date"
-                        value={a.licenseExpiresAt ? a.licenseExpiresAt.slice(0, 10) : ''}
-                        onChange={(e) =>
-                          updateAccount(a.id, { licenseExpiresAt: e.target.value ? new Date(e.target.value).toISOString() : null })
-                        }
-                        className="border rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-red-500"
-                      />
-                    </td>
-                    <td className="px-4 py-3">
-                      <button
-                        onClick={() => updateAccount(a.id, { serviceModuleEnabled: !a.serviceModuleEnabled })}
-                        className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                          a.serviceModuleEnabled ? 'bg-teal-100 text-teal-700' : 'bg-gray-100 text-gray-500'
-                        }`}
-                      >
-                        {a.serviceModuleEnabled ? 'Enabled' : 'Disabled'}
-                      </button>
-                    </td>
-                    <td className="px-4 py-3">
-                      <button
-                        onClick={() => updateAccount(a.id, { websiteEnabled: !a.websiteEnabled })}
-                        className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                          a.websiteEnabled ? 'bg-teal-100 text-teal-700' : 'bg-gray-100 text-gray-500'
-                        }`}
-                      >
-                        {a.websiteEnabled ? 'Enabled' : 'Disabled'}
-                      </button>
-                    </td>
-                    <td className="px-4 py-3">
-                      <input
-                        type="text"
-                        defaultValue={a.siteKey || ''}
-                        placeholder="e.g. h2o-water-care"
-                        onBlur={(e) => {
-                          const value = e.target.value.trim();
-                          if (value !== (a.siteKey || '')) updateAccount(a.id, { siteKey: value || null });
-                        }}
-                        className="border rounded px-2 py-1 text-xs font-mono w-36 focus:outline-none focus:ring-2 focus:ring-red-500"
-                      />
-                    </td>
-                    <td className="px-4 py-3 text-gray-500">{new Date(a.createdAt).toLocaleString()}</td>
+          <>
+            {/* Phones: one card per business. */}
+            <div className="space-y-3 md:hidden">
+              {filtered.map((a) => (
+                <div key={a.id} className="rounded-xl border bg-white p-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-gray-900">{a.businessName}</p>
+                      <p className="text-sm text-gray-600">{a.ownerName}</p>
+                    </div>
+                    <StatusBadge status={a.status} />
+                  </div>
+                  <div className="mt-1 space-y-0.5 text-sm">
+                    <a href={`mailto:${a.email}`} className="block truncate text-blue-600">{a.email}</a>
+                    <a href={`tel:${a.phone}`} className="block text-blue-600">{a.phone}</a>
+                    <p className="font-mono text-xs text-gray-500">{a.tenantDbName}</p>
+                    <p className="text-xs text-gray-400">Signed up {new Date(a.createdAt).toLocaleDateString()}</p>
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-3 border-t pt-3 text-sm">
+                    <label className="col-span-2 flex items-center justify-between gap-2">
+                      <span className="text-gray-500">License expiry</span>
+                      <ExpiryInput a={a} onChange={updateAccount} />
+                    </label>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-gray-500">Service</span>
+                      <ModuleToggle on={a.serviceModuleEnabled} onClick={() => updateAccount(a.id, { serviceModuleEnabled: !a.serviceModuleEnabled })} />
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-gray-500">Website</span>
+                      <ModuleToggle on={a.websiteEnabled} onClick={() => updateAccount(a.id, { websiteEnabled: !a.websiteEnabled })} />
+                    </div>
+                    <label className="col-span-2 flex items-center justify-between gap-2">
+                      <span className="text-gray-500">Site key</span>
+                      <SiteKeyInput a={a} onChange={updateAccount} />
+                    </label>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Tablets and up: the full table. */}
+            <div className="hidden md:block bg-white rounded-xl border overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-gray-500 border-b">
+                    <th className="px-4 py-3 font-medium">Business</th>
+                    <th className="px-4 py-3 font-medium">Owner</th>
+                    <th className="px-4 py-3 font-medium">Email</th>
+                    <th className="px-4 py-3 font-medium">Phone</th>
+                    <th className="px-4 py-3 font-medium">Database</th>
+                    <th className="px-4 py-3 font-medium">Status</th>
+                    <th className="px-4 py-3 font-medium">License Expiry</th>
+                    <th className="px-4 py-3 font-medium">Service Module</th>
+                    <th className="px-4 py-3 font-medium">Website</th>
+                    <th className="px-4 py-3 font-medium">Site Key</th>
+                    <th className="px-4 py-3 font-medium">Signed Up</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {filtered.map((a) => (
+                    <tr key={a.id} className="border-b last:border-0">
+                      <td className="px-4 py-3">
+                        <p className="font-medium text-gray-900">{a.businessName}</p>
+                        <p className="text-xs text-gray-400 font-mono">{a.id}</p>
+                      </td>
+                      <td className="px-4 py-3 text-gray-700">{a.ownerName}</td>
+                      <td className="px-4 py-3 text-gray-700">{a.email}</td>
+                      <td className="px-4 py-3 text-gray-700">{a.phone}</td>
+                      <td className="px-4 py-3 text-gray-600 font-mono text-xs">{a.tenantDbName}</td>
+                      <td className="px-4 py-3"><StatusBadge status={a.status} /></td>
+                      <td className="px-4 py-3"><ExpiryInput a={a} onChange={updateAccount} /></td>
+                      <td className="px-4 py-3">
+                        <ModuleToggle on={a.serviceModuleEnabled} onClick={() => updateAccount(a.id, { serviceModuleEnabled: !a.serviceModuleEnabled })} />
+                      </td>
+                      <td className="px-4 py-3">
+                        <ModuleToggle on={a.websiteEnabled} onClick={() => updateAccount(a.id, { websiteEnabled: !a.websiteEnabled })} />
+                      </td>
+                      <td className="px-4 py-3"><SiteKeyInput a={a} onChange={updateAccount} /></td>
+                      <td className="px-4 py-3 text-gray-500">{new Date(a.createdAt).toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
     </div>
+  );
+}
+
+type UpdateAccount = (id: string, patch: Partial<PlatformAccount>) => void;
+
+function StatusBadge({ status }: { status: PlatformAccount['status'] }) {
+  return (
+    <span className={`shrink-0 text-xs px-2 py-0.5 rounded-full font-medium ${status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-600'}`}>
+      {status}
+    </span>
+  );
+}
+
+function ModuleToggle({ on, onClick }: { on: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      aria-pressed={on}
+      className={`min-h-[32px] text-xs px-3 rounded-full font-medium ${on ? 'bg-teal-100 text-teal-700' : 'bg-gray-100 text-gray-500'}`}
+    >
+      {on ? 'Enabled' : 'Disabled'}
+    </button>
+  );
+}
+
+function ExpiryInput({ a, onChange }: { a: PlatformAccount; onChange: UpdateAccount }) {
+  return (
+    <input
+      type="date"
+      value={a.licenseExpiresAt ? a.licenseExpiresAt.slice(0, 10) : ''}
+      onChange={(e) => onChange(a.id, { licenseExpiresAt: e.target.value ? new Date(e.target.value).toISOString() : null })}
+      className="border rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-red-500"
+    />
+  );
+}
+
+function SiteKeyInput({ a, onChange }: { a: PlatformAccount; onChange: UpdateAccount }) {
+  return (
+    <input
+      type="text"
+      defaultValue={a.siteKey || ''}
+      placeholder="e.g. h2o-water-care"
+      onBlur={(e) => {
+        const value = e.target.value.trim();
+        if (value !== (a.siteKey || '')) onChange(a.id, { siteKey: value || null });
+      }}
+      className="border rounded px-2 py-1 text-xs font-mono w-36 min-w-0 focus:outline-none focus:ring-2 focus:ring-red-500"
+    />
   );
 }

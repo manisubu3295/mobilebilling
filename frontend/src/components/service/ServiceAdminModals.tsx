@@ -37,8 +37,8 @@ export function FrequencyPicker({ value, months, onChange }: {
   onChange: (value: string, months: string) => void;
 }) {
   return (
-    <div className="flex gap-2">
-      <select value={value} onChange={(e) => onChange(e.target.value, months)} className="flex-1 rounded-lg border bg-white px-3 py-2 text-sm">
+    <div className="flex flex-wrap gap-2">
+      <select value={value} onChange={(e) => onChange(e.target.value, months)} className="min-w-0 flex-1 rounded-lg border bg-white px-3 py-2 text-sm">
         {FREQUENCIES.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
       </select>
       {value === 'CUSTOM' && (

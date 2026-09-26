@@ -87,7 +87,7 @@ function CustomersInner() {
           <h1 className="text-xl font-bold text-gray-900">Customers</h1>
           <p className="text-sm text-gray-500 mt-0.5">{customers.length} records</p>
         </div>
-        <button
+        <button aria-label="Add Customer"
           onClick={() => setShowAdd(true)}
           className="flex items-center gap-2 px-4 py-2 bg-red-700 text-white rounded-lg text-sm font-medium hover:bg-red-800 shrink-0"
         >

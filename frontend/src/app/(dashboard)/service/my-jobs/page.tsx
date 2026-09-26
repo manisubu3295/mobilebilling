@@ -41,12 +41,12 @@ const waHref = (phone: string) => `https://wa.me/91${phone.replace(/\D/g, '').re
 
 function ContactRow({ customer }: { customer: { phone: string; address: string | null } }) {
   return (
-    <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-      <a href={`tel:${customer.phone}`} onClick={(e) => e.stopPropagation()} className="flex items-center gap-1 text-xs text-blue-600 hover:underline">
-        <Phone className="h-3 w-3" /> Call
+    <div className="flex items-center gap-2 mt-2 flex-wrap">
+      <a href={`tel:${customer.phone}`} onClick={(e) => e.stopPropagation()} className="flex min-h-[36px] items-center gap-1.5 rounded-full border border-blue-200 px-3 text-sm font-medium text-blue-700 hover:bg-blue-50">
+        <Phone className="h-4 w-4" /> Call
       </a>
-      <a href={waHref(customer.phone)} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="flex items-center gap-1 text-xs text-green-600 hover:underline">
-        <MessageCircle className="h-3 w-3" /> WhatsApp
+      <a href={waHref(customer.phone)} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="flex min-h-[36px] items-center gap-1.5 rounded-full border border-green-200 px-3 text-sm font-medium text-green-700 hover:bg-green-50">
+        <MessageCircle className="h-4 w-4" /> WhatsApp
       </a>
       {customer.address && (
         <a

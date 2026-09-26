@@ -256,7 +256,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <header className="bg-gray-900 text-white flex items-center gap-3 px-4 py-3 shrink-0 no-print">
           <button
             onClick={() => setSidebarOpen(true)}
-            className="lg:hidden text-gray-400 hover:text-white"
+            aria-label="Open menu"
+            className="lg:hidden -ml-2 flex h-10 w-10 items-center justify-center rounded-lg text-gray-300 hover:bg-gray-800 hover:text-white"
           >
             <Menu className="h-6 w-6" />
           </button>
@@ -311,7 +312,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
             {/* Account — name/role + sign out, top-right corner. */}
             <details className="relative" data-menu>
-              <summary className="list-none cursor-pointer flex items-center gap-2 px-2 py-1.5 rounded-lg text-gray-300 hover:text-white hover:bg-gray-800">
+              <summary aria-label="Account menu" className="list-none cursor-pointer flex items-center gap-2 px-2 py-1.5 rounded-lg text-gray-300 hover:text-white hover:bg-gray-800">
                 <UserCircle className="h-6 w-6" />
                 <span className="text-sm font-medium hidden sm:inline max-w-[10rem] truncate">{user?.name}</span>
               </summary>

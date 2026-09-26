@@ -265,13 +265,13 @@ export default function WebsiteProductsPage() {
           <p className="text-sm text-gray-500 mt-0.5">The catalog shown on the public website's shop — {products.length} products</p>
         </div>
         <div className="flex gap-2 shrink-0">
-          <button
+          <button aria-label="Categories"
             onClick={() => setShowCategories(true)}
             className="flex items-center gap-2 px-3 py-2 border rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
           >
             <FolderTree className="h-4 w-4" /> <span className="hidden sm:inline">Categories</span>
           </button>
-          <button
+          <button aria-label="Add Product"
             onClick={openAdd}
             className="flex items-center gap-2 px-4 py-2 bg-red-700 text-white rounded-lg text-sm font-medium hover:bg-red-800"
           >
@@ -334,13 +334,14 @@ export default function WebsiteProductsPage() {
                         </p>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
-                        <button
+                        <button aria-label="Edit"
                           onClick={() => openEdit(p)}
                           className="flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
                         >
                           <Pencil className="h-4 w-4" /> <span className="hidden sm:inline">Edit</span>
                         </button>
                         <button
+                          aria-label={`Delete ${p.name}`}
                           onClick={() => handleDelete(p.id, p.name)}
                           disabled={deletingId === p.id}
                           className="flex items-center gap-1.5 px-3 py-2 border border-red-200 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"

@@ -60,7 +60,7 @@ export default function UsersPage() {
           <h1 className="text-xl font-bold text-gray-900">User Management</h1>
           <p className="text-sm text-gray-500 mt-0.5">{users.length} users in this store</p>
         </div>
-        <button
+        <button aria-label="Add User"
           onClick={() => setShowAdd(true)}
           className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-red-700 text-white rounded-lg text-sm font-medium hover:bg-red-800"
         >

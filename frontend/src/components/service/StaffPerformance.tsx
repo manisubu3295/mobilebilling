@@ -136,7 +136,7 @@ export function StaffPerformance() {
                         key={b.key}
                         onClick={() => toggle(s.staffId, b.key)}
                         title={b.hint}
-                        className={`p-2 transition-colors ${active ? 'bg-red-50 ring-2 ring-inset ring-red-600' : 'bg-white hover:bg-gray-50'}`}
+                        className={`p-2 transition-colors ${b.key === 'BILLS' ? 'col-span-2 sm:col-span-1' : ''} ${active ? 'bg-red-50 ring-2 ring-inset ring-red-600' : 'bg-white hover:bg-gray-50'}`}
                       >
                         <p className="text-gray-400">{b.label}</p>
                         <p className={`text-base font-bold ${alert ? 'text-red-600' : 'text-gray-800'}`}>{counts[b.key]}</p>

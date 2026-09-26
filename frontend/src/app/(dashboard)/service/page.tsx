@@ -300,6 +300,7 @@ export default function ServiceAdminPage() {
           <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2"><Wrench className="h-5 w-5 text-red-700" /> Service</h1>
           <button
             onClick={() => setShowAmcOnboard(true)}
+            aria-label="Register AMC"
             className="flex items-center gap-2 px-3 py-2 bg-red-700 text-white rounded-lg text-sm font-medium hover:bg-red-800"
           >
             <UserPlus className="h-4 w-4" /> <span className="hidden sm:inline">Register AMC</span>
@@ -397,7 +398,7 @@ export default function ServiceAdminPage() {
                           <p className="text-xs text-gray-400 mt-1">Sold {dateText(w.startDate)}</p>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
-                          <button onClick={() => setRejecting(w)} className="flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm font-medium text-gray-500 hover:bg-gray-50">
+                          <button aria-label="Reject" onClick={() => setRejecting(w)} className="flex items-center gap-1.5 px-3 py-2 border rounded-lg text-sm font-medium text-gray-500 hover:bg-gray-50">
                             <XCircle className="h-4 w-4" /> <span className="hidden sm:inline">Reject</span>
                           </button>
                           <button onClick={() => setApproving(w)} className="px-4 py-2 bg-red-700 text-white rounded-lg text-sm font-medium hover:bg-red-800">Approve</button>

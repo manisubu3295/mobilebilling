@@ -159,7 +159,7 @@ function SingleEntry({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
         )}
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <div>
           <label className="block text-xs font-medium text-gray-600 mb-1">Purchase / Install Date</label>
           <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" />
@@ -168,7 +168,7 @@ function SingleEntry({ onClose, onSaved }: { onClose: () => void; onSaved: () =>
           <label className="block text-xs font-medium text-gray-600 mb-1">AMC Period (months)</label>
           <input type="number" min={1} value={warrantyMonths} onChange={(e) => setWarrantyMonths(e.target.value)} className="w-full border rounded-lg px-3 py-2 text-sm" />
         </div>
-        <div>
+        <div className="col-span-2 sm:col-span-1">
           <label className="block text-xs font-medium text-gray-600 mb-1">Service Frequency</label>
           <FrequencyPicker value={frequency} months={freqMonths} onChange={(v, mo) => { setFrequency(v); setFreqMonths(mo); }} />
         </div>

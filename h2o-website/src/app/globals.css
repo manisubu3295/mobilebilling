@@ -802,3 +802,11 @@ img { max-width: 100%; }
   footer.site .footer-credit a { color: #fff; }
   footer.site .footer-credit { border-top-color: rgba(255, 255, 255, 0.3); }
   footer.site a:hover { color: #fff; text-decoration: underline; text-underline-offset: 3px; }
+
+/* Phones: form fields need 16px text, otherwise iPhone Safari zooms the page
+   in every time one is tapped. (!important so it wins over text-sm etc.) */
+@media (max-width: 767px) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']),
+  select,
+  textarea { font-size: 16px !important; }
+}
