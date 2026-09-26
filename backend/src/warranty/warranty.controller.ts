@@ -85,6 +85,24 @@ export class WarrantyController {
     return this.warrantyService.deleteServiceJob(id, storeId);
   }
 
+  @Get('reports/customers')
+  @Roles(...ADMIN_ROLES)
+  customerServiceReport(
+    @CurrentUser('storeId') storeId: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('search') search?: string,
+    @Query('technicianId') technicianId?: string,
+  ) {
+    const today = new Date().toLocaleDateString('en-CA');
+    return this.warrantyService.customerServiceReport(
+      storeId,
+      new Date((from || today) + 'T00:00:00+05:30'),
+      new Date((to || today) + 'T23:59:59+05:30'),
+      { search, technicianId },
+    );
+  }
+
   @Get('reports/staff')
   @Roles(...ADMIN_ROLES)
   staffReport(@CurrentUser('storeId') storeId: string, @Query('from') from?: string, @Query('to') to?: string) {

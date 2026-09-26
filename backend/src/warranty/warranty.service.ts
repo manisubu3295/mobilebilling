@@ -14,7 +14,7 @@ import { UpdateWarrantyCardDto } from './dto/warranty-card.dto';
 import { Role, ServiceFrequency, ServiceJobStatus, WarrantyStatus, AuditAction, InvoiceStatus, ProductType, NotificationType, BillType, BillSeries, ServiceCategory } from '@prisma/client';
 import { assignBillNo, nextInvoiceNumber } from '../billing/bill-numbers';
 import { assignMissingCardNumbers } from '../customers/card-numbers';
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 
 const ADMIN_ROLES: Role[] = [Role.SUPER_ADMIN, Role.STORE_MANAGER];
@@ -33,6 +33,58 @@ function addFrequency(date: Date, frequency: ServiceFrequency, customMonths?: nu
 }
 
 const OPEN_JOB_STATUSES = [ServiceJobStatus.SCHEDULED, ServiceJobStatus.ASSIGNED, ServiceJobStatus.IN_PROGRESS];
+
+const round2 = (n: number) => Math.round(n * 100) / 100;
+// Due dates are calendar days: a visit is on time / not yet overdue until the
+// end of its due day.
+const endOfDay = (d: Date) => new Date(d.getTime() + 24 * 60 * 60 * 1000 - 1);
+
+// Everything the report drill-downs show about one visit.
+const SERVICE_REPORT_JOB_SELECT = {
+  id: true, assignedToId: true, status: true, dueDate: true, visitDate: true, closedAt: true,
+  isExtra: true, serviceCategory: true, requestNote: true, customerFeedback: true, staffExpenseAmount: true,
+  warranty: {
+    select: {
+      id: true, serviceFrequency: true, frequencyMonths: true,
+      customer: { select: { id: true, name: true, phone: true, cardNo: true, address: true, city: true, landmark: true } },
+      product: { select: { name: true } },
+    },
+  },
+  parts: { select: { quantity: true, sku: { select: { product: { select: { name: true } } } } } },
+  invoice: { select: { id: true, billNo: true, invoiceNumber: true, totalAmount: true, paidAmount: true } },
+} as const;
+
+type ReportJobRow = Prisma.ServiceJobGetPayload<{ select: typeof SERVICE_REPORT_JOB_SELECT }>;
+
+function reportJob(j: ReportJobRow) {
+  return {
+    id: j.id,
+    assignedToId: j.assignedToId,
+    status: j.status,
+    dueDate: j.dueDate,
+    visitDate: j.visitDate,
+    closedAt: j.closedAt,
+    isExtra: j.isExtra,
+    serviceCategory: j.serviceCategory,
+    requestNote: j.requestNote,
+    feedback: j.customerFeedback,
+    expense: Number(j.staffExpenseAmount ?? 0),
+    warrantyId: j.warranty.id,
+    product: j.warranty.product.name,
+    serviceFrequency: j.warranty.serviceFrequency,
+    frequencyMonths: j.warranty.frequencyMonths,
+    customer: j.warranty.customer,
+    parts: j.parts.map((p) => `${p.sku.product.name} x ${Number(p.quantity)}`),
+    bill: j.invoice
+      ? {
+          id: j.invoice.id,
+          billNo: j.invoice.billNo ?? j.invoice.invoiceNumber,
+          total: round2(Number(j.invoice.totalAmount)),
+          due: round2(Math.max(0, Number(j.invoice.totalAmount) - Number(j.invoice.paidAmount))),
+        }
+      : null,
+  };
+}
 
 const warrantyInclude = {
   customer: { select: { id: true, name: true, phone: true, address: true, cardNo: true } },
@@ -1159,32 +1211,39 @@ export class WarrantyService {
   // period), completed and on time, still overdue, service bills raised and
   // billed amount, expenses, requests — and a score out of 100:
   // 40 × on-time % + 30 × completion % + 30 × min(billed ÷ team average, 1).
+  // Per-technician work for a period, with every work item behind each
+  // number so the report can drill down from "10 visits" to the customers and
+  // what each visit needs. A visit belongs to the period when it was due in it
+  // or closed in it; open visits that are already overdue are always listed.
   async staffReport(storeId: string, from: Date, to: Date) {
+    const now = new Date();
     const staff = await this.prisma.user.findMany({
       where: { storeId, role: Role.SERVICE_STAFF },
-      select: { id: true, name: true, isActive: true },
+      select: { id: true, name: true, phone: true, isActive: true },
       orderBy: { name: 'asc' },
     });
-    const now = new Date();
-    const [assigned, completed, overdue, bills, requests] = await Promise.all([
+    const [jobs, bills, requests] = await Promise.all([
       this.prisma.serviceJob.findMany({
-        where: { storeId, assignedToId: { not: null }, dueDate: { gte: from, lte: to }, status: { notIn: [ServiceJobStatus.REQUESTED, ServiceJobStatus.CANCELLED] } },
-        select: { id: true, assignedToId: true },
-      }),
-      this.prisma.serviceJob.findMany({
-        where: { storeId, status: ServiceJobStatus.COMPLETED, closedAt: { gte: from, lte: to } },
-        select: {
-          id: true, assignedToId: true, dueDate: true, closedAt: true, staffExpenseAmount: true, customerFeedback: true,
-          warranty: { select: { customer: { select: { name: true, cardNo: true } }, product: { select: { name: true } } } },
+        where: {
+          storeId,
+          assignedToId: { not: null },
+          status: { notIn: [ServiceJobStatus.REQUESTED, ServiceJobStatus.CANCELLED] },
+          OR: [
+            { dueDate: { gte: from, lte: to } },
+            { status: ServiceJobStatus.COMPLETED, closedAt: { gte: from, lte: to } },
+            { status: { in: OPEN_JOB_STATUSES }, dueDate: { lt: now } },
+          ],
         },
-      }),
-      this.prisma.serviceJob.findMany({
-        where: { storeId, status: { in: OPEN_JOB_STATUSES }, dueDate: { lt: now, gte: from }, assignedToId: { not: null } },
-        select: { assignedToId: true },
+        orderBy: { dueDate: 'asc' },
+        select: SERVICE_REPORT_JOB_SELECT,
       }),
       this.prisma.invoice.findMany({
         where: { storeId, billType: 'SERVICE', technicianId: { not: null }, createdAt: { gte: from, lte: to }, status: { not: 'CANCELLED' } },
-        select: { technicianId: true, totalAmount: true },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true, billNo: true, invoiceNumber: true, createdAt: true, totalAmount: true, paidAmount: true, technicianId: true,
+          customer: { select: { id: true, name: true, phone: true, cardNo: true } },
+        },
       }),
       this.prisma.serviceJob.findMany({
         where: { storeId, requestedById: { not: null }, createdAt: { gte: from, lte: to } },
@@ -1192,29 +1251,44 @@ export class WarrantyService {
       }),
     ]);
 
-    const endOfDay = (d: Date) => new Date(d.getTime() + 24 * 60 * 60 * 1000 - 1);
+    const items = jobs.map((j) => {
+      const dueInPeriod = j.dueDate >= from && j.dueDate <= to;
+      const done = j.status === ServiceJobStatus.COMPLETED && !!j.closedAt && j.closedAt >= from && j.closedAt <= to;
+      const open = (OPEN_JOB_STATUSES as ServiceJobStatus[]).includes(j.status);
+      return {
+        ...reportJob(j),
+        flags: {
+          inPeriod: dueInPeriod || done,
+          todo: open && dueInPeriod,
+          done,
+          onTime: done && j.closedAt! <= endOfDay(j.dueDate),
+          overdue: open && endOfDay(j.dueDate) < now,
+        },
+      };
+    });
+
     const rows = staff.map((u) => {
-      const done = completed.filter((j) => j.assignedToId === u.id);
-      const onTime = done.filter((j) => j.closedAt! <= endOfDay(j.dueDate)).length;
+      const mine = items.filter((j) => j.assignedToId === u.id);
       const myBills = bills.filter((b) => b.technicianId === u.id);
+      const done = mine.filter((j) => j.flags.done);
       return {
         staffId: u.id,
         name: u.name,
+        phone: u.phone,
         isActive: u.isActive,
-        // Work in the period: visits due in it plus any closed in it (a late
-        // visit closed this month still counts), so completed <= assigned.
-        assigned: new Set([...assigned.filter((j) => j.assignedToId === u.id).map((j) => j.id), ...done.map((j) => j.id)]).size,
+        assigned: mine.filter((j) => j.flags.inPeriod).length,
+        todo: mine.filter((j) => j.flags.todo).length,
         completed: done.length,
-        onTime,
-        overdueOpen: overdue.filter((j) => j.assignedToId === u.id).length,
+        onTime: done.filter((j) => j.flags.onTime).length,
+        overdueOpen: mine.filter((j) => j.flags.overdue).length,
         billsCount: myBills.length,
-        billed: Math.round(myBills.reduce((s, b) => s + Number(b.totalAmount), 0) * 100) / 100,
-        expenses: Math.round(done.reduce((s, j) => s + Number(j.staffExpenseAmount ?? 0), 0) * 100) / 100,
+        billed: round2(myBills.reduce((s, b) => s + Number(b.totalAmount), 0)),
+        expenses: round2(done.reduce((s, j) => s + j.expense, 0)),
         requests: requests.filter((r) => r.requestedById === u.id).length,
-        visits: done.map((j) => ({
-          id: j.id, dueDate: j.dueDate, closedAt: j.closedAt, onTime: j.closedAt! <= endOfDay(j.dueDate),
-          customer: j.warranty.customer.name, cardNo: j.warranty.customer.cardNo, product: j.warranty.product.name,
-          feedback: j.customerFeedback,
+        jobs: mine,
+        bills: myBills.map((b) => ({
+          id: b.id, billNo: b.billNo ?? b.invoiceNumber, date: b.createdAt, customer: b.customer,
+          total: round2(Number(b.totalAmount)), due: round2(Math.max(0, Number(b.totalAmount) - Number(b.paidAmount))),
         })),
       };
     });
@@ -1224,13 +1298,100 @@ export class WarrantyService {
     const scored = rows.map((r) => {
       const onTimePct = r.completed ? r.onTime / r.completed : 0;
       const completionPct = r.assigned ? Math.min(r.completed / r.assigned, 1) : r.completed ? 1 : 0;
-      // Nobody billed anything in the period → billing doesn't count against anyone.
+      // Nobody billed anything in the period -> billing doesn't count against anyone.
       const billingRatio = teamAvgBilled > 0 ? Math.min(r.billed / teamAvgBilled, 1) : 1;
       const hasWork = r.assigned > 0 || r.completed > 0;
       const score = hasWork ? Math.round(40 * onTimePct + 30 * completionPct + 30 * billingRatio) : null;
       return { ...r, onTimePct: Math.round(onTimePct * 100), completionPct: Math.round(completionPct * 100), billingPct: Math.round(billingRatio * 100), score };
     });
-    return { from, to, teamAvgBilled: Math.round(teamAvgBilled * 100) / 100, staff: scored.sort((a, b) => (b.score ?? -1) - (a.score ?? -1)) };
+    return { from, to, teamAvgBilled: round2(teamAvgBilled), staff: scored.sort((a, b) => (b.score ?? -1) - (a.score ?? -1)) };
+  }
+
+  // Customer-level service view: one row per customer with an AMC or service
+  // bill - their AMCs, next visit and who is on it, overdue visits, visits in
+  // the period, technicians involved and money still due.
+  async customerServiceReport(storeId: string, from: Date, to: Date, opts: { search?: string; technicianId?: string } = {}) {
+    const now = new Date();
+    const search = opts.search?.trim();
+    const customers = await this.prisma.customer.findMany({
+      where: {
+        AND: [
+          { OR: [{ warranties: { some: { storeId } } }, { invoices: { some: { storeId, billType: 'SERVICE' } } }] },
+          ...(search
+            ? [{ OR: [
+                { name: { contains: search, mode: 'insensitive' as const } },
+                { phone: { contains: search } },
+                { cardNo: { contains: search } },
+              ] }]
+            : []),
+        ],
+      },
+      select: { id: true, name: true, phone: true, cardNo: true, address: true, city: true },
+      orderBy: { name: 'asc' },
+      take: 500,
+    });
+    const ids = customers.map((c) => c.id);
+    const [warranties, invoices] = await Promise.all([
+      this.prisma.warranty.findMany({
+        where: { storeId, customerId: { in: ids } },
+        select: {
+          id: true, customerId: true, status: true, product: { select: { name: true } },
+          serviceJobs: {
+            where: { status: { notIn: [ServiceJobStatus.REQUESTED, ServiceJobStatus.CANCELLED] } },
+            select: { id: true, status: true, dueDate: true, closedAt: true, assignedTo: { select: { id: true, name: true } } },
+          },
+        },
+      }),
+      this.prisma.invoice.findMany({
+        where: { storeId, customerId: { in: ids }, status: { not: 'CANCELLED' } },
+        select: { customerId: true, totalAmount: true, paidAmount: true },
+      }),
+    ]);
+
+    const rows = customers.map((c) => {
+      const amcs = warranties.filter((w) => w.customerId === c.id);
+      const jobs = amcs.flatMap((w) => w.serviceJobs.map((j) => ({ ...j, product: w.product.name })));
+      const open = jobs.filter((j) => (OPEN_JOB_STATUSES as ServiceJobStatus[]).includes(j.status)).sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime());
+      const done = jobs.filter((j) => j.status === ServiceJobStatus.COMPLETED && j.closedAt);
+      const inPeriod = done.filter((j) => j.closedAt! >= from && j.closedAt! <= to);
+      const techs = new Map<string, string>();
+      for (const j of [...open, ...inPeriod]) if (j.assignedTo) techs.set(j.assignedTo.id, j.assignedTo.name);
+      const bills = invoices.filter((i) => i.customerId === c.id);
+      const next = open[0];
+      return {
+        customer: c,
+        amcs: amcs.map((w) => ({ id: w.id, product: w.product.name, status: w.status })),
+        activeAmcs: amcs.filter((w) => w.status === WarrantyStatus.ACTIVE).length,
+        nextVisit: next
+          ? { id: next.id, dueDate: next.dueDate, status: next.status, product: next.product, technician: next.assignedTo?.name ?? null, overdue: endOfDay(next.dueDate) < now }
+          : null,
+        openVisits: open.length,
+        overdueVisits: open.filter((j) => endOfDay(j.dueDate) < now).length,
+        unassignedVisits: open.filter((j) => !j.assignedTo).length,
+        visitsInPeriod: inPeriod.length,
+        lastVisit: done.reduce<Date | null>((m, j) => (!m || j.closedAt! > m ? j.closedAt! : m), null),
+        technicians: Array.from(techs, ([id, name]) => ({ id, name })),
+        totalBusiness: round2(bills.reduce((s, i) => s + Number(i.totalAmount), 0)),
+        outstanding: round2(bills.reduce((s, i) => s + Math.max(0, Number(i.totalAmount) - Number(i.paidAmount)), 0)),
+      };
+    });
+
+    const filtered = opts.technicianId ? rows.filter((r) => r.technicians.some((t) => t.id === opts.technicianId)) : rows;
+    filtered.sort((a, b) =>
+      b.overdueVisits - a.overdueVisits
+      || (a.nextVisit?.dueDate.getTime() ?? Infinity) - (b.nextVisit?.dueDate.getTime() ?? Infinity)
+      || a.customer.name.localeCompare(b.customer.name));
+    return {
+      from, to,
+      totals: {
+        customers: filtered.length,
+        overdue: filtered.filter((r) => r.overdueVisits > 0).length,
+        unassigned: filtered.filter((r) => r.unassignedVisits > 0).length,
+        withDue: filtered.filter((r) => r.outstanding > 0).length,
+        outstanding: round2(filtered.reduce((s, r) => s + r.outstanding, 0)),
+      },
+      customers: filtered,
+    };
   }
 
   async nearingDue(storeId: string, role: Role, userId: string, daysAhead?: number, range?: { from?: string; until?: string }) {

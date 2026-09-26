@@ -217,7 +217,30 @@ export class CustomersService {
         id: w.id, product: w.product.name, status: w.status, startDate: w.startDate,
         warrantyPeriodMonths: w.warrantyPeriodMonths, serviceFrequency: w.serviceFrequency, frequencyMonths: w.frequencyMonths,
         amcFrom: w.amcFrom, amcTo: w.amcTo, nextServiceDueAt: w.nextServiceDueAt,
+        // Every visit on this AMC, newest first, for the service drill-downs.
+        visits: w.serviceJobs.map((j) => ({
+          id: j.id, status: j.status, dueDate: j.dueDate, visitDate: j.visitDate, closedAt: j.closedAt,
+          isExtra: j.isExtra, serviceCategory: j.serviceCategory, technician: j.assignedTo?.name ?? null,
+          feedback: j.customerFeedback, requestNote: j.requestNote,
+          parts: j.parts.map((p) => `${p.sku.product.name} x ${num(p.quantity)}`),
+          bill: j.invoice ? { id: j.invoice.id, billNo: j.invoice.billNo, total: round(num(j.invoice.totalAmount)) } : null,
+        })),
       })),
+      // What the customer bought (sales bills), line by line.
+      itemsSold: sales.flatMap((inv) => inv.items.map((it) => ({
+        invoiceId: inv.id, billNo: inv.billNo ?? inv.invoiceNumber, date: inv.createdAt,
+        name: it.description || it.sku.product.name + (it.sku.variantName ? ` (${it.sku.variantName})` : ''),
+        qty: num(it.quantity) - num(it.returnedQty),
+        amount: round(num(it.lineTotal)),
+      }))),
+      // Bills with money still to collect, oldest first.
+      dues: live
+        .filter((i) => num(i.totalAmount) - num(i.paidAmount) > 0.005)
+        .sort((x, y) => x.createdAt.getTime() - y.createdAt.getTime())
+        .map((i) => ({
+          invoiceId: i.id, billNo: i.billNo ?? i.invoiceNumber, billType: i.billType, date: i.createdAt,
+          total: round(num(i.totalAmount)), paid: round(num(i.paidAmount)), due: round(num(i.totalAmount) - num(i.paidAmount)),
+        })),
       timeline,
     };
   }

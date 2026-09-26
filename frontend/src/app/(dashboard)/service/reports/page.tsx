@@ -1,11 +1,12 @@
 'use client';
 
 import React, { useCallback, useEffect, useState } from 'react';
-import { BarChart2, Wallet, IndianRupee, TrendingDown, FileDown, FileSpreadsheet, FileText } from 'lucide-react';
+import { BarChart2, Users, Wallet, IndianRupee, TrendingDown, FileDown, FileSpreadsheet, FileText } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import api from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
 import { StaffPerformance } from '@/components/service/StaffPerformance';
+import { CustomerServiceReport } from '@/components/service/CustomerServiceReport';
 
 interface Report {
   totals: { expense: number; charge: number; net: number; jobCount: number };
@@ -26,13 +27,13 @@ const RANGES = [
   { label: 'Custom', id: 'custom' },
 ] as const;
 
-// Service Reports: staff performance (default) and the money in / out report.
+// Service Reports: staff performance (default), customers, and money in / out.
 export default function ServiceReportsPage() {
-  const [view, setView] = useState<'staff' | 'money'>('staff');
+  const [view, setView] = useState<'staff' | 'customers' | 'money'>('staff');
   return (
     <div className="h-full flex flex-col bg-gray-50">
       <div className="flex gap-1 border-b bg-white px-4 pt-3 sm:px-6">
-        {([['staff', 'Staff performance'], ['money', 'Money in / out']] as const).map(([k, l]) => (
+        {([['staff', 'Staff performance'], ['customers', 'Customers'], ['money', 'Money in / out']] as const).map(([k, l]) => (
           <button
             key={k}
             onClick={() => setView(k)}
@@ -45,6 +46,11 @@ export default function ServiceReportsPage() {
       <div className="min-h-0 flex-1">
         {view === 'money' ? (
           <MoneyReport />
+        ) : view === 'customers' ? (
+          <div className="h-full overflow-auto p-4 sm:p-6">
+            <h1 className="mb-3 flex items-center gap-2 text-xl font-bold text-gray-900"><Users className="h-5 w-5 text-red-700" /> Customers</h1>
+            <CustomerServiceReport />
+          </div>
         ) : (
           <div className="h-full overflow-auto p-4 sm:p-6">
             <h1 className="mb-3 flex items-center gap-2 text-xl font-bold text-gray-900"><BarChart2 className="h-5 w-5 text-red-700" /> Staff performance</h1>
